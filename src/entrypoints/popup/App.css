@@ -1,0 +1,129 @@
+:root {
+  color-scheme: light dark;
+  --ca-bg: #ffffff;
+  --ca-fg: #1a1a1a;
+  --ca-border: #d0d0d0;
+  --ca-accent: #2f6fed;
+  --ca-accent-fg: #ffffff;
+  --ca-muted: #5a5a5a;
+  --ca-danger-bg: #fdeceb;
+  --ca-danger-fg: #7a1f1f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ca-bg: #1e1f22;
+    --ca-fg: #f1f1f1;
+    --ca-border: #44464a;
+    --ca-muted: #b8b8b8;
+    --ca-danger-bg: #3a2222;
+    --ca-danger-fg: #ffb4b4;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ca-bg);
+  color: var(--ca-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+}
+
+.popup {
+  width: 280px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.popup__header h1 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.popup__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.popup__label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+select,
+input[type='range'],
+button {
+  font: inherit;
+  color: inherit;
+}
+
+select {
+  padding: 6px 8px;
+  border: 1px solid var(--ca-border);
+  border-radius: 6px;
+  background: var(--ca-bg);
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--ca-border);
+  background: var(--ca-bg);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ca-accent);
+  outline-offset: 2px;
+}
+
+.popup__toggle {
+  align-self: flex-start;
+  min-width: 72px;
+  font-weight: 700;
+}
+
+.popup__toggle--on {
+  background: var(--ca-accent);
+  color: var(--ca-accent-fg);
+  border-color: var(--ca-accent);
+}
+
+.popup__result {
+  margin: 0;
+  color: var(--ca-muted);
+}
+
+.popup__error {
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--ca-danger-bg);
+  color: var(--ca-danger-fg);
+}
+
+.popup__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.popup__link-button {
+  border: none;
+  background: none;
+  color: var(--ca-accent);
+  padding: 4px;
+  text-decoration: underline;
+}

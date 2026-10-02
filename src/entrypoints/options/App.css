@@ -1,0 +1,138 @@
+:root {
+  color-scheme: light dark;
+  --ca-bg: #ffffff;
+  --ca-fg: #1a1a1a;
+  --ca-border: #d8d8d8;
+  --ca-accent: #2f6fed;
+  --ca-muted: #5a5a5a;
+  --ca-surface: #f6f7f9;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ca-bg: #18191b;
+    --ca-fg: #f1f1f1;
+    --ca-border: #3b3d41;
+    --ca-muted: #b8b8b8;
+    --ca-surface: #212326;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ca-bg);
+  color: var(--ca-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+.options {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.options h1 {
+  font-size: 22px;
+  margin: 0;
+}
+
+.options__section {
+  background: var(--ca-surface);
+  border: 1px solid var(--ca-border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.options__section h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.options__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.options__checkbox--planned {
+  color: var(--ca-muted);
+}
+
+.options__badge {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--ca-border);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.options__hint {
+  margin: 0;
+  color: var(--ca-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.options__site-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.options__site-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--ca-border);
+  border-radius: 8px;
+}
+
+select,
+input[type='range'],
+button {
+  font: inherit;
+  color: inherit;
+}
+
+select {
+  padding: 6px 8px;
+  border: 1px solid var(--ca-border);
+  border-radius: 6px;
+  background: var(--ca-bg);
+  width: fit-content;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--ca-border);
+  background: var(--ca-bg);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--ca-accent);
+  outline-offset: 2px;
+}

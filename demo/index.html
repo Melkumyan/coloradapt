@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ColorAdapt Demo Page</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 16px;
+        color: #222;
+        background: #fff;
+      }
+      section {
+        margin-bottom: 32px;
+      }
+      h2 {
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 4px;
+      }
+      .status-ok {
+        color: #2e8b2e;
+        font-weight: bold;
+      }
+      .status-error {
+        color: #d13b3b;
+        font-weight: bold;
+      }
+      .low-contrast {
+        color: #aaaaaa;
+        background: #ffffff;
+      }
+      .very-low-contrast {
+        color: #f0f0f0;
+        background: #ffffff;
+      }
+      .btn {
+        display: inline-block;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: none;
+        color: white;
+        font-weight: 600;
+        margin-right: 8px;
+      }
+      .btn-success {
+        background: #2e8b2e;
+      }
+      .btn-danger {
+        background: #d13b3b;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        color: white;
+        margin-right: 6px;
+      }
+      .badge-buy {
+        background: #2e8b2e;
+      }
+      .badge-sell {
+        background: #d13b3b;
+      }
+      .alert {
+        padding: 10px 14px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+      }
+      .alert-success {
+        background: #e6f4e6;
+        color: #2e8b2e;
+      }
+      .alert-danger {
+        background: #fbe9e9;
+        color: #d13b3b;
+      }
+      a {
+        color: #6b6bd6;
+      }
+      .transparent-stack {
+        background: rgb(20, 60, 120);
+        padding: 16px;
+      }
+      .transparent-stack__mid {
+        background: rgba(255, 255, 255, 0.4);
+        padding: 16px;
+      }
+      .transparent-stack__inner {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 12px;
+        color: white;
+      }
+      .semi-opacity {
+        opacity: 0.5;
+      }
+      .gradient-bg {
+        background-image: linear-gradient(90deg, #ff7e5f, #feb47b);
+        color: white;
+        padding: 12px;
+        border-radius: 6px;
+      }
+      .image-bg {
+        background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23808080"/></svg>');
+        color: white;
+        padding: 12px;
+        border-radius: 6px;
+      }
+      .mixed-bg {
+        background-image:
+          linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)),
+          url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="%23808080"/></svg>');
+        color: white;
+        padding: 12px;
+        border-radius: 6px;
+      }
+      .bordered {
+        border: 2px solid #d13b3b;
+        border-radius: 4px;
+        padding: 8px 12px;
+        display: inline-block;
+      }
+      .mixed-border {
+        border-top: 3px solid #2e8b2e;
+        border-bottom: 3px solid #d13b3b;
+        border-left: 1px solid #ccc;
+        padding: 8px 12px;
+        display: inline-block;
+      }
+      fieldset {
+        margin-bottom: 8px;
+      }
+      .deep-nest {
+        padding: 2px;
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ColorAdapt Demo Page</h1>
+    <p>
+      A small fixture page for manually exercising ColorAdapt during development. Load the
+      extension, open this page, and click "Analyse page" in the popup.
+    </p>
+
+    <section>
+      <h2>Red / green statuses</h2>
+      <p><span class="status-ok">● Operational</span></p>
+      <p><span class="status-error">● Down</span></p>
+    </section>
+
+    <section>
+      <h2>Low contrast text</h2>
+      <p class="low-contrast">This text has borderline contrast against its background.</p>
+      <p class="very-low-contrast">
+        This text has very low contrast and should be flagged as critical.
+      </p>
+    </section>
+
+    <section>
+      <h2>Buttons</h2>
+      <button class="btn btn-success" type="button">Approve</button>
+      <button class="btn btn-danger" type="button">Reject</button>
+    </section>
+
+    <section>
+      <h2>Links</h2>
+      <p><a href="#">A regular link inside a paragraph of text.</a></p>
+    </section>
+
+    <section>
+      <h2>Badges (buy/sell)</h2>
+      <span class="badge badge-buy">BUY</span>
+      <span class="badge badge-sell">SELL</span>
+    </section>
+
+    <section>
+      <h2>Alerts</h2>
+      <div class="alert alert-success">Your changes were saved successfully.</div>
+      <div class="alert alert-danger">Something went wrong. Please try again.</div>
+    </section>
+
+    <section>
+      <h2>SVG icons</h2>
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-label="success icon" role="img">
+        <circle cx="16" cy="16" r="14" fill="#2e8b2e" />
+      </svg>
+      <svg width="32" height="32" viewBox="0 0 32 32" aria-label="error icon" role="img">
+        <circle cx="16" cy="16" r="14" fill="#d13b3b" />
+      </svg>
+    </section>
+
+    <section>
+      <h2>Nested transparent layers</h2>
+      <p>
+        Each layer below is semi-transparent; the innermost text's effective background should be
+        the composite of all three, not just "transparent".
+      </p>
+      <div class="transparent-stack">
+        <div class="transparent-stack__mid">
+          <div class="transparent-stack__inner">
+            <p>Text over three composited transparent/semi-transparent layers.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Element opacity vs. color alpha</h2>
+      <p>
+        <span class="semi-opacity"
+          >This whole element has <code>opacity: 0.5</code> — different from setting alpha directly
+          on its color.</span
+        >
+      </p>
+    </section>
+
+    <section>
+      <h2>Gradient &amp; image backgrounds (should be classified, not guessed)</h2>
+      <p class="gradient-bg">Text over a linear-gradient background.</p>
+      <p class="image-bg">Text over a background-image (tiled SVG data URI).</p>
+      <p class="mixed-bg">Text over a gradient layered with a background-image.</p>
+    </section>
+
+    <section>
+      <h2>Borders</h2>
+      <span class="bordered">Uniform red border</span>
+      <span class="mixed-border">Mixed per-side border colors</span>
+    </section>
+
+    <section>
+      <h2>Inputs &amp; form controls</h2>
+      <p>
+        <label for="demo-text">Text input:</label>
+        <input id="demo-text" type="text" placeholder="Type here…" />
+      </p>
+      <p>
+        <label for="demo-select">Select:</label>
+        <select id="demo-select">
+          <option>One</option>
+          <option>Two</option>
+        </select>
+      </p>
+      <p>
+        <label for="demo-textarea">Textarea:</label>
+        <textarea id="demo-textarea" placeholder="Notes…"></textarea>
+      </p>
+      <fieldset>
+        <legend>Disabled controls</legend>
+        <input type="text" value="Disabled input" disabled />
+        <button type="button" disabled>Disabled button</button>
+      </fieldset>
+    </section>
+
+    <section>
+      <h2>Deep nesting</h2>
+      <p>20 levels of transparent wrappers around one line of text.</p>
+      <div class="deep-nest">
+        <div class="deep-nest">
+          <div class="deep-nest">
+            <div class="deep-nest">
+              <div class="deep-nest">
+                <div class="deep-nest">
+                  <div class="deep-nest">
+                    <div class="deep-nest">
+                      <div class="deep-nest">
+                        <div class="deep-nest">
+                          <span>Still correctly resolves to the page background.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
