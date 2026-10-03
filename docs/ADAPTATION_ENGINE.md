@@ -30,7 +30,7 @@ stays `PARTIAL` (Machado linear-RGB assumption), and every result keeps its
 
 ## Non-goals (M3)
 
-MutationObserver / SPA lifecycle, Shadow DOM, iframes, SVG, Canvas, charts,
+MutationObserver / SPA lifecycle (M4), Shadow DOM, iframes, SVG (M5, see below), Canvas, charts,
 image recoloring, semantic meaning (red = error is **not** preserved
 artificially; that is M6), developer audit, cloud services, background
 adaptation, global CSS-token rewriting.
@@ -325,6 +325,30 @@ trip (metrics identical to 1e-10), and (c) include a pair where a floating-point
 color and its 8-bit rounding disagree on feasibility — only the rounded color is
 ever judged or applied.
 
+## Inline SVG (M5)
+
+SVG reuses this engine unchanged; `docs/SVG_ANALYSIS.md` has the details. What differs is the
+**target** of a plan, not the search:
+
+- An inline `<svg>` is one `ElementDescriptor` (`svg` info, one effective paint over the page
+  background). `findAdaptation` runs on that pair (memoized on the pair like any other), with
+  the same constraints, the same model confidence and the same `no-safe-candidate` outcome.
+- `AdaptationChange.property` is `color`, `fill` or `stroke`. `currentColor` paint is adapted
+  through `color` on the `<svg>` (never materialized as `fill`); inherited paint through
+  `fill`/`stroke` on the `<svg>`; shape-declared paint on each shape; `<use>` instances on the
+  `<use>` element. All changes of one SVG carry the same adapted value and an `ownerId`.
+- Rules are keyed by (element, property). Rules sharing an `ownerId` are replaced, verified and
+  dropped **as a group**: after the read-back of each target, every visible paint of every shape
+  in the `<svg>` must read the planned color (`verifySvgPaints`), otherwise none of the unit's
+  rules is kept and it counts once in `notApplied`. `AdaptationSummary` counts units, not rules.
+- Eligibility is stricter than for text: exactly one distinct visible paint; no filter, mask, blend
+  mode, marker, paint server, animation, `foreignObject` or embedded image; no translucent paint
+  (an opaque rule cannot reproduce a composite, the same reason `findNotAdaptable` skips text whose
+  `color` differs from its effective foreground); resolved background. Gated by `adaptSVG` and
+  `improveUIColors`.
+- The analysis never sees the adaptation: SVG analysis also runs inside `withOriginalStyles`, and
+  its style probe (`StylesheetManager.withProbe`) sits on top of the page's original styles.
+
 ## Real-browser validation
 
 `pnpm test:e2e` (builds, then Playwright + Chromium with the built extension
@@ -406,8 +430,9 @@ red/green 1.20:1 → 1.70:1).
   resolved background; nothing is optimized jointly and tokens are never rewritten.
 - **Foreground only.** Background adaptation is architecturally possible but off;
   if the foreground cannot be fixed the result is `no-safe-candidate`.
-- Only the `color` property (text). `border-color`, `background-color`, SVG fill
-  are not adapted.
+- Only foreground paint: `color` for text, and (M5) `color`/`fill`/`stroke` for single-paint inline
+  SVG. `border-color`, `background-color` are not adapted; multi-color SVG, gradients and patterns
+  are classified and left alone (`docs/SVG_ANALYSIS.md`).
 - Not a WCAG fixer (see contrast policy). A low-contrast pair that is already
   "distinguishable" under the profile is left alone.
 - No semantic awareness: an adapted "error red" may no longer look like the

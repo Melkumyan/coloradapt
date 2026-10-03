@@ -15,7 +15,11 @@ import { clamp01 } from '@shared/utils';
 import type { AdaptationConstraints } from './constraints';
 import { findAdaptation } from './optimizer';
 
-/** Roles M3 never adapts (SVG/images/charts are later milestones). */
+/**
+ * Roles of descriptors that are not analyzed units: SVG elements are only ever
+ * adapted as a whole inline `<svg>` (a descriptor with `svg` info, see below);
+ * images and charts are later milestones.
+ */
 const OUT_OF_SCOPE_ROLES: ReadonlySet<ElementDescriptor['role']> = new Set([
   'svg',
   'image',
@@ -47,10 +51,25 @@ function isCategoryEnabled(element: ElementDescriptor, settings: UserSettings): 
  * `unsupported` are reported as unresolved and never touched.
  */
 function classify(element: ElementDescriptor, settings: UserSettings): Eligibility {
+  if (element.svg) return classifySvg(element, settings);
   if (OUT_OF_SCOPE_ROLES.has(element.role) || element.disabled) return 'skipped';
   if (!element.hasTextContent && element.role !== 'form-control') return 'skipped';
   if (!isCategoryEnabled(element, settings)) return 'skipped';
   return element.analysisStatus === 'resolved' ? 'eligible' : 'unresolved';
+}
+
+/**
+ * Fail-safe eligibility of an inline SVG unit (docs/SVG_ANALYSIS.md). Beyond the
+ * HTML rules: only a *single visible paint* the analyzer could attribute to
+ * rules (`svg.targets`) is adapted; anything it classified (`unsupportedReason`)
+ * or could not fully trust (`partialReason`) is reported as unresolved.
+ */
+function classifySvg(element: ElementDescriptor, settings: UserSettings): Eligibility {
+  const svg = element.svg;
+  if (!svg || !settings.adaptSVG || !settings.improveUIColors) return 'skipped';
+  if (svg.unsupportedReason || svg.partialReason) return 'unresolved';
+  if (element.analysisStatus !== 'resolved') return 'unresolved';
+  return svg.targets.length > 0 ? 'eligible' : 'skipped';
 }
 
 function colorKey(color: ColorValue): string {
@@ -67,10 +86,14 @@ function describeChange(result: AdaptedAdaptation): string {
   );
 }
 
-function toChange(elementId: string, result: AdaptedAdaptation): AdaptationChange {
-  return {
-    elementId,
-    property: 'color',
+/**
+ * The rules one adapted element needs. An HTML element has one (`color`); an
+ * inline SVG has one per paint owner (its `color`/`fill`/`stroke` on the
+ * `<svg>`, on shapes, or on `<use>` instances), all with the same adapted value
+ * and all owned by the `<svg>` so they live and die together.
+ */
+function toChanges(element: ElementDescriptor, result: AdaptedAdaptation): AdaptationChange[] {
+  const base = {
     originalValue: toHex(result.originalColor),
     adaptedValue: toHex(result.outputColor),
     reason: describeChange(result),
@@ -84,11 +107,18 @@ function toChange(elementId: string, result: AdaptedAdaptation): AdaptationChang
       score: result.score,
     },
   };
+  if (!element.svg) return [{ ...base, elementId: element.id, property: 'color' }];
+  return element.svg.targets.map((target) => ({
+    ...base,
+    elementId: target.elementId,
+    ownerId: element.id,
+    property: target.property,
+  }));
 }
 
-/** What the planner decided for one element. Only `adapted` carries a change. */
+/** What the planner decided for one element. Only `adapted` carries changes. */
 export type ElementOutcome =
-  | { readonly kind: 'adapted'; readonly change: AdaptationChange }
+  | { readonly kind: 'adapted'; readonly changes: readonly AdaptationChange[] }
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'noSafeCandidate' }
   | { readonly kind: 'unresolved' }
@@ -149,7 +179,7 @@ export function planElement(
 
   switch (result.status) {
     case 'adapted':
-      return { kind: 'adapted', change: toChange(element.id, result) };
+      return { kind: 'adapted', changes: toChanges(element, result) };
     case 'unchanged':
       return { kind: 'unchanged' };
     case 'no-safe-candidate':
@@ -193,7 +223,7 @@ export function createDetailedAdaptationPlan(
       const outcome = planElement(element, context, memo);
       outcomes.set(element.id, outcome);
       countOutcome(counts, outcome);
-      if (outcome.kind === 'adapted') changes.push(outcome.change);
+      if (outcome.kind === 'adapted') changes.push(...outcome.changes);
     }
   }
 

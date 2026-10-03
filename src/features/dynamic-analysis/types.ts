@@ -13,7 +13,12 @@ export type MutationKind =
 
 export type ClassifiedMutation =
   | { readonly kind: 'NODE_ADDED'; readonly element: Element }
-  | { readonly kind: 'NODE_REMOVED'; readonly element: Element }
+  | {
+      readonly kind: 'NODE_REMOVED';
+      readonly element: Element;
+      /** The node it was removed from (an inline SVG whose child went away must be re-analyzed). */
+      readonly parent?: Element;
+    }
   | {
       readonly kind: 'STYLE_AFFECTING_ATTRIBUTE';
       readonly element: Element;

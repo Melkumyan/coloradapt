@@ -26,7 +26,7 @@ ColorAdapt should be able to reason about:
 - Reversible UI color adaptation (M3 — implemented in this foundation as a
   minimal lightness-based fix).
 - Dynamic pages / SPAs (M4): handled by the mutation pipeline, see `docs/DYNAMIC_ANALYSIS.md`.
-- SVG icons and vector graphics (M5).
+- SVG icons and SVG text (M5 — single-paint inline SVG; see `docs/SVG_ANALYSIS.md`); chart-like and multi-color vector graphics are M7.
 - Semantic roles — success/error/warning/active/buy/sell/status — so that
   color-only meaning can be reinforced with icons, shapes, or text, not
   just recolored (M6).

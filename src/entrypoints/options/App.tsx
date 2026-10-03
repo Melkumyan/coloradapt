@@ -95,9 +95,13 @@ export function App(): JSX.Element {
           />
           Improve status indicators (success/error/warning)
         </label>
-        <label className="options__checkbox options__checkbox--planned">
-          <input type="checkbox" checked={settings.adaptSVG} disabled />
-          Adapt SVG icons <span className="options__badge">planned</span>
+        <label className="options__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.adaptSVG}
+            onChange={(event) => void update({ adaptSVG: event.target.checked })}
+          />
+          Adapt inline SVG icons and text
         </label>
         <label className="options__checkbox options__checkbox--planned">
           <input type="checkbox" checked={settings.adaptCharts} disabled />

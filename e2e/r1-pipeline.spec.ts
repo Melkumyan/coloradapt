@@ -139,6 +139,7 @@ test.describe('R1-2. self-mutation / feedback-loop attack', () => {
         | 'incrementalPasses'
         | 'fullRescans'
         | 'stylesheetRepairs'
+        | 'stylesheetRepairsDeferred'
         | 'batches'
         | 'observerCallbacks'
         | 'mutationRecords'
@@ -147,11 +148,15 @@ test.describe('R1-2. self-mutation / feedback-loop attack', () => {
     expect(total('incrementalPasses')).toBe(5 * CYCLES);
     expect(total('fullRescans')).toBe(0);
     expect(total('stylesheetRepairs')).toBe(CYCLES);
-    expect(total('batches')).toBe(6 * CYCLES);
+    // Causal, not wall-clock: a repair that falls inside the 500 ms spacing is deferred to one timer,
+    // and that timer costs exactly one extra batch. Whether a cycle was fast enough to be deferred is
+    // timing; that each deferral costs exactly one batch, and at most one per repair, is the invariant.
+    expect(total('stylesheetRepairsDeferred')).toBeLessThanOrEqual(CYCLES);
+    expect(total('batches')).toBe(6 * CYCLES + total('stylesheetRepairsDeferred'));
     expect(total('observerCallbacks')).toBeLessThanOrEqual(12 * CYCLES);
     test.info().annotations.push({
       type: 'counters',
-      description: `R1-2 totals over ${CYCLES} cycles: passes=${total('incrementalPasses')} rescans=${total('fullRescans')} repairs=${total('stylesheetRepairs')} batches=${total('batches')} observerCallbacks=${total('observerCallbacks')} records=${total('mutationRecords')} ownIgnored=${total('selfMutationsIgnored')}`,
+      description: `R1-2 totals over ${CYCLES} cycles: passes=${total('incrementalPasses')} rescans=${total('fullRescans')} repairs=${total('stylesheetRepairs')} deferred=${total('stylesheetRepairsDeferred')} batches=${total('batches')} observerCallbacks=${total('observerCallbacks')} records=${total('mutationRecords')} ownIgnored=${total('selfMutationsIgnored')}`,
     });
   });
 

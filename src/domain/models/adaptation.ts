@@ -110,6 +110,12 @@ export interface AdaptationMetrics {
  */
 export interface AdaptationChange {
   readonly elementId: string;
+  /**
+   * The analyzed element this change belongs to, when it differs from the one
+   * the rule targets (an inline SVG's rules target its shapes). Rules sharing an
+   * owner are applied, verified and dropped together; absent => the element itself.
+   */
+  readonly ownerId?: string;
   readonly property: string;
   readonly originalValue: string;
   readonly adaptedValue: string;
@@ -131,9 +137,13 @@ export interface AdaptationSummary {
    * They are removed from the plan's changes — never reported as adapted.
    */
   readonly notApplied: number;
-  /** Elements not adapted because analysis was `partial`/`unsupported`, or the profile is unsupported. */
+  /**
+   * Elements not adapted because analysis was `partial`/`unsupported` (for an inline SVG:
+   * multi-paint, gradients, translucent paint, ... see `SvgUnsupportedReason`), or the
+   * profile is unsupported.
+   */
   readonly unresolved: number;
-  /** Elements outside M3 scope (svg/img, disabled, no text, ...). */
+  /** Elements outside scope (img, disabled, no text, an SVG when `adaptSVG` is off, ...). */
   readonly skipped: number;
 }
 

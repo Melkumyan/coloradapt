@@ -60,6 +60,8 @@ export function findNotAdaptable(
   const animated = colorAnimationTargets(doc);
   const unsafe = new Set<string>();
   for (const element of elements) {
+    // An inline SVG has its own checks (its paint, not `color`; see core/svg).
+    if (element.svg) continue;
     const node = byId.get(element.id);
     if (node && animated.size > 0 && isAnimatedOrInheritsAnimation(node, animated)) {
       unsafe.add(element.id);

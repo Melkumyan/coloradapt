@@ -590,6 +590,150 @@ describe('self-mutation filtering and loop safety', () => {
     expect(document.getElementById('coloradapt-stylesheet')).not.toBeNull();
   });
 
+  describe('repair scheduler (M5.R1: causal, clock injected)', () => {
+    /** One deletion cycle: delete, let the frame run. */
+    async function deleteAndFrame(scheduler: ReturnType<typeof createManualScheduler>) {
+      document.getElementById('coloradapt-stylesheet')?.remove();
+      await microtasks();
+      scheduler.runFrame();
+    }
+
+    it('a repair inside the spacing costs exactly one extra batch; outside it, none (the old 720/721 flake)', async () => {
+      let clock = 10_000;
+      const { dynamic, scheduler } = setup(`<p id="t" style="${CONFLICT_STYLE}">x</p>`, {
+        now: () => clock,
+      });
+      await deleteAndFrame(scheduler); // first repair: immediate
+      const slow0 = dynamic.diagnostics();
+      expect(slow0).toMatchObject({ stylesheetRepairs: 1, stylesheetRepairsDeferred: 0 });
+
+      // A slow cycle (past the interval): one batch, one repair, nothing deferred.
+      clock += 600;
+      const b0 = dynamic.diagnostics().batches;
+      await deleteAndFrame(scheduler);
+      let d = dynamic.diagnostics();
+      expect(d.batches - b0).toBe(1);
+      expect(d).toMatchObject({ stylesheetRepairs: 2, stylesheetRepairsDeferred: 0 });
+
+      // A fast cycle (inside the interval): the repair is deferred, its timer adds one batch.
+      clock += 16;
+      const b1 = d.batches;
+      await deleteAndFrame(scheduler);
+      expect(dynamic.diagnostics().stylesheetRepairsDeferred).toBe(1);
+      clock += 600;
+      scheduler.runTimers();
+      scheduler.runFrame();
+      d = dynamic.diagnostics();
+      expect(d.batches - b1).toBe(2);
+      expect(d).toMatchObject({ stylesheetRepairs: 3, stylesheetRepairsDeferred: 1 });
+      // The invariant the E2E asserts: batches = work batches + deferred repairs.
+      expect(d.batches).toBe(3 + d.stylesheetRepairsDeferred);
+    });
+
+    it('rapid deletions coalesce: one timer, one deferral, one repair, not one per mutation', async () => {
+      let clock = 10_000;
+      const { dynamic, scheduler } = setup(`<p id="t" style="${CONFLICT_STYLE}">x</p>`, {
+        now: () => clock,
+      });
+      await deleteAndFrame(scheduler);
+      for (let i = 0; i < 50; i += 1) {
+        clock += 1;
+        await deleteAndFrame(scheduler);
+      }
+      expect(scheduler.timers).toHaveLength(1);
+      expect(dynamic.diagnostics()).toMatchObject({
+        stylesheetRepairs: 1,
+        stylesheetRepairsDeferred: 1,
+      });
+      clock += 600;
+      scheduler.runTimers();
+      scheduler.runFrame();
+      expect(dynamic.diagnostics()).toMatchObject({
+        stylesheetRepairs: 2,
+        throttleTimerActive: false,
+      });
+      expect(document.getElementById('coloradapt-stylesheet')).not.toBeNull();
+    });
+
+    it('a repair does not feed the observer: after it nothing is scheduled and nothing is queued', async () => {
+      const { dynamic, scheduler } = setup(`<p id="t" style="${CONFLICT_STYLE}">x</p>`);
+      await deleteAndFrame(scheduler);
+      await microtasks();
+      expect(scheduler.pending).toBe(0);
+      expect(scheduler.timers).toHaveLength(0);
+      expect(dynamic.diagnostics()).toMatchObject({ state: 'IDLE', queuedRecords: 0 });
+      const callbacks = dynamic.diagnostics().observerCallbacks;
+      await microtasks();
+      scheduler.runFrame();
+      expect(dynamic.diagnostics().observerCallbacks).toBe(callbacks);
+    });
+
+    it('OFF cancels a pending repair: no timer, no repair, no sheet', async () => {
+      let clock = 10_000;
+      const { controller, dynamic, scheduler } = setup(
+        `<p id="t" style="${CONFLICT_STYLE}">x</p>`,
+        { now: () => clock },
+      );
+      await deleteAndFrame(scheduler);
+      clock += 1;
+      await deleteAndFrame(scheduler);
+      expect(dynamic.diagnostics().throttleTimerActive).toBe(true);
+
+      controller.disableAdaptation();
+      expect(dynamic.diagnostics().throttleTimerActive).toBe(false);
+      expect(scheduler.timers).toHaveLength(0);
+      const repairs = dynamic.diagnostics().stylesheetRepairs;
+      clock += 600;
+      scheduler.runTimers();
+      scheduler.runFrame();
+      expect(dynamic.diagnostics().stylesheetRepairs).toBe(repairs);
+      expect(document.getElementById('coloradapt-stylesheet')).toBeNull();
+    });
+
+    it('dispose cancels a pending repair', async () => {
+      let clock = 10_000;
+      const { dynamic, scheduler } = setup(`<p id="t" style="${CONFLICT_STYLE}">x</p>`, {
+        now: () => clock,
+      });
+      await deleteAndFrame(scheduler);
+      clock += 1;
+      await deleteAndFrame(scheduler);
+      expect(scheduler.timers).toHaveLength(1);
+      dynamic.dispose();
+      expect(scheduler.timers).toHaveLength(0);
+      expect(dynamic.diagnostics().throttleTimerActive).toBe(false);
+      clock += 600;
+      scheduler.runTimers();
+      scheduler.runFrame();
+      expect(dynamic.diagnostics().stylesheetRepairs).toBe(1);
+    });
+
+    it('ON after OFF with a repair pending creates a single timer and a single repair', async () => {
+      let clock = 10_000;
+      const { controller, dynamic, scheduler } = setup(
+        `<p id="t" style="${CONFLICT_STYLE}">x</p>`,
+        { now: () => clock },
+      );
+      await deleteAndFrame(scheduler);
+      clock += 1;
+      await deleteAndFrame(scheduler);
+      controller.disableAdaptation();
+      controller.enableAdaptation('https://example.com', DEUTAN);
+      expect(scheduler.timers).toHaveLength(0); // the rescan rebuilt the sheet; nothing is owed
+      expect(document.getElementById('coloradapt-stylesheet')).not.toBeNull();
+
+      clock += 1;
+      await deleteAndFrame(scheduler);
+      await deleteAndFrame(scheduler);
+      expect(scheduler.timers.length).toBeLessThanOrEqual(1);
+      clock += 600;
+      scheduler.runTimers();
+      scheduler.runFrame();
+      expect(dynamic.diagnostics().throttleTimerActive).toBe(false);
+      expect(document.getElementById('coloradapt-stylesheet')).not.toBeNull();
+    });
+  });
+
   it('re-analysis reads original colors: repeated passes never drift', () => {
     const { dynamic } = setup(`<div id="host"><p id="t" style="${CONFLICT_STYLE}">x</p></div>`);
     const first = document.getElementById('coloradapt-stylesheet')!.textContent;

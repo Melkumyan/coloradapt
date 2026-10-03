@@ -9,6 +9,14 @@ import {
   createBackgroundResolutionCache,
   type BackgroundResolutionCache,
 } from './background-resolution';
+import {
+  analyzeSvgUnits,
+  collectAnimatedPaintTargets,
+  isOutermostSvg,
+  isSvgElement,
+  outermostSvg,
+  type SvgStyleProbe,
+} from '../svg';
 
 export interface AnalyzeDocumentOptions {
   readonly root?: ParentNode;
@@ -16,6 +24,12 @@ export interface AnalyzeDocumentOptions {
   readonly maxDurationMs?: number;
   readonly now?: () => number;
   readonly getStyle?: (element: Element) => CSSStyleDeclaration;
+  /**
+   * Applies a style probe for one synchronous read (see `core/svg/inheritance.ts`).
+   * Without it no inline SVG can be told apart as `currentColor` / inherited /
+   * explicit, so SVGs are analyzed but never adapted.
+   */
+  readonly probeStyles?: SvgStyleProbe;
 }
 
 let idCounter = 0;
@@ -140,6 +154,45 @@ function describeElement(
 }
 
 /**
+ * An outermost `<svg>` that lives inside an HTML document. A standalone SVG
+ * document (the browser showing `icon.svg` itself) is not "inline SVG": there is
+ * no `<head>` to hold our `<style>`, so nothing there can be adapted.
+ */
+function isInlineSvgUnit(element: Element): boolean {
+  return isOutermostSvg(element) && element !== element.ownerDocument.documentElement;
+}
+
+/**
+ * Analyzes the outermost inline SVGs found in a pass as one batch (a single
+ * style probe covers them all). Returns descriptors and the nodes that rules
+ * target, by id.
+ */
+function describeSvgBatch(
+  svgs: readonly Element[],
+  getStyle: (element: Element) => CSSStyleDeclaration,
+  backgroundCache: BackgroundResolutionCache,
+  probe: SvgStyleProbe | undefined,
+): { descriptors: ElementDescriptor[]; nodes: Map<string, Element> } {
+  const descriptors: ElementDescriptor[] = [];
+  const nodes = new Map<string, Element>();
+  const first = svgs[0];
+  if (!first) return { descriptors, nodes };
+  const results = analyzeSvgUnits(svgs, {
+    getStyle,
+    backgroundCache,
+    ensureId: ensureElementId,
+    probe,
+    animatedTargets: collectAnimatedPaintTargets(first.ownerDocument),
+  });
+  for (const result of results) {
+    if (!result.descriptor) continue;
+    descriptors.push(result.descriptor);
+    for (const [id, node] of result.nodes) nodes.set(id, node);
+  }
+  return { descriptors, nodes };
+}
+
+/**
  * Performs a single, bounded pass over `root`, extracting a descriptor for
  * every element that matches {@link ANALYZER_SELECTOR}, is visible, and has
  * a parseable color. Honors a hard element-count and wall-clock budget
@@ -158,11 +211,12 @@ export function analyzeDocument(options: AnalyzeDocumentOptions = {}): {
   const candidates = root.querySelectorAll(ANALYZER_SELECTOR);
   const elements: ElementDescriptor[] = [];
   const backgroundCache = createBackgroundResolutionCache();
+  const svgs: Element[] = [];
   const startedAt = now();
   let truncated = false;
 
   for (let i = 0; i < candidates.length; i += 1) {
-    if (elements.length >= maxElements) {
+    if (elements.length + svgs.length >= maxElements) {
       truncated = true;
       break;
     }
@@ -174,10 +228,19 @@ export function analyzeDocument(options: AnalyzeDocumentOptions = {}): {
     const element = candidates[i];
     if (!element) continue;
 
+    // An inline SVG is analyzed as one unit; elements inside it are part of it.
+    if (isSvgElement(element)) {
+      if (isInlineSvgUnit(element)) svgs.push(element);
+      continue;
+    }
+
     const descriptor = describeElement(element, getStyle, backgroundCache);
     if (descriptor) elements.push(descriptor);
   }
 
+  elements.push(
+    ...describeSvgBatch(svgs, getStyle, backgroundCache, options.probeStyles).descriptors,
+  );
   return { elements, truncated };
 }
 
@@ -227,6 +290,7 @@ export function analyzeSubtrees(
   const nodes = new Map<string, Element>();
   const backgroundCache = createBackgroundResolutionCache();
   const seen = new Set<Element>();
+  const svgs: Element[] = [];
   const startedAt = now();
   let candidatesInspected = 0;
   let rootsCompleted = 0;
@@ -234,26 +298,38 @@ export function analyzeSubtrees(
 
   for (const root of roots) {
     const first = rootsCompleted === 0;
-    if (!first && (elements.length >= maxElements || now() - startedAt > maxDurationMs)) break;
+    if (
+      !first &&
+      (elements.length + svgs.length >= maxElements || now() - startedAt > maxDurationMs)
+    ) {
+      break;
+    }
 
     if (root.element.isConnected) {
       const candidates: Element[] = [];
-      if (root.element.matches(ANALYZER_SELECTOR)) candidates.push(root.element);
+      // A region inside an inline SVG is re-analyzed as the SVG it belongs to.
+      const unit = outermostSvg(root.element);
+      if (unit && unit !== root.element) candidates.push(unit);
+      else if (root.element.matches(ANALYZER_SELECTOR)) candidates.push(root.element);
       if (root.scope === 'subtree') {
         for (const node of root.element.querySelectorAll(ANALYZER_SELECTOR)) candidates.push(node);
       }
       // Does not fit in what is left: it waits for a pass where it is the first root.
-      if (!first && elements.length + candidates.length > maxElements) break;
+      if (!first && elements.length + svgs.length + candidates.length > maxElements) break;
 
       let rootTruncated = false;
       for (const element of candidates) {
         if (seen.has(element)) continue;
-        if (elements.length >= maxElements) {
+        if (elements.length + svgs.length >= maxElements) {
           rootTruncated = true;
           break;
         }
         seen.add(element);
         candidatesInspected += 1;
+        if (isSvgElement(element)) {
+          if (isInlineSvgUnit(element)) svgs.push(element);
+          continue;
+        }
         const descriptor = describeElement(element, getStyle, backgroundCache);
         if (!descriptor) continue;
         elements.push(descriptor);
@@ -266,6 +342,10 @@ export function analyzeSubtrees(
     }
     rootsCompleted += 1;
   }
+
+  const svg = describeSvgBatch(svgs, getStyle, backgroundCache, options.probeStyles);
+  elements.push(...svg.descriptors);
+  for (const [id, node] of svg.nodes) nodes.set(id, node);
 
   return { elements, nodes, candidatesInspected, rootsCompleted, truncated };
 }

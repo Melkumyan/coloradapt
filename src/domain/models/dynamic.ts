@@ -1,3 +1,5 @@
+import type { SvgDiagnostics } from './svg';
+
 /** Why the whole document is re-analyzed instead of a few regions (docs/DYNAMIC_ANALYSIS.md). */
 export type FullRescanReason =
   'manual' | 'stylesheet' | 'document-root' | 'too-many-roots' | 'queue-overflow';
@@ -34,6 +36,12 @@ export interface DynamicDiagnostics {
   readonly truncatedPasses: number;
   /** Times the page deleted our `<style>` and it was put back (spaced out, never dropped). */
   readonly stylesheetRepairs: number;
+  /**
+   * Repairs that had to wait out the minimum interval (one timer armed each). Every one costs exactly
+   * one extra batch when its timer fires, which makes `batches` an exact function of the other counters
+   * instead of a function of the wall clock.
+   */
+  readonly stylesheetRepairsDeferred: number;
   /** Times the observer was actually connected. */
   readonly observerStarts: number;
   /** Full rescans postponed by the minimum-interval throttle. */
@@ -55,4 +63,6 @@ export interface DynamicDiagnostics {
   readonly pendingRescan: FullRescanReason | null;
   /** A throttled full rescan or stylesheet repair is waiting on its timer right now. */
   readonly throttleTimerActive: boolean;
+  /** Inline-SVG gauges (docs/SVG_ANALYSIS.md). */
+  readonly svg: SvgDiagnostics;
 }

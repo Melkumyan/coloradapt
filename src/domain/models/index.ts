@@ -2,6 +2,7 @@ export * from './vision-profile';
 export * from './vision-analysis';
 export * from './color';
 export * from './conflict';
+export * from './svg';
 export * from './element';
 export * from './analysis';
 export * from './adaptation';

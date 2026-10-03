@@ -9,7 +9,7 @@ export interface UserSettings {
   readonly improveUIColors: boolean;
   readonly improveLinks: boolean;
   readonly improveStatusIndicators: boolean;
-  /** Planned for M5 — kept in settings now so UI/storage shape is stable. */
+  /** Adapt inline SVG icons and text (M5, docs/SVG_ANALYSIS.md). */
   readonly adaptSVG: boolean;
   /** Planned for M7. */
   readonly adaptCharts: boolean;
@@ -26,7 +26,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   improveUIColors: true,
   improveLinks: true,
   improveStatusIndicators: true,
-  adaptSVG: false,
+  adaptSVG: true,
   adaptCharts: false,
   adaptImages: false,
   showWarnings: true,

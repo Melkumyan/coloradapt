@@ -1,13 +1,14 @@
 /**
  * Which inline-style / class changes can alter what ColorAdapt computes.
- * ColorAdapt reads colors, backgrounds, opacity and visibility (and borders),
+ * ColorAdapt reads colors, backgrounds, opacity and visibility (and borders, and an
+ * inline SVG's fill/stroke/mask/marker),
  * so an animation loop writing `transform` or `top` into `style` every frame
  * must not wake the analyzer.
  */
 
 /** Longhands/shorthands whose change can alter an analysis result. */
 const RELEVANT_PROPERTY =
-  /^(?:color|color-scheme|opacity|visibility|display|content-visibility|filter|mix-blend-mode|all|--.*|background(?:-.*)?|border(?:-(?:top|right|bottom|left))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style))?)$/;
+  /^(?:color|color-scheme|opacity|visibility|display|content-visibility|filter|mix-blend-mode|all|--.*|fill|fill-opacity|stroke|stroke-opacity|stroke-width|mask(?:-.*)?|marker(?:-.*)?|background(?:-.*)?|border(?:-(?:top|right|bottom|left))?(?:-(?:color|width|style))?|outline(?:-(?:color|width|style))?)$/;
 
 /** Splits a declaration list on top-level `;` (not inside `()` or quotes). */
 function splitDeclarations(cssText: string): string[] {

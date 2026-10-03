@@ -62,6 +62,13 @@ export function createContentController(
   analyzerOptions: Partial<AnalyzeDocumentOptions> = {},
 ): ContentController {
   const stylesheetManager = new StylesheetManager(doc);
+  // Analysis reads the page's own styles through the stylesheet manager; inline SVGs are told
+  // apart (currentColor / inherited / explicit) by a probe that goes through the same <style>.
+  analyzerOptions = {
+    ...analyzerOptions,
+    probeStyles:
+      analyzerOptions.probeStyles ?? ((css, read) => stylesheetManager.withProbe(css, read)),
+  };
   let lastAnalysis: AnalysisResult | null = null;
   /** Elements whose effective foreground cannot be reproduced by a plain `color` rule. */
   let notAdaptable = new Set<string>();
@@ -118,6 +125,8 @@ export function createContentController(
     // The browser has the last word: a change whose computed color is not the
     // planned one (e.g. an inline `!important`) is dropped, never reported as adapted.
     const { applied, notApplied } = stylesheetManager.apply(planned.changes);
+    // One element (or one inline SVG, whose rules share an owner) counts once, however many rules it has.
+    const notAppliedIds = new Set(notApplied.map((change) => change.ownerId ?? change.elementId));
     const adaptation: AdaptationPlan =
       notApplied.length === 0
         ? planned
@@ -126,12 +135,12 @@ export function createContentController(
             changes: applied,
             summary: {
               ...planned.summary,
-              adapted: planned.summary.adapted - notApplied.length,
-              notApplied: notApplied.length,
+              adapted: planned.summary.adapted - notAppliedIds.size,
+              notApplied: notAppliedIds.size,
             },
           };
     if (settings.enabled) {
-      session.begin(settings, outcomes, new Set(notApplied.map((change) => change.elementId)));
+      session.begin(settings, outcomes, notAppliedIds, analysis.elements);
     } else {
       session.end();
     }

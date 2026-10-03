@@ -130,6 +130,23 @@ otherwise cost a repair per frame, forever (measured before the fix: 90 repairs 
 frames; after: 3). While such a fight lasts the page wins the cascade anyway; when it
 stops, the sheet is back within one interval.
 
+**Determinism of the repair cadence (M5.R1).** The spacing is the only place where the
+pipeline's work depends on a clock, so it is made observable instead of being left to
+timing. A repair that falls inside the interval is _deferred_ (`stylesheetRepairsDeferred`
+counts each timer armed); the timer then costs exactly one extra batch, because the owed
+repair makes its wake-up a batch of its own. Hence, for any run,
+`batches = (batches of real work) + stylesheetRepairsDeferred`, and
+`stylesheetRepairsDeferred <= stylesheetRepairs`. Whether one particular cycle was fast
+enough to be deferred is wall-clock luck; that every deferral costs exactly one batch, that
+nothing is dropped and that deferrals never exceed repairs is the invariant. The clock and
+the scheduler are injectable (`now`, `scheduler`; production passes neither), and the unit
+tests (`repair scheduler`, `tests/features/dynamic/pipeline.test.ts`) drive both regimes
+with a manual clock: coalescing of rapid deletions into one timer, OFF and `dispose()`
+cancelling the pending timer, ON-after-OFF arming at most one, no observer feedback after a
+repair. The previous E2E assertion `batches === 6 * cycles` assumed no cycle was ever
+faster than 500 ms and failed (721 instead of 720) when one was; it now asserts the
+equation above.
+
 A page that writes to our private `data-coloradapt-id` attribute (copying, erasing or
 forging it) is not observed at all (the attribute is outside the observer's filter),
 which keeps this loop-free; the incremental path does not repair that tampering, a
@@ -191,6 +208,11 @@ STOPPED -start-> IDLE -enqueue/request-> SCHEDULED -flush-> RUNNING -> IDLE
   resolve to, so descendants are invalidated; siblings and `:has()` effects are
   not (see limitations). This is a pragmatic bounded invalidation, not a
   browser dependency graph;
+- anything **inside an inline `<svg>`** (M5): the outermost `<svg>` as a `self` region, analyzed
+  whole as one unit (`subtree` only when the `<svg>` itself was added or restyled); an `<svg>`
+  that defines ids (a sprite) additionally queues the `<svg>`s whose `<use>` points into it;
+  a child removed from an `<svg>` re-analyzes that `<svg>` (`NODE_REMOVED` records its parent).
+  See `docs/SVG_ANALYSIS.md`;
 - text change: the element alone (`self`);
 - removed element: nothing to analyze. If the node is really detached its
   owned ids are collected for cleanup; a node that is connected again was
@@ -304,6 +326,7 @@ logged): `mutationRecords`, `batches`, `incrementalPasses`, `fullRescans`,
 `fullRescansByReason`, `affectedRoots`, `elementsProcessed`,
 `selfMutationsIgnored`, `irrelevantMutations`, `rulesAdded/Updated/Removed`,
 `queueOverflows`, `rootsDeferred`, `truncatedPasses`, `stylesheetRepairs`,
+`stylesheetRepairsDeferred`,
 `observerStarts`, `fullRescansThrottled`, `observerCallbacks`, and the live gauges
 `state`, `trackedElements`, `rules`, `pendingLinks`, `queuedRecords`, `deferredRoots`,
 `pendingRescan` (a rescan owed but not yet run) and `throttleTimerActive` (a postponed
@@ -351,6 +374,14 @@ Nothing is printed to the console.
   rule in place), and `REFRESH_ADAPTATION` makes the state correct. Narrower than it
   sounds: an **element inserted** after a speedy `insertRule` is adapted (its insertion
   is a mutation, and the analysis reads the CSSOM as it is then).
+- **SVG (M5).** The observer is attribute-filtered: the SVG paint attributes (`fill`, `stroke`,
+  `fill-opacity`, `stroke-opacity`, `stroke-width`, `opacity`, `color`, `display`, `visibility`,
+  `filter`, `mask`, `mix-blend-mode`) and `href` count only on SVG elements. A legacy namespaced
+  `xlink:href` change is never delivered by a `MutationObserver` `attributeFilter` (verified in
+  Chromium: no record, no work; `svg-dynamic.spec.ts` asserts both that and that
+  `REFRESH_ADAPTATION` then yields the correct state); M5 deliberately adds no compatibility
+  layer for it. Everything else about SVG
+  limits is in `docs/SVG_ANALYSIS.md`.
 - **Sibling and structural selectors.** A `class` change can restyle siblings
   (`.a + .b`, `:nth-child`) or ancestors (`:has()`). Only the target subtree is
   invalidated.
@@ -481,7 +512,9 @@ What each suite proves (all in Chromium):
   not detected; `REFRESH_ADAPTATION` corrects).
 - **Feedback loops**: 120 hostile cycles (insert, page deletes our `<style>`, insert,
   rule out/in, remove last rule) = 600 passes, 120 repairs, 0 rescans, 840 observer
-  callbacks, then silence; page writes to `data-coloradapt-id` are never delivered.
+  callbacks, then silence; page writes to `data-coloradapt-id` are never delivered. The
+  batch total is asserted as `6 x cycles + stylesheetRepairsDeferred` (see "Determinism of the
+  repair cadence"), not as a wall-clock-dependent constant.
 - **Page fights** (the page mutates right after every ColorAdapt write): inline `!important`
   (`notApplied`, no stale rule, recovered when released), class change, replacing, moving,
   cloning and style deletion all converge to the full-rescan result.

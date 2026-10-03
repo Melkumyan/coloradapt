@@ -1,5 +1,9 @@
 import { DYNAMIC_BUDGET, type DynamicBudget } from '@shared/constants';
-import type { DynamicDiagnostics, FullRescanReason } from '@domain/models';
+import {
+  EMPTY_SVG_DIAGNOSTICS,
+  type DynamicDiagnostics,
+  type FullRescanReason,
+} from '@domain/models';
 import type { AnalysisRoot } from '@core/analysis';
 import type { IncrementalAdaptation } from '../page-analysis/incremental-adaptation';
 import { collectRemovedIds, normalizeRoots, resolveAffectedRoots } from './affected-roots';
@@ -68,6 +72,7 @@ function emptyCounters(): Counters {
     rootsDeferred: 0,
     truncatedPasses: 0,
     stylesheetRepairs: 0,
+    stylesheetRepairsDeferred: 0,
     observerStarts: 0,
     fullRescansThrottled: 0,
     state: 'STOPPED',
@@ -79,6 +84,7 @@ function emptyCounters(): Counters {
     deferredRoots: 0,
     pendingRescan: null,
     throttleTimerActive: false,
+    svg: EMPTY_SVG_DIAGNOSTICS,
   };
 }
 
@@ -190,10 +196,13 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     if (!forcing && lastRepairAt !== null) {
       const remaining = budget.stylesheetRepairMinIntervalMs - (now() - lastRepairAt);
       if (remaining > 0) {
-        cancelRepairTimer ??= scheduler.scheduleAfter(remaining, () => {
-          cancelRepairTimer = null;
-          batcher.request();
-        });
+        if (cancelRepairTimer === null) {
+          counters.stylesheetRepairsDeferred += 1;
+          cancelRepairTimer = scheduler.scheduleAfter(remaining, () => {
+            cancelRepairTimer = null;
+            batcher.request();
+          });
+        }
         return;
       }
     }
@@ -345,6 +354,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       deferredRoots: deferredRoots.length,
       pendingRescan: pendingFullRescan,
       throttleTimerActive: cancelThrottle !== null || cancelRepairTimer !== null,
+      svg: adaptation.svgDiagnostics(),
     };
   }
 

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E svg use/symbol</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      .cell {
+        display: inline-block;
+        padding: 6px;
+        margin: 4px;
+        vertical-align: top;
+      }
+      /* red on two greens (both conflicts for deuteranopia, with different best answers), and on white (fine) */
+      .bg-green {
+        background-color: #27ae60;
+      }
+      .bg-dgreen {
+        background-color: #1e8449;
+      }
+      .bg-white {
+        background-color: #ffffff;
+      }
+      .decl {
+        fill: #c0392b;
+      }
+      .red {
+        color: #c0392b;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- A sprite: rendered nowhere. The shared <symbol>s are what must never be rewritten. -->
+    <svg id="sprite" width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="sym-cc" viewBox="0 0 24 24">
+          <rect id="sym-cc-r" width="24" height="24" fill="currentColor" />
+        </symbol>
+        <symbol id="sym-inherit" viewBox="0 0 24 24">
+          <rect id="sym-inherit-r" width="24" height="24" />
+        </symbol>
+        <symbol id="sym-stroke" viewBox="0 0 24 24">
+          <rect
+            id="sym-stroke-r"
+            x="3"
+            y="3"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="6"
+          />
+        </symbol>
+        <symbol id="sym-explicit" viewBox="0 0 24 24">
+          <rect id="sym-explicit-r" width="24" height="24" fill="#c0392b" />
+        </symbol>
+        <symbol id="sym-css" viewBox="0 0 24 24">
+          <rect id="sym-css-r" class="decl" width="24" height="24" />
+        </symbol>
+        <symbol id="sym-two" viewBox="0 0 24 24">
+          <rect id="sym-two-a" width="12" height="24" fill="currentColor" />
+          <rect id="sym-two-b" x="12" width="12" height="24" fill="#1b1b1b" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <!-- The same symbol on three backgrounds -->
+    <div class="cell bg-green">
+      <svg id="cc-a" width="24" height="24" class="red"><use id="cc-a-u" href="#sym-cc" /></svg>
+    </div>
+    <div class="cell bg-dgreen">
+      <svg id="cc-b" width="24" height="24" class="red"><use id="cc-b-u" href="#sym-cc" /></svg>
+    </div>
+    <div class="cell bg-white">
+      <svg id="cc-c" width="24" height="24" class="red"><use id="cc-c-u" href="#sym-cc" /></svg>
+    </div>
+
+    <!-- Symbol content that inherits fill from the <use> -->
+    <div class="cell bg-green">
+      <svg id="inh-a" width="24" height="24">
+        <use id="inh-a-u" href="#sym-inherit" fill="#c0392b" />
+      </svg>
+    </div>
+    <div class="cell bg-dgreen">
+      <svg id="inh-b" width="24" height="24">
+        <use id="inh-b-u" href="#sym-inherit" fill="#c0392b" />
+      </svg>
+    </div>
+
+    <!-- A <use> whose own fill is currentColor: still the <use>'s color that owns the paint -->
+    <div class="cell bg-green">
+      <svg id="ucc-a" width="24" height="24" class="red">
+        <use id="ucc-a-u" href="#sym-inherit" fill="currentColor" />
+      </svg>
+    </div>
+
+    <!-- A stroke that follows currentColor -->
+    <div class="cell bg-green">
+      <svg id="str-a" width="24" height="24" class="red">
+        <use id="str-a-u" href="#sym-stroke" />
+      </svg>
+    </div>
+
+    <!-- Content that declares its own paint: shared by every instance, so never adapted -->
+    <div class="cell bg-green">
+      <svg id="exp-a" width="24" height="24"><use id="exp-a-u" href="#sym-explicit" /></svg>
+    </div>
+    <div class="cell bg-dgreen">
+      <svg id="exp-b" width="24" height="24"><use id="exp-b-u" href="#sym-explicit" /></svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="css-a" width="24" height="24"><use id="css-a-u" href="#sym-css" /></svg>
+    </div>
+    <!-- Two paints in the instance: multi-paint -->
+    <div class="cell bg-green">
+      <svg id="two-a" width="24" height="24" class="red"><use id="two-a-u" href="#sym-two" /></svg>
+    </div>
+
+    <!-- Not resolvable here -->
+    <div class="cell bg-green">
+      <svg id="ext-a" width="24" height="24" class="red">
+        <use id="ext-a-u" href="sprite.svg#search" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="miss-a" width="24" height="24" class="red">
+        <use id="miss-a-u" href="#nope" />
+      </svg>
+    </div>
+  </body>
+</html>

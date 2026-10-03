@@ -175,6 +175,16 @@ the analyzer skips elements with no own text: their visible text is
 identical to a nested element's, which is (or will be) independently
 analyzed.
 
+## Inline SVG (M5)
+
+An outermost inline `<svg>` is one candidate and one descriptor (`ElementDescriptor.svg`); the shapes,
+text and `<use>` content inside it are never separate descriptors, and an SVG-namespace element matched by
+`ANALYZER_SELECTOR` (a `<path class="badge">`, an `<a>` inside an SVG) is skipped in favor of its unit.
+Its foreground is the unit's single effective paint, composited with the same group-opacity model as text
+(M1.R1) over the `<svg>`'s own background chain; its background is resolved exactly as for any element, so a
+gradient or image behind an SVG is `unsupported` here too. A standalone SVG document is not inline SVG.
+Everything else (paint model, `currentColor`, `<use>`, classification) is in `docs/SVG_ANALYSIS.md`.
+
 ## Visibility
 
 Unchanged from M0's approach and still deliberately cheap: `display`,

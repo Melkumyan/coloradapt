@@ -1,3 +1,4 @@
+import { isSvgElement } from '@core/svg';
 import { isColorAdaptOwnedMutation, removesColorAdaptStyle } from './ownership';
 import { isClassChangeRelevant, isStyleChangeRelevant } from './style-relevance';
 import type { ClassifiedMutation } from './types';
@@ -19,7 +20,41 @@ export const OBSERVED_ATTRIBUTES: readonly string[] = [
   'href',
   'media',
   'rel',
+  // Presentation attributes of inline SVG (docs/SVG_ANALYSIS.md). Delivered for any element;
+  // the classifier keeps them only on SVG elements.
+  'fill',
+  'stroke',
+  'fill-opacity',
+  'stroke-opacity',
+  'stroke-width',
+  'opacity',
+  'color',
+  'display',
+  'visibility',
+  'filter',
+  'mask',
+  'mix-blend-mode',
 ];
+
+/**
+ * Attributes that change what an inline SVG paints. `href` is the `<use>` target; the legacy
+ * `xlink:href` is namespaced, which a MutationObserver `attributeFilter` never delivers.
+ */
+const SVG_PAINT_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'href',
+  'fill',
+  'stroke',
+  'fill-opacity',
+  'stroke-opacity',
+  'stroke-width',
+  'opacity',
+  'color',
+  'display',
+  'visibility',
+  'filter',
+  'mask',
+  'mix-blend-mode',
+]);
 
 /** On `<html>`/`<body>` any theme-switch attribute (`data-theme`, `data-bs-theme`, ...) counts. */
 export const THEME_ATTRIBUTE = /theme|color-?mode|color-?scheme|^data-mode$/i;
@@ -83,10 +118,16 @@ function isDocumentRoot(element: Element, doc: Document): boolean {
   return element === doc.documentElement || element === doc.body;
 }
 
-function classifyElementNode(element: Element, added: boolean): ClassifiedMutation[] {
+function classifyElementNode(element: Element, added: boolean, parent: Node): ClassifiedMutation[] {
   if (INERT_TAGS.has(element.localName)) return [{ kind: 'IRRELEVANT', reason: 'inert-tag' }];
   if (isStylesheetNode(element)) return [stylesheetChange(element)];
-  const nodeChange: ClassifiedMutation = { kind: added ? 'NODE_ADDED' : 'NODE_REMOVED', element };
+  const nodeChange: ClassifiedMutation = added
+    ? { kind: 'NODE_ADDED', element }
+    : {
+        kind: 'NODE_REMOVED',
+        element,
+        ...(parent.nodeType === Node.ELEMENT_NODE ? { parent: parent as Element } : {}),
+      };
   if (!element.firstElementChild) return [nodeChange];
 
   // Every stylesheet in the subtree counts (each pending link needs its own wait).
@@ -130,6 +171,12 @@ function classifyAttribute(record: MutationRecord, context: ClassifyContext): Cl
   if (INERT_TAGS.has(target.localName)) return { kind: 'IRRELEVANT', reason: 'inert-tag' };
 
   if (isDocumentRoot(target, context.doc) && THEME_ATTRIBUTE.test(name)) {
+    return previous === current
+      ? { kind: 'IRRELEVANT', reason: 'no-net-change' }
+      : { kind: 'STYLE_AFFECTING_ATTRIBUTE', element: target, attribute: name };
+  }
+
+  if (isSvgElement(target) && SVG_PAINT_ATTRIBUTES.has(name)) {
     return previous === current
       ? { kind: 'IRRELEVANT', reason: 'no-net-change' }
       : { kind: 'STYLE_AFFECTING_ATTRIBUTE', element: target, attribute: name };
@@ -247,7 +294,9 @@ export function classifyMutations(
       for (const node of nodes) {
         anyNode = true;
         if (node.nodeType === Node.ELEMENT_NODE) {
-          for (const mutation of classifyElementNode(node as Element, added)) push(mutation);
+          for (const mutation of classifyElementNode(node as Element, added, record.target)) {
+            push(mutation);
+          }
         } else if (node.nodeType === Node.TEXT_NODE && !textTouched) {
           textTouched = true;
           push(classifyTextParent(record.target));

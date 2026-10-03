@@ -36,16 +36,17 @@ algorithm needs to change, only `core/color` changes.
 
 ## Modules
 
-| Module                                    | Responsibility                                                                                                                                                                                        |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Color Engine (`core/color`)               | Parse/convert/compare colors; sRGB transfer functions; alpha-composite; OKLab distance; find accessible alternatives.                                                                                 |
-| Vision Engine (`core/vision`)             | Replaceable, DOM-free color vision simulation (Brettel/Viénot/Machado + approximations); pair analysis. Holds no module-level mutable state or caches (M2.R1). See `docs/COLOR_VISION_SIMULATION.md`. |
-| DOM Analyzer (`core/analysis`)            | Bounded traversal of a document, resolving each element's effective foreground/background/role — see `docs/CSS_ANALYSIS.md`.                                                                          |
-| Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                                                                                                 |
-| Adaptation Engine (`core/adaptation`)     | Constrained candidate search (OKLCH) -> `AdaptationResult` -> DOM-free `AdaptationPlan`; the stylesheet manager applies/restores a plan. See `docs/ADAPTATION_ENGINE.md`.                             |
-| Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                                                                                                    |
-| Messaging (`infrastructure/messaging`)    | Typed message contracts and a typed router, instead of ad-hoc strings.                                                                                                                                |
-| Page Analysis / Settings (`features/`)    | Content-script controller; React hooks (`useSettings`, `usePageAnalysis`) for Popup/Options.                                                                                                          |
+| Module                                    | Responsibility                                                                                                                                                                                                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Color Engine (`core/color`)               | Parse/convert/compare colors; sRGB transfer functions; alpha-composite; OKLab distance; find accessible alternatives.                                                                                                            |
+| Vision Engine (`core/vision`)             | Replaceable, DOM-free color vision simulation (Brettel/Viénot/Machado + approximations); pair analysis. Holds no module-level mutable state or caches (M2.R1). See `docs/COLOR_VISION_SIMULATION.md`.                            |
+| DOM Analyzer (`core/analysis`)            | Bounded traversal of a document, resolving each element's effective foreground/background/role — see `docs/CSS_ANALYSIS.md`.                                                                                                     |
+| SVG layer (`core/svg`)                    | Isolated analysis of inline `<svg>` units: element roles, paint model, a style probe that tells `currentColor` / inherited / explicit paint apart, `<use>`/`<symbol>`, a bounded scan, verification. See `docs/SVG_ANALYSIS.md`. |
+| Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                                                                                                                            |
+| Adaptation Engine (`core/adaptation`)     | Constrained candidate search (OKLCH) -> `AdaptationResult` -> DOM-free `AdaptationPlan`; the stylesheet manager applies/restores a plan. See `docs/ADAPTATION_ENGINE.md`.                                                        |
+| Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                                                                                                                               |
+| Messaging (`infrastructure/messaging`)    | Typed message contracts and a typed router, instead of ad-hoc strings.                                                                                                                                                           |
+| Page Analysis / Settings (`features/`)    | Content-script controller; React hooks (`useSettings`, `usePageAnalysis`) for Popup/Options.                                                                                                                                     |
 
 ## Data flow — analysis & adaptation
 
@@ -120,7 +121,16 @@ before being dispatched, since both `runtime.onMessage` and
    explicit fallback (stylesheet changes, `<html>/<body>` changes, budget
    overflow). The observer exists only while adaptation is ON. See
    `docs/DYNAMIC_ANALYSIS.md`.
-7. Disabling adaptation removes that one stylesheet. The page's original
+7. Inline `<svg>` elements (M5, `core/svg`) are analyzed as one unit each: a bounded
+   walk, one shared style probe per batch, and a single effective paint over the
+   page background. A unit that is exactly one visible paint becomes an
+   `ElementDescriptor` with `svg` info and goes through the same optimizer and
+   `AdaptationPlan`; its rules (`color` on the `<svg>`, `fill`/`stroke` on the `<svg>`,
+   shapes, or `<use>` instances) share an owner and are verified and dropped as a
+   group. Everything else is classified (`unsupportedReason`) and left alone. M4
+   handles dynamic SVG with no separate observer: anything inside an `<svg>` is a
+   change of that `<svg>`. See `docs/SVG_ANALYSIS.md`.
+8. Disabling adaptation removes that one stylesheet. The page's original
    styles were never touched, so this is an exact restore. Every analysis
    (including re-scans while adapted) runs with the stylesheet suspended, so
    the original styles stay the source of truth and adaptation never compounds.

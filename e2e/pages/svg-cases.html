@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E svg cases</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      .cell {
+        display: inline-block;
+        padding: 4px;
+        margin: 2px;
+        vertical-align: top;
+      }
+      /* red on green: a conflict for deuteranopia */
+      .bg-green {
+        background-color: #27ae60;
+      }
+      .bg-white {
+        background-color: #ffffff;
+      }
+      .btn-red {
+        color: #c0392b;
+        background-color: #27ae60;
+        border: 0;
+        padding: 4px;
+        font: inherit;
+      }
+      .red-on-green {
+        color: #c0392b;
+        background-color: #27ae60;
+        padding: 4px;
+        display: inline-block;
+      }
+
+      /* ---- specificity: red fill/stroke declared in five different places ---- */
+      .sp-class {
+        fill: #c0392b;
+      }
+      #sp-id-p {
+        fill: #c0392b;
+      }
+      .sp-wrap .sp-chain {
+        fill: #c0392b;
+      }
+      .sp-stroke-class {
+        fill: none;
+        stroke: #c0392b;
+        stroke-width: 3;
+      }
+      #sp-stroke-id-p {
+        fill: none;
+        stroke: #c0392b;
+        stroke-width: 3;
+      }
+      /* !important in the page: out-ranked by our (1,1,0) !important rule, except inline */
+      .imp-class {
+        fill: #c0392b !important;
+      }
+      #imp-id-p {
+        fill: #c0392b !important;
+      }
+      .imp-stroke-class {
+        fill: none;
+        stroke: #c0392b !important;
+        stroke-width: 3;
+      }
+      /* a page-level currentColor owner */
+      .icon-owner {
+        color: #c0392b;
+      }
+      .icon-owner svg path {
+        fill: currentColor;
+      }
+      /* a source that changes on :hover: the adapted color persists (documented, as for M3 text) */
+      .hover-src {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      .hover-src:hover {
+        color: #2980b9;
+      }
+      /* a shape that has its own `color` (cannot follow the <svg>) */
+      .local-color {
+        color: #c0392b;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ================= basic paints ================= -->
+    <div class="cell bg-green">
+      <svg id="fill-attr" width="24" height="24" viewBox="0 0 24 24">
+        <path id="fill-attr-p" fill="#c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="stroke-attr" width="24" height="24" viewBox="0 0 24 24">
+        <path id="stroke-attr-p" fill="none" stroke="#c0392b" stroke-width="3" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="fill-stroke" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="fill-stroke-p"
+          fill="#c0392b"
+          stroke="#c0392b"
+          stroke-width="2"
+          d="M4 4h16v16H4z"
+        />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="inherit-svg" width="24" height="24" viewBox="0 0 24 24" fill="#c0392b">
+        <g id="inherit-g">
+          <path id="inherit-p" d="M2 2h20v20H2z" />
+        </g>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="group-svg" width="24" height="24" viewBox="0 0 24 24">
+        <g id="group-g" fill="#c0392b">
+          <path id="group-p1" d="M2 2h9v20H2z" />
+          <path id="group-p2" d="M13 2h9v20h-9z" />
+        </g>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="two-shapes-same" width="24" height="24" viewBox="0 0 24 24">
+        <rect id="two-a" x="2" y="2" width="9" height="20" fill="#c0392b" />
+        <circle id="two-b" cx="17" cy="12" r="5" fill="rgb(192, 57, 43)" />
+      </svg>
+    </div>
+
+    <!-- ================= currentColor ================= -->
+    <div class="cell">
+      <button id="cc-btn" class="btn-red">
+        <svg id="cc-fill" width="16" height="16" viewBox="0 0 24 24">
+          <path id="cc-fill-p" fill="currentColor" d="M2 2h20v20H2z" />
+        </svg>
+        Label
+      </button>
+    </div>
+    <div class="cell">
+      <span id="cc-stroke-host" class="red-on-green">
+        <svg id="cc-stroke" width="16" height="16" viewBox="0 0 24 24">
+          <path
+            id="cc-stroke-p"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            d="M3 3h18v18H3z"
+          />
+        </svg>
+      </span>
+    </div>
+    <div id="cc-host" class="cell" style="color: #c0392b; background-color: #27ae60">
+      <svg id="cc-only" width="24" height="24" viewBox="0 0 24 24">
+        <path id="cc-only-p" fill="currentColor" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div id="cc-owner" class="cell bg-green icon-owner">
+      <svg id="cc-css" width="24" height="24" viewBox="0 0 24 24">
+        <path id="cc-css-p" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <!-- fill and stroke both currentColor: one `color` rule, not two -->
+    <div class="cell red-on-green">
+      <svg id="cc-both" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="cc-both-p"
+          fill="currentColor"
+          stroke="currentColor"
+          stroke-width="2"
+          d="M4 4h16v16H4z"
+        />
+      </svg>
+    </div>
+    <!-- the icon-library pattern: currentColor declared on the <svg> itself -->
+    <div class="cell red-on-green">
+      <svg
+        id="cc-root-stroke"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="3"
+      >
+        <path id="cc-root-stroke-p" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <div class="cell red-on-green">
+      <svg id="cc-root-fill" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path id="cc-root-fill-p" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <!-- fill: currentColor declared on a page ancestor: whichever way the browser inherits it,
+         the paint the browser shows must be the planned one -->
+    <div id="cc-ancestor" class="cell red-on-green" style="fill: currentColor">
+      <svg id="cc-ancestor-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="cc-ancestor-p" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <!-- a path with its own local `color`: the <svg> rule cannot reach it -->
+    <div class="cell red-on-green">
+      <svg id="cc-local" width="24" height="24" viewBox="0 0 24 24">
+        <path id="cc-local-p" class="local-color" fill="currentColor" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+
+    <div id="hover-host" class="cell hover-src">
+      <svg id="hover-icon" width="24" height="24" viewBox="0 0 24 24">
+        <path id="hover-icon-p" fill="currentColor" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+
+    <!-- ================= SVG text ================= -->
+    <div class="cell bg-green">
+      <svg id="svg-text" width="80" height="24">
+        <text id="svg-text-t" x="2" y="18" fill="#c0392b">Label</text>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="svg-tspan" width="80" height="24">
+        <text id="svg-tspan-t" x="2" y="18">
+          <tspan id="svg-tspan-s" fill="#c0392b">Label</tspan>
+        </text>
+      </svg>
+    </div>
+    <div class="cell red-on-green">
+      <svg id="svg-text-cc" width="80" height="24">
+        <text id="svg-text-cc-t" x="2" y="18" fill="currentColor">Label</text>
+      </svg>
+    </div>
+
+    <!-- ================= accessible: nothing to do ================= -->
+    <div class="cell bg-white">
+      <svg id="good" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <path id="good-p" fill="#000000" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="decorative" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+        <path id="decorative-p" fill="#c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="labelled" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="ok">
+        <title>ok</title>
+        <path id="labelled-p" fill="#c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+
+    <!-- ================= opacity: analyzed, never rewritten ================= -->
+    <div class="cell bg-green">
+      <svg id="op-svg" width="24" height="24" viewBox="0 0 24 24" style="opacity: 0.6">
+        <path id="op-svg-p" fill="#c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="op-fill" width="24" height="24" viewBox="0 0 24 24">
+        <path id="op-fill-p" fill="#c0392b" fill-opacity="0.6" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="op-stroke" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="op-stroke-p"
+          fill="none"
+          stroke="#c0392b"
+          stroke-opacity="0.6"
+          stroke-width="3"
+          d="M3 3h18v18H3z"
+        />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="op-group" width="24" height="24" viewBox="0 0 24 24">
+        <g opacity="0.6">
+          <path id="op-group-p" fill="#c0392b" d="M2 2h20v20H2z" />
+        </g>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="op-alpha" width="24" height="24" viewBox="0 0 24 24">
+        <path id="op-alpha-p" fill="rgba(192, 57, 43, 0.6)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green" style="opacity: 0.6">
+      <svg id="op-parent" width="24" height="24" viewBox="0 0 24 24">
+        <path id="op-parent-p" fill="#c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+
+    <!-- ================= unsupported: classified, never recolored ================= -->
+    <div class="cell bg-green">
+      <svg id="u-gradient" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <linearGradient id="lg">
+            <stop offset="0" stop-color="#c0392b" />
+            <stop offset="1" stop-color="#c0392b" />
+          </linearGradient>
+        </defs>
+        <path id="u-gradient-p" fill="url(#lg)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-radial" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <radialGradient id="rg"><stop offset="0" stop-color="#c0392b" /></radialGradient>
+        </defs>
+        <path id="u-radial-p" fill="none" stroke="url(#rg)" stroke-width="3" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-pattern" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <pattern id="pt" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="2" height="2" fill="#c0392b" />
+          </pattern>
+        </defs>
+        <path id="u-pattern-p" fill="url(#pt)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-mask" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <mask id="mk"><rect width="24" height="12" fill="#ffffff" /></mask>
+        </defs>
+        <path id="u-mask-p" fill="#c0392b" mask="url(#mk)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-filter" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <filter id="fl"><feColorMatrix type="hueRotate" values="90" /></filter>
+        </defs>
+        <path id="u-filter-p" fill="#c0392b" filter="url(#fl)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-blend" width="24" height="24" viewBox="0 0 24 24">
+        <path id="u-blend-p" fill="#c0392b" style="mix-blend-mode: multiply" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-clip" width="24" height="24" viewBox="0 0 24 24">
+        <defs>
+          <clipPath id="cp"><rect width="24" height="12" /></clipPath>
+        </defs>
+        <path id="u-clip-p" fill="#c0392b" clip-path="url(#cp)" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-multi" width="24" height="24" viewBox="0 0 24 24">
+        <circle id="u-multi-a" cx="12" cy="12" r="10" fill="#c0392b" />
+        <path id="u-multi-b" fill="#ffffff" d="M10 6h4v8h-4zM10 16h4v2h-4z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-fill-stroke-diff" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="u-fill-stroke-diff-p"
+          fill="#c0392b"
+          stroke="#1b1b1b"
+          stroke-width="2"
+          d="M4 4h16v16H4z"
+        />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-chart" width="120" height="60" viewBox="0 0 120 60">
+        <rect id="u-chart-a" x="5" y="30" width="20" height="25" fill="#c0392b" />
+        <rect id="u-chart-b" x="35" y="20" width="20" height="35" fill="#1b1b1b" />
+        <rect id="u-chart-c" x="65" y="10" width="20" height="45" fill="#2980b9" />
+        <text x="5" y="58" fill="#1b1b1b">A</text>
+        <text x="35" y="58" fill="#1b1b1b">B</text>
+        <text x="65" y="58" fill="#1b1b1b">C</text>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-complex" width="80" height="80" viewBox="0 0 80 80" fill="#c0392b">
+        <script>
+          // 30 same-colored squares: over the painted-element threshold, however simple.
+          (() => {
+            const svg = document.currentScript.parentNode;
+            for (let i = 0; i < 30; i += 1) {
+              const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+              r.setAttribute('x', String((i % 6) * 12));
+              r.setAttribute('y', String(Math.floor(i / 6) * 12));
+              r.setAttribute('width', '10');
+              r.setAttribute('height', '10');
+              svg.appendChild(r);
+            }
+          })();
+        </script>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-foreign" width="60" height="24">
+        <foreignObject width="60" height="24"
+          ><span id="u-foreign-span" class="btn-red">x</span></foreignObject
+        >
+        <path id="u-foreign-p" fill="#c0392b" d="M2 2h10v10H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-smil" width="24" height="24" viewBox="0 0 24 24">
+        <path id="u-smil-p" fill="#c0392b" d="M2 2h20v20H2z">
+          <animate
+            attributeName="fill"
+            values="#c0392b;#c0392b"
+            dur="10s"
+            repeatCount="indefinite"
+          />
+        </path>
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-extuse" width="24" height="24" viewBox="0 0 24 24" style="color: #c0392b">
+        <use id="u-extuse-u" href="icons.svg#search" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="u-missing" width="24" height="24" viewBox="0 0 24 24" style="color: #c0392b">
+        <use id="u-missing-u" href="#nothing-here" />
+      </svg>
+    </div>
+    <!-- <img> with an SVG: not inline, never touched -->
+    <div class="cell bg-green">
+      <img
+        id="img-svg"
+        alt=""
+        width="24"
+        height="24"
+        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect width='24' height='24' fill='%23c0392b'/%3E%3C/svg%3E"
+      />
+    </div>
+
+    <!-- ================= specificity ================= -->
+    <div class="cell bg-green">
+      <svg id="sp-class-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-class-p" class="sp-class" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="sp-id-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-id-p" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green sp-wrap">
+      <svg id="sp-chain-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-chain-p" class="sp-chain" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="sp-inline-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-inline-p" style="fill: #c0392b" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="sp-stroke-class-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-stroke-class-p" class="sp-stroke-class" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="sp-stroke-id-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="sp-stroke-id-p" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="imp-class-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="imp-class-p" class="imp-class" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="imp-id-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="imp-id-p" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="imp-stroke-class-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="imp-stroke-class-p" class="imp-stroke-class" d="M3 3h18v18H3z" />
+      </svg>
+    </div>
+    <!-- inline !important out-ranks everything we can write: reported, not applied -->
+    <div class="cell bg-green">
+      <svg id="imp-inline-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path id="imp-inline-p" style="fill: #c0392b !important" d="M2 2h20v20H2z" />
+      </svg>
+    </div>
+    <div class="cell bg-green">
+      <svg id="imp-inline-stroke-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="imp-inline-stroke-p"
+          fill="none"
+          stroke-width="3"
+          style="stroke: #c0392b !important"
+          d="M3 3h18v18H3z"
+        />
+      </svg>
+    </div>
+    <!-- the same inline declaration without !important loses to our rule -->
+    <div class="cell bg-green">
+      <svg id="inline-stroke-svg" width="24" height="24" viewBox="0 0 24 24">
+        <path
+          id="inline-stroke-p"
+          fill="none"
+          stroke-width="3"
+          style="stroke: #c0392b"
+          d="M3 3h18v18H3z"
+        />
+      </svg>
+    </div>
+  </body>
+</html>

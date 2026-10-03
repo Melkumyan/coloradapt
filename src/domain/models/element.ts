@@ -1,4 +1,5 @@
 import type { ColorPair, ColorValue } from './color';
+import type { SvgUnitInfo } from './svg';
 
 /**
  * Coarse semantic role of an analyzed element. This is the seam where
@@ -60,4 +61,10 @@ export interface ElementDescriptor {
   readonly isVisible: boolean;
   readonly hasTextContent: boolean;
   readonly disabled?: boolean;
+  /**
+   * Present on an outermost inline `<svg>` (docs/SVG_ANALYSIS.md). The
+   * descriptor then stands for the whole SVG: `colorPair.foreground` is its
+   * single effective paint, and `svg.targets` say which rules would change it.
+   */
+  readonly svg?: SvgUnitInfo;
 }

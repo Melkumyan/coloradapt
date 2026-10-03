@@ -1,6 +1,7 @@
 import type { AdaptationChange } from '@domain/models';
 import { ELEMENT_ID_ATTRIBUTE } from '@core/analysis';
 import { parseColor } from '@core/color';
+import { verifySvgPaints } from '@core/svg';
 
 export const STYLE_ELEMENT_ID = 'coloradapt-stylesheet';
 
@@ -30,6 +31,11 @@ function escapeAttributeValue(value: string): string {
   return value.replace(/["\\]/g, '\\$&');
 }
 
+/** A rule is identified by the element it targets and the property it writes. */
+export function ruleKey(change: AdaptationChange): string {
+  return `${change.elementId}\u0000${change.property}`;
+}
+
 function selectorFor(change: AdaptationChange): string {
   return `[${ELEMENT_ID_ATTRIBUTE}="${escapeAttributeValue(change.elementId)}"]${SPECIFICITY_BUMP}`;
 }
@@ -45,7 +51,7 @@ function buildCss(changes: readonly AdaptationChange[]): string {
 export interface RuleDelta {
   /** Rules to add, or to replace when the element already has one. */
   readonly upsert: readonly AdaptationChange[];
-  /** Element ids whose rule is dropped. Unknown ids are ignored. */
+  /** Ids whose rules are dropped (an element, or an owner such as an SVG). Unknown ids are ignored. */
   readonly remove: readonly string[];
 }
 
@@ -56,6 +62,8 @@ export interface DeltaApplyResult extends ApplyResult {
   readonly updated: number;
   /** Rules dropped — requested removals plus upserts the browser did not honor. */
   readonly removed: number;
+  /** Rules dropped because their owner's new rule set no longer includes them. */
+  readonly pruned: number;
 }
 
 export interface ApplyResult {
@@ -80,15 +88,20 @@ export interface ApplyResult {
  * `apply` reads the browser's computed values back and reports what was not
  * honored: a plan is never trusted over the real cascade.
  *
- * The current rule per element lives in a map keyed by element id, so a
- * rule can be upserted or removed individually (`applyDelta`) and can never
- * be duplicated: updating one element 100 times leaves one rule. The sheet
- * text is regenerated from that map only when the delta changes something.
+ * The current rule per (element, property) lives in a map, so a rule can be
+ * upserted or removed individually (`applyDelta`) and can never be duplicated:
+ * updating one element 100 times leaves one rule. An inline SVG's rules target
+ * several elements (its `<svg>` and some shapes) but share an *owner*: they are
+ * replaced, verified and dropped as one group. The sheet text is regenerated
+ * from the map only when the delta changes something.
  */
 export class StylesheetManager {
   #doc: Document;
   #styleElement: HTMLStyleElement | null = null;
+  /** Rules by {@link ruleKey}. */
   #rules = new Map<string, AdaptationChange>();
+  /** Rule keys by element id *and* by owner id: one lookup finds everything an id owns. */
+  #index = new Map<string, Set<string>>();
 
   constructor(doc: Document = document) {
     this.#doc = doc;
@@ -101,7 +114,8 @@ export class StylesheetManager {
       return { applied: [], notApplied: [] };
     }
 
-    this.#rules = new Map(changes.map((change) => [change.elementId, change]));
+    this.#clearRules();
+    for (const change of changes) this.#setRule(change);
     const styleElement = this.#ensureStyleElement();
     this.#commit(styleElement, this.#css());
 
@@ -118,10 +132,30 @@ export class StylesheetManager {
    */
   applyDelta(delta: RuleDelta, nodes?: ReadonlyMap<string, Element>): DeltaApplyResult {
     let removed = 0;
+    let pruned = 0;
     let dirty = false;
     for (const id of delta.remove) {
-      if (this.#rules.delete(id)) {
-        removed += 1;
+      const dropped = this.#deleteRulesOf(id);
+      if (dropped > 0) {
+        removed += dropped;
+        dirty = true;
+      }
+    }
+
+    // An owner's rules are replaced as a group: whatever it had before and does not
+    // submit again (an SVG whose paint moved from one shape to its <svg>) is dropped.
+    const submitted = new Map<string, Set<string>>();
+    for (const change of delta.upsert) {
+      if (change.ownerId === undefined) continue;
+      const keys = submitted.get(change.ownerId) ?? new Set<string>();
+      keys.add(ruleKey(change));
+      submitted.set(change.ownerId, keys);
+    }
+    for (const [ownerId, keep] of submitted) {
+      for (const key of [...(this.#index.get(ownerId) ?? [])]) {
+        if (keep.has(key)) continue;
+        this.#deleteRule(key);
+        pruned += 1;
         dirty = true;
       }
     }
@@ -129,11 +163,9 @@ export class StylesheetManager {
     let added = 0;
     let updated = 0;
     for (const change of delta.upsert) {
-      const existing = this.#rules.get(change.elementId);
-      if (existing?.property === change.property && existing.adaptedValue === change.adaptedValue) {
-        continue;
-      }
-      this.#rules.set(change.elementId, change);
+      const existing = this.#rules.get(ruleKey(change));
+      if (existing?.adaptedValue === change.adaptedValue) continue;
+      this.#setRule(change);
       dirty = true;
       if (existing) updated += 1;
       else added += 1;
@@ -141,7 +173,7 @@ export class StylesheetManager {
 
     if (this.#rules.size === 0) {
       this.restore();
-      return { applied: [], notApplied: [], added, updated, removed };
+      return { applied: [], notApplied: [], added, updated, removed, pruned };
     }
     // Content changed, or the page deleted our <style> out from under us.
     const wasAttached = this.#styleElement?.isConnected === true;
@@ -152,17 +184,17 @@ export class StylesheetManager {
 
     const { applied, notApplied } = this.#verify(delta.upsert, nodes);
     removed += this.#dropUnapplied(notApplied, styleElement);
-    return { applied, notApplied, added, updated, removed };
+    return { applied, notApplied, added, updated, removed, pruned };
   }
 
-  /** Whether an adaptation rule currently exists for `elementId`. */
-  has(elementId: string): boolean {
-    return this.#rules.has(elementId);
+  /** Whether any rule targets, or belongs to, `id` (an element, or an owner such as an SVG). */
+  has(id: string): boolean {
+    return (this.#index.get(id)?.size ?? 0) > 0;
   }
 
-  /** The change behind a rule, if that element has one. */
-  ruleFor(elementId: string): AdaptationChange | undefined {
-    return this.#rules.get(elementId);
+  /** The change behind the rule for `property` on `elementId`, if there is one. */
+  ruleFor(elementId: string, property = 'color'): AdaptationChange | undefined {
+    return this.#rules.get(`${elementId}\u0000${property}`);
   }
 
   /** Number of rules currently in the sheet. */
@@ -170,9 +202,9 @@ export class StylesheetManager {
     return this.#rules.size;
   }
 
-  /** Ids with a rule (a snapshot; for diagnostics and tests). */
+  /** Ids of the elements rules target, each once (a snapshot; for diagnostics and tests). */
   ruleIds(): string[] {
-    return [...this.#rules.keys()];
+    return [...new Set([...this.#rules.values()].map((change) => change.elementId))];
   }
 
   /**
@@ -202,19 +234,38 @@ export class StylesheetManager {
     changes: readonly AdaptationChange[],
     nodes?: ReadonlyMap<string, Element>,
   ): { applied: AdaptationChange[]; notApplied: AdaptationChange[] } {
+    const failed = new Set<AdaptationChange>();
+    for (const change of changes) {
+      if (!this.#isApplied(change, nodes?.get(change.elementId))) failed.add(change);
+    }
+
+    // Rules that share an owner stand or fall together: an SVG half-adapted is not adapted.
+    const groups = new Map<string, AdaptationChange[]>();
+    for (const change of changes) {
+      if (change.ownerId === undefined) continue;
+      const group = groups.get(change.ownerId) ?? [];
+      group.push(change);
+      groups.set(change.ownerId, group);
+    }
+    for (const [ownerId, group] of groups) {
+      const broken =
+        group.some((change) => failed.has(change)) || !this.#isOwnerApplied(ownerId, group, nodes);
+      if (broken) for (const change of group) failed.add(change);
+    }
+
     const applied: AdaptationChange[] = [];
     const notApplied: AdaptationChange[] = [];
-    for (const change of changes) {
-      (this.#isApplied(change, nodes?.get(change.elementId)) ? applied : notApplied).push(change);
-    }
+    for (const change of changes) (failed.has(change) ? notApplied : applied).push(change);
     return { applied, notApplied };
   }
 
-  /** Removes the rules the browser did not honor; returns how many existed. */
+  /** Removes the rules the browser did not honor (whole owner groups); returns how many existed. */
   #dropUnapplied(notApplied: readonly AdaptationChange[], styleElement: HTMLStyleElement): number {
     if (notApplied.length === 0) return 0;
     let dropped = 0;
-    for (const change of notApplied) if (this.#rules.delete(change.elementId)) dropped += 1;
+    for (const change of notApplied) {
+      dropped += this.#deleteRulesOf(change.ownerId ?? change.elementId);
+    }
     if (this.#rules.size === 0) this.restore();
     else this.#commit(styleElement, this.#css());
     return dropped;
@@ -243,8 +294,36 @@ export class StylesheetManager {
     }
   }
 
+  /**
+   * Runs `read` with `css` added on top of whatever the sheet holds right now
+   * (call it inside {@link withOriginalStyles}, so the page's own styles are what
+   * the probe sits on). One synchronous style flush in, one out, nothing painted
+   * in between; `css` is expected to suppress the transitions it could start
+   * (see `buildProbeCss`). Creates the `<style>` element if there is none yet
+   * and removes it again if nothing else needs it.
+   */
+  withProbe<T>(css: string, read: () => T): T {
+    const existed = this.#styleElement?.isConnected === true;
+    const styleElement = this.#ensureStyleElement();
+    const previous = styleElement.textContent ?? '';
+    styleElement.textContent = `${previous}\n${css}`;
+    this.#flushStyle();
+    try {
+      return read();
+    } finally {
+      // The probe leaves with its transition suppression still in effect for one flush, so a
+      // page's `transition: fill` has nothing to start from; then the sheet is as it was.
+      this.#flushStyle();
+      styleElement.textContent = previous;
+      if (!existed && this.#rules.size === 0) {
+        styleElement.remove();
+        this.#styleElement = null;
+      }
+    }
+  }
+
   restore(): void {
-    this.#rules.clear();
+    this.#clearRules();
     const styleElement = this.#styleElement;
     if (styleElement?.isConnected) {
       // Original colors return with transitions suppressed, then the sheet goes.
@@ -283,6 +362,62 @@ export class StylesheetManager {
       Math.abs(computed.g - planned.g) <= APPLIED_TOLERANCE &&
       Math.abs(computed.b - planned.b) <= APPLIED_TOLERANCE
     );
+  }
+
+  /**
+   * The unit-level check for an owner whose rules target several elements: every
+   * visible paint of its shapes must read the planned color, whatever rule or
+   * local declaration is behind it.
+   */
+  #isOwnerApplied(
+    ownerId: string,
+    group: readonly AdaptationChange[],
+    nodes?: ReadonlyMap<string, Element>,
+  ): boolean {
+    const view = this.#doc.defaultView;
+    const first = group[0];
+    if (!view || !first) return false;
+    const owner =
+      nodes?.get(ownerId) ??
+      this.#doc.querySelector(`[${ELEMENT_ID_ATTRIBUTE}="${escapeAttributeValue(ownerId)}"]`);
+    const planned = parseColor(first.adaptedValue);
+    if (!owner || !planned) return false;
+    return verifySvgPaints(owner, planned, (element) => view.getComputedStyle(element));
+  }
+
+  #setRule(change: AdaptationChange): void {
+    const key = ruleKey(change);
+    this.#deleteRule(key);
+    this.#rules.set(key, change);
+    for (const id of new Set([change.elementId, change.ownerId ?? change.elementId])) {
+      const keys = this.#index.get(id) ?? new Set<string>();
+      keys.add(key);
+      this.#index.set(id, keys);
+    }
+  }
+
+  #deleteRule(key: string): boolean {
+    const change = this.#rules.get(key);
+    if (!change) return false;
+    this.#rules.delete(key);
+    for (const id of new Set([change.elementId, change.ownerId ?? change.elementId])) {
+      const keys = this.#index.get(id);
+      keys?.delete(key);
+      if (keys?.size === 0) this.#index.delete(id);
+    }
+    return true;
+  }
+
+  /** Drops every rule that targets, or belongs to, `id`; returns how many there were. */
+  #deleteRulesOf(id: string): number {
+    let dropped = 0;
+    for (const key of [...(this.#index.get(id) ?? [])]) if (this.#deleteRule(key)) dropped += 1;
+    return dropped;
+  }
+
+  #clearRules(): void {
+    this.#rules.clear();
+    this.#index.clear();
   }
 
   #ensureStyleElement(): HTMLStyleElement {

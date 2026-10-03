@@ -8,6 +8,7 @@ import {
   createOutcomeCounts,
   createPlanningContext,
   planElement,
+  ruleKey,
   toSummary,
   type ElementOutcome,
   type OutcomeCounts,
@@ -19,6 +20,9 @@ import type {
   AdaptationChange,
   AdaptationDelta,
   AdaptationSummary,
+  ElementDescriptor,
+  SvgDiagnostics,
+  SvgUnitInfo,
   UserSettings,
 } from '@domain/models';
 import { findNotAdaptable } from './adaptability';
@@ -58,12 +62,19 @@ export interface IncrementalAdaptation {
   readonly ruleCount: number;
   /** Elements the bookkeeping currently tracks (ids only; for leak tests and diagnostics). */
   trackedCount(): number;
+  /** Gauges of the inline-SVG units currently tracked. */
+  svgDiagnostics(): SvgDiagnostics;
   /** Re-analyzes `input.roots` and applies only the difference. */
   update(input: IncrementalPassInput): IncrementalPassResult;
   /** Re-attaches the sheet if the page removed it. */
   repairStylesheet(): boolean;
   /** The injected `<style>` element, if any (for mutation-ownership checks). */
   readonly styleElement: HTMLStyleElement | null;
+}
+
+/** The analyzed element a change belongs to (an inline SVG for all of its rules). */
+function owner(change: AdaptationChange): string {
+  return change.ownerId ?? change.elementId;
 }
 
 const EMPTY_RESULT: IncrementalPassResult = {
@@ -89,6 +100,8 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
   #memo: PlanningMemo = new Map();
   #kinds = new Map<string, TrackedKind>();
   #counts: OutcomeCounts = createOutcomeCounts();
+  /** What is known about each tracked inline SVG: data only, never a node. */
+  #svg = new Map<string, Pick<SvgUnitInfo, 'unsupportedReason' | 'paintServer'>>();
 
   constructor(
     doc: Document,
@@ -117,14 +130,17 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     settings: UserSettings,
     outcomes: ReadonlyMap<string, ElementOutcome>,
     notApplied: ReadonlySet<string>,
+    elements: readonly ElementDescriptor[] = [],
   ): void {
     this.#context = createPlanningContext(settings);
     this.#memo = new Map();
     this.#kinds = new Map();
+    this.#svg = new Map();
     this.#counts = createOutcomeCounts();
     for (const [id, outcome] of outcomes) {
       this.#track(id, notApplied.has(id) ? 'notApplied' : outcome.kind);
     }
+    for (const element of elements) this.#trackSvg(element);
   }
 
   /** Stops tracking and forgets everything (adaptation switched off). */
@@ -132,6 +148,7 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     this.#context = null;
     this.#memo = new Map();
     this.#kinds = new Map();
+    this.#svg = new Map();
     this.#counts = createOutcomeCounts();
   }
 
@@ -141,6 +158,27 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
   trackedCount(): number {
     return this.#kinds.size;
+  }
+
+  svgDiagnostics(): SvgDiagnostics {
+    let svgAdapted = 0;
+    let svgUnsupported = 0;
+    let svgNotApplied = 0;
+    let svgPaintServers = 0;
+    for (const [id, info] of this.#svg) {
+      const kind = this.#kinds.get(id);
+      if (kind === 'adapted') svgAdapted += 1;
+      if (kind === 'notApplied') svgNotApplied += 1;
+      if (info.unsupportedReason) svgUnsupported += 1;
+      if (info.paintServer) svgPaintServers += 1;
+    }
+    return {
+      svgAnalyzed: this.#svg.size,
+      svgAdapted,
+      svgUnsupported,
+      svgNotApplied,
+      svgPaintServers,
+    };
   }
 
   repairStylesheet(): boolean {
@@ -202,9 +240,10 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
         this.#memo,
       );
       this.#track(element.id, outcome.kind);
+      this.#trackSvg(element);
       if (outcome.kind === 'unresolved') unresolved += 1;
       if (outcome.kind === 'adapted') {
-        upserts.push(outcome.change);
+        upserts.push(...outcome.changes);
         removals.delete(element.id);
       } else if (this.#stylesheet.has(element.id)) {
         removals.add(element.id);
@@ -213,22 +252,27 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     if (this.#memo.size > MAX_MEMO_ENTRIES) this.#memo = new Map();
 
     const previous = new Map(
-      upserts.map((change) => [change.elementId, this.#stylesheet.ruleFor(change.elementId)]),
+      upserts.map((change) => [
+        ruleKey(change),
+        this.#stylesheet.ruleFor(change.elementId, change.property),
+      ]),
     );
     const result = this.#stylesheet.applyDelta(
       { upsert: upserts, remove: [...removals] },
       sub.nodes,
     );
-    for (const change of result.notApplied) this.#track(change.elementId, 'notApplied');
+    for (const change of result.notApplied) this.#track(owner(change), 'notApplied');
 
-    const dropped = new Set(result.notApplied.map((change) => change.elementId));
+    const dropped = new Set(result.notApplied.map(owner));
     // A rule the browser refused to honor is gone again, even if an earlier value had one.
-    for (const id of dropped) if (previous.get(id)) removals.add(id);
+    for (const change of upserts) {
+      if (dropped.has(owner(change)) && previous.get(ruleKey(change))) removals.add(owner(change));
+    }
     const added: AdaptationChange[] = [];
     const updated: AdaptationChange[] = [];
     for (const change of upserts) {
-      if (dropped.has(change.elementId)) continue;
-      const before = previous.get(change.elementId);
+      if (dropped.has(owner(change))) continue;
+      const before = previous.get(ruleKey(change));
       if (!before) added.push(change);
       else if (before.adaptedValue !== change.adaptedValue) updated.push(change);
     }
@@ -244,7 +288,11 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
         notApplied: result.notApplied,
         unresolved,
       },
-      rules: { added: added.length, updated: updated.length, removed: removals.size },
+      rules: {
+        added: added.length,
+        updated: updated.length,
+        removed: removals.size + result.pruned,
+      },
     };
   }
 
@@ -256,7 +304,17 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     this.#counts[kind] += 1;
   }
 
+  #trackSvg(element: ElementDescriptor): void {
+    const info = element.svg;
+    if (!info) return;
+    this.#svg.set(element.id, {
+      unsupportedReason: info.unsupportedReason,
+      paintServer: info.paintServer,
+    });
+  }
+
   #untrack(id: string): void {
+    this.#svg.delete(id);
     const before = this.#kinds.get(id);
     if (!before) return;
     this.#counts[before] -= 1;

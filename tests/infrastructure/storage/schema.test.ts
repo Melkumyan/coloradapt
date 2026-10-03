@@ -32,6 +32,33 @@ describe('parseUserSettings', () => {
     expect(result.improveLinks).toBe(false);
   });
 
+  describe('adaptSVG (M5.R1 migration)', () => {
+    it('is true on a fresh install', () => {
+      expect(DEFAULT_USER_SETTINGS.adaptSVG).toBe(true);
+      expect(parseUserSettings(undefined).adaptSVG).toBe(true);
+    });
+
+    it('settings stored before M5 (no adaptSVG field) load with the product default, true', () => {
+      const { adaptSVG: _omitted, ...beforeM5 } = DEFAULT_USER_SETTINGS;
+      const old = { ...beforeM5, visionProfile: 'protanopia', improveLinks: false };
+      const result = parseUserSettings(old);
+      expect(result.adaptSVG).toBe(true);
+      // ...and nothing else about the stored settings changed.
+      expect(result).toMatchObject({ visionProfile: 'protanopia', improveLinks: false });
+    });
+
+    it('an explicitly stored value is never overridden, true or false', () => {
+      expect(parseUserSettings({ adaptSVG: false }).adaptSVG).toBe(false);
+      expect(parseUserSettings({ adaptSVG: true }).adaptSVG).toBe(true);
+    });
+
+    it('a non-boolean stored value falls back to the default instead of rejecting the object', () => {
+      const result = parseUserSettings({ adaptSVG: 'no', enabled: false });
+      expect(result.adaptSVG).toBe(true);
+      expect(result.enabled).toBe(false);
+    });
+  });
+
   it('drops malformed site overrides but keeps valid ones', () => {
     const result = parseUserSettings({
       siteOverrides: {

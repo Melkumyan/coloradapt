@@ -101,6 +101,51 @@ Unit tests (`tests/features/dynamic/`) inject a manual scheduler
 (`createManualScheduler`) and call `controller.dynamic.flush()`; mutation
 records come from a real jsdom `MutationObserver`. See `docs/DYNAMIC_ANALYSIS.md`.
 
+### Inline SVG (M5)
+
+`e2e/svg-paint.spec.ts` and `e2e/svg-dynamic.spec.ts` (helpers in `e2e/svg-kit.ts`, pages
+`e2e/pages/svg-cases.html`, `svg-use.html`, `svg-dynamic.html`). Everything is read from
+the browser: computed `fill`/`stroke`/`color` per rule target (`plannedByOwner` maps the
+plan's changes to DOM ids, grouped by owning `<svg>`), the injected `<style>`
+(`sheetRules`, `expectOnlyOwnRules`), the last analysis (`svgUnits`, per-unit
+`unsupportedReason` / `partialReason`), and **rendered pixels** (`pixelAt`) for `<use>`
+instances, which are not part of the DOM and invisible to `getComputedStyle`. Give every
+fixture element an `id`; sample the middle of a solid area (antialiasing makes edges
+useless). Dynamic scenarios reuse the M4 kit (`load`, `step`, `expectConsistent`,
+`expectNoWork`).
+
+Unit tests for the SVG layer (`tests/core/svg/`) cannot use jsdom's `getComputedStyle`
+(it knows no SVG inheritance, and resolves `currentColor` wrongly), so they run on a
+miniature CSS engine, `tests/core/svg/fake-engine.ts`: presentation attributes, rules,
+inline style, the inheritance of `fill`/`stroke`/`color`, `currentColor`, the style
+probe, ColorAdapt's own sheet rules and `installFakeComputedStyle` for the controller
+tests. If you add an SVG feature, extend the engine rather than mocking per test.
+
+```bash
+# the SVG-focused suites, as used for the M5 stability runs
+pnpm vitest run tests/core/svg tests/core/adaptation/svg-plan.test.ts \
+  tests/core/adaptation/stylesheet-owner.test.ts tests/core/analysis/svg-integration.test.ts \
+  tests/features/svg-controller.test.ts tests/features/dynamic/svg-dynamic.test.ts
+pnpm exec playwright test e2e/svg-paint.spec.ts e2e/svg-dynamic.spec.ts e2e/svg-validation.spec.ts   # after `pnpm build`
+```
+
+`e2e/svg-validation.spec.ts` (M5.R1) holds the cross-cutting checks: the `adaptSVG` default and
+toggle, ON/OFF x10, refresh drift, multi-paint, paint servers, budget boundaries, retention.
+
+### Stability runs and the hostile-cycle test
+
+Nothing in the E2E suites may depend on wall-clock timing. The one place where the pipeline itself
+reads a clock, the spaced repair of ColorAdapt's `<style>`, is asserted through counters
+(`batches = 6 x cycles + stylesheetRepairsDeferred`) in `e2e/r1-pipeline.spec.ts`, and at unit level
+with an injected clock/scheduler (`createDynamicContentController(..., { scheduler, now })`).
+One `120 hostile cycles` run takes about 1.7 minutes because every deferred repair waits for its real
+timer. Run stability loops one at a time, never concurrently:
+
+```bash
+pnpm exec playwright test e2e/r1-pipeline.spec.ts -g "120 hostile" --repeat-each=100
+pnpm test:e2e    # the whole Chromium suite; repeat it sequentially for a stability run
+```
+
 ### Adaptation benchmark
 
 `tests/benchmarks/` runs as part of `pnpm test` and writes
@@ -126,8 +171,8 @@ See `docs/ARCHITECTURE.md` for the full layering rationale, and
 resolved. In short:
 
 - `src/domain` — pure types, no logic.
-- `src/core` — pure(ish) business logic (color math, DOM analysis,
-  conflict detection, adaptation). No React, no `wxt/browser`.
+- `src/core` — pure(ish) business logic (color math, DOM analysis, the isolated
+  SVG layer `core/svg`, conflict detection, adaptation). No React, no `wxt/browser`.
 - `src/infrastructure` — the only layer allowed to import `wxt/browser`
   (storage, messaging).
 - `src/features` — React hooks and the content-script controllers that wire

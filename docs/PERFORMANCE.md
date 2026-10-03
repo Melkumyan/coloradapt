@@ -49,7 +49,7 @@ Defined in `src/shared/constants/performance.ts`:
 | `maxDurationMs` | 50 ms   | A single analysis pass should not visibly block the page.                                                   |
 
 These are tuning knobs, not hard architectural constraints — revisit them
-with real profiling data as the analyzer grows (SVG, charts, images).
+with real profiling data as the analyzer grows (charts, images; SVG has its own table above).
 
 ## Dynamic pipeline budgets (M4)
 
@@ -81,6 +81,59 @@ The benchmark (`tests/benchmarks/dynamic-benchmark.test.ts`, report in
 `benchmark-report/dynamic-benchmark.json`) asserts counters only: 500 synchronous
 inserts = 1 pass; 1000 inserts = 1 full rescan; 1 insert into a 1000-row page = 1 element
 analyzed. Wall-clock is recorded for information and never asserted.
+
+### Repair cadence is not a performance claim about time
+
+`stylesheetRepairMinIntervalMs` only bounds how _often_ the page-deleted `<style>` is put back.
+The tests do not assert wall-clock outcomes of it: they assert the structural equation
+`batches = real-work batches + stylesheetRepairsDeferred` and that deferrals never exceed
+repairs (`docs/DYNAMIC_ANALYSIS.md`, "Determinism of the repair cadence").
+
+## Inline SVG budgets (M5)
+
+Defined in `SVG_BUDGET` (`src/shared/constants/svg.ts`). They are structural engineering
+thresholds, never wall-clock values, and exceeding one makes the SVG `complex-svg`
+(unsupported) instead of half-analyzed:
+
+| Budget                  | Default | Meaning                                                             |
+| ----------------------- | ------- | ------------------------------------------------------------------- |
+| `maxDescendants`        | 200     | elements visited in one outermost `<svg>` (and its `<use>` content) |
+| `maxPaintedElements`    | 24      | painted shapes + text + `<use>` instances in one `<svg>`            |
+| `maxUseContentElements` | 24      | painted elements in one `<use>` target                              |
+| `maxDistinctPaints`     | 4       | more distinct paints than this: `complex-svg`                       |
+| `maxDepth`              | 32      | nesting followed                                                    |
+
+Boundaries are asserted in real Chromium at limit - 1 / limit / limit + 1 (`e2e/svg-validation.spec.ts`):
+24 painted elements adapt and 25 do not; an `<svg>` with 200 elements in total (itself included)
+adapts and 201 do not; a path nested in 31 `<g>` adapts and in 32 does not; a `<use>` target with 24
+painted shapes adapts and 25 do not; 4 distinct paints are multi-paint and 5 are complex. All of it
+is structural and deterministic.
+
+Structural metrics of the 500-icon scenario (informational; recorded in Chromium, wall-clock is never
+asserted): appending 500 `currentColor` icons is **1 incremental pass**, 0 rescans, 1000 elements
+processed (wrapper + `<svg>` each), 500 rules added, `svgAnalyzed = svgAdapted = 500`; 100 following
+replacements are 100 passes, 0 rescans, 100 rules added and 100 removed, 200 elements processed in
+total, and the settled state is again 500 rules, 500 tracked elements, 0 unsupported. Five cycles of
+create 500 / adapt / remove leave 0 rules, 0 SVG units, the baseline tracked count and an idle,
+empty queue.
+
+An `<svg>` is **one element** of the analysis (it counts once against `maxElements`); what
+is inside it is bounded by the table, so the worst case of a pass is
+`maxElements x maxDescendants` style reads, and a typical icon (a few elements) costs a few
+reads. The `<use>` walk shares the same visit budget.
+
+The style probe is the one extra cost of SVG analysis: **one** stylesheet write and style flush in,
+one out, for the whole batch of SVGs of a pass (not per icon), and none at all when no SVG in the
+pass can use it (hidden, already unsupported, nothing painted). A second, color-only probe of the
+same shape runs only when some paint inherited `fill`/`stroke` (to tell `<svg stroke="currentColor">`
+from a literal color). So a pass over 500 icons performs at most two probes. Verification of an
+applied unit re-walks that unit (bounded by the same table); it runs only for rules that are new or
+re-submitted.
+
+Measured structurally, never by time: `e2e/svg-dynamic.spec.ts` appends 500 icons in one batch
+(0 full rescans, 500 rules) and then performs 100 replacements (each bounded to one icon,
+`elementsProcessed <= 3`, 0 full rescans, 500 rules and 500 tracked units afterwards, no stale or
+duplicate rule). No millisecond threshold is asserted.
 
 ## What to measure before optimizing further
 

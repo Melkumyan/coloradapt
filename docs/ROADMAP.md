@@ -121,12 +121,51 @@ overridden, inline `!important` is not adaptable.
   the hidden-tab scheduler path, `dispose()`, actual GC, Firefox runtime (build only).
   See `docs/DYNAMIC_ANALYSIS.md`.
 
-Next: **M5 — SVG** (not started).
+## M5 — SVG & Icons ✅ (M5.R1 PASS)
 
-## M5 — SVG ⬜
+- `core/svg`: inline `<svg>` as one unit — element roles, an explicit paint model
+  (`none` / `solid` / `currentColor` / paint server / context / unsupported), computed
+  `fill` and `stroke` (with `stroke-width`, `fill-opacity`, `stroke-opacity`), and
+  inheritance through `svg` / `g` / shapes.
+- `currentColor` ownership: adapted through `color` on the `<svg>` (never materialized as
+  `fill`), found by a style probe that tells `currentColor`, inherited and explicit paint
+  apart; one probe per batch.
+- SVG text (`text`, `tspan`) analyzed like regular text; monochrome icons fully supported.
+- `<use>`/`<symbol>`: per-instance adaptation on the `<use>` element; shared symbol content is
+  never mutated (content with its own paint, external and unresolved targets are unsupported).
+- Fail-safe classification: multi-paint, complex, chart-like, gradients, patterns, masks,
+  filters, blend modes, markers, `foreignObject`, embedded images, animated paints, translucent
+  paints (analyzed, not rewritten). Structural thresholds in `SVG_BUDGET`.
+- Same optimizer, plan, stylesheet and confidence as M3; rules of one `<svg>` are an owner group,
+  verified against the browser's computed paint and applied or dropped together; reversible,
+  idempotent.
+- Dynamic SVG through the M4 pipeline (no separate observer): paint attributes, `href`, class,
+  text, node churn, late sprites; diagnostics `svg*` gauges.
+- `adaptSVG` is on by default and has an options checkbox.
+- Real-Chromium E2E for computed `fill`/`stroke`/`color`, `<use>` pixels, the cascade, ON/OFF,
+  refresh drift, dynamic scenarios and a 500-icon stress. Firefox: build only.
+- Not in M5: semantics (M6), charts (M7), Canvas, raster images / `<img src=*.svg>` (M8), external
+  sprites, Shadow DOM, iframes. See `docs/SVG_ANALYSIS.md`.
 
-- SVG fill/stroke color extraction and adaptation.
-- Icon-aware handling.
+### M5.R1 — SVG real-browser validation & freeze: PASS
+
+- The one non-deterministic M4.R1 test (`120 hostile cycles`, 721 batches instead of 720) is fixed
+  structurally: a repair inside the 500 ms spacing is deferred to a timer and costs exactly one
+  extra batch, now counted as `stylesheetRepairsDeferred`; the test asserts
+  `batches = 6 x cycles + deferred` (no sleep, retry, skip or looser range). Clock and scheduler
+  were already injectable; the unit tests drive both regimes.
+- New `e2e/svg-validation.spec.ts` (26 tests): `adaptSVG` default with pre-M5 stored settings and
+  true/false/true toggle, ON/OFF x10 (computed values and `<use>` pixels), refresh drift,
+  multi-paint 2 to 6 colors, paint servers, budget boundaries (limit - 1 / limit / limit + 1),
+  retention (5 x 500 SVGs). Settings migration tested in `schema.test.ts`.
+- Stability: hostile test 100/100, SVG-focused unit suites 50/50, full unit suite 5/5 (752
+  tests), `pnpm verify` 3/3, complete Chromium E2E 5/5 (221 passed, 1 intentional skip: the
+  hidden-tab scheduler path, unchanged). No retries.
+- Firefox: build PASS, runtime NOT_VERIFIED. Known limitation kept: namespaced `xlink:href`
+  mutations are not delivered to the observer; a full refresh corrects the state.
+- Upstream M2 scientific status remains PARTIAL.
+
+Next: **M6 — Semantic Accessibility** (not started).
 
 ## M6 — Semantic Accessibility ⬜
 

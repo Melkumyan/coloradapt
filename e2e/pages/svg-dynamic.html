@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E svg dynamic</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      .cell {
+        display: inline-block;
+        padding: 4px;
+        margin: 2px;
+        vertical-align: top;
+      }
+      .bg-green {
+        background-color: #27ae60;
+      }
+      .red {
+        color: #c0392b;
+      }
+      .blue {
+        color: #2980b9;
+      }
+      .f-red {
+        fill: #c0392b;
+      }
+      .f-blue {
+        fill: #2980b9;
+      }
+      .s-red {
+        fill: none;
+        stroke: #c0392b;
+        stroke-width: 3;
+      }
+      .s-blue {
+        fill: none;
+        stroke: #2980b9;
+        stroke-width: 3;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="sprite" width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="sym-cc" viewBox="0 0 24 24">
+          <rect width="24" height="24" fill="currentColor" />
+        </symbol>
+        <symbol id="sym-inherit" viewBox="0 0 24 24">
+          <rect width="24" height="24" />
+        </symbol>
+      </defs>
+    </svg>
+    <div id="app"></div>
+    <script>
+      // Page-side helpers (they run in the page's own world, like a framework would).
+      window.add = (html) => {
+        document.getElementById('app').insertAdjacentHTML('beforeend', html);
+      };
+      window.addSprite = (html) => {
+        document.body.insertAdjacentHTML('afterbegin', html);
+      };
+      window.replace = (id, html) => {
+        const old = document.getElementById(id);
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        old.replaceWith(template.content.firstElementChild);
+      };
+    </script>
+  </body>
+</html>

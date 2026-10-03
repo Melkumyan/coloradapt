@@ -26,6 +26,7 @@ leaving the rest of the page's design untouched.
 Web Page → Content Script → DOM Analyzer → Color Engine →
 Conflict Detector → Adaptation Engine (candidate search → AdaptationPlan) →
 Injected Stylesheet
+              ↑ inline <svg> units: core/svg (paint probe, <use>) feed the same engine
 ```
 
 The Adaptation Engine (M3) does model-guided accessibility adaptation: for a
@@ -41,13 +42,23 @@ them per frame, resolves the affected regions and re-adapts only those,
 updating the stylesheet by delta; a full rescan is a counted fallback. See
 `docs/DYNAMIC_ANALYSIS.md`.
 
+M5 extends the same safety model to inline SVG icons and SVG text: an `<svg>` is
+analyzed as one unit and adapted only when it is a single visible paint (`fill`,
+`stroke`, `currentColor`, inherited paint, `<use>`/`<symbol>` instances). Multi-color
+artwork, gradients, patterns, masks, filters, charts and external sprites are
+classified and left alone (`adaptSVG` is on by default; stored settings without the field get the
+default). Rules go through the same stylesheet, are verified against
+the real computed paint, and are reversible. See `docs/SVG_ANALYSIS.md`.
+
 Status: **M3 engineering PASS** (validated in real Chromium); **upstream
 scientific confidence PARTIAL** (M2 model assumption). Known limitations:
 a page's own `:hover`/`:focus` colors are
 overridden on adapted elements; inline `!important` text colors cannot be adapted
 (reported, never faked); animated colors are skipped; Firefox is build-verified
 but not runtime-tested; CSSOM-only restyles (`insertRule`, `adoptedStyleSheets`),
-Shadow DOM and iframes are not tracked (`docs/DYNAMIC_ANALYSIS.md`).
+Shadow DOM and iframes are not tracked (`docs/DYNAMIC_ANALYSIS.md`). SVG: multi-paint,
+gradient/pattern/mask/filter, translucent and `<use>` content with its own paint are
+analyzed but never adapted (`docs/SVG_ANALYSIS.md`).
 
 `pnpm verify` runs lint, typecheck, format check, unit tests and the build;
 `pnpm test:e2e` additionally runs the real-browser (Chromium) suite.
@@ -101,13 +112,13 @@ rule, an adaptation strategy, etc.).
 ```text
 src/
   domain/           Pure types (VisionProfile, ColorConflict, UserSettings, ...)
-  core/             Color engine, DOM analyzer, conflict detection, adaptation engine
+  core/             Color engine, DOM analyzer, SVG layer, conflict detection, adaptation engine
   infrastructure/   Storage and messaging abstractions over the WebExtension API
   features/         React hooks + content-script controller
   entrypoints/      background, content, popup, options (WXT entrypoints)
   shared/           Cross-cutting utils/constants
 tests/              Vitest unit tests, mirroring src/
-docs/               Architecture, CSS analysis, product, roadmap, privacy, security, performance, development
+docs/               Architecture, CSS/SVG analysis, dynamic sites, product, roadmap, privacy, security, performance, development
 ```
 
 ## Privacy principles
