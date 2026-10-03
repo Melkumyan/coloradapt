@@ -32,7 +32,7 @@ Explicit M1 policy (documented limitation, not a silent gap — see
 `docs/CSS_ANALYSIS.md`'s "Known limitations"): pseudo-elements,
 `::placeholder`, Shadow DOM, and iframes are not analyzed.
 
-## M2 — Color Vision Simulation ✅ (pending review/freeze)
+## M2 — Color Vision Simulation ✅ (scientific freeze: PARTIAL)
 
 - `core/vision`: sRGB -> linear RGB -> model -> clip -> sRGB pipeline.
 - Brettel 1997 (protanopia/deuteranopia/tritanopia, two half-planes),
@@ -49,8 +49,15 @@ Explicit M1 policy (documented limitation, not a silent gap — see
 
 M2.R1 (regression stabilization & scientific review): flaky wall-clock tests
 made deterministic, constants cross-checked against libDaltonLens, Machado
-linear-RGB documented as a model assumption. Severity stays engine-level;
+linear-RGB documented as an engineering convention. Severity stays engine-level;
 conflict thresholds stay uncalibrated.
+
+Scientific freeze = PARTIAL: the Machado 2009 paper and the authors' page do
+not state the matrix input space (primary review category D; Eq. 8-10 imply
+linear RGB, but it is not explicit). Output is "Machado 2009, linear-RGB
+interpretation", not canonical Machado output. The Eq. 17/18 erratum does not
+affect the precomputed matrices. Resolving this to PASS needs author
+confirmation. No PASS tag.
 
 Still open: severity UI/settings field, calibrating conflict thresholds
 against the new engine, a custom-profile model.
