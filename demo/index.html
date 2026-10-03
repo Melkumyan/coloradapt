@@ -133,6 +133,26 @@
       fieldset {
         margin-bottom: 8px;
       }
+      .m3-red-green {
+        color: #c0392b;
+        background: #27ae60;
+        padding: 6px 10px;
+      }
+      .m3-blue-purple {
+        color: #3355cc;
+        background: #7a3fa0;
+        padding: 6px 10px;
+      }
+      .m3-yellow-green {
+        color: #e6e66a;
+        background: #b7e08a;
+        padding: 6px 10px;
+      }
+      .m3-fine {
+        color: #000000;
+        background: #ffffff;
+        padding: 6px 10px;
+      }
       .deep-nest {
         padding: 2px;
         background: transparent;
@@ -253,6 +273,18 @@
         <input type="text" value="Disabled input" disabled />
         <button type="button" disabled>Disabled button</button>
       </fieldset>
+    </section>
+
+    <section>
+      <h2>Adaptation candidates (deuteranopia / protanopia)</h2>
+      <p>
+        Pairs whose estimated distinguishability is low for some profiles. Which ones change depends
+        on the selected profile; the accessible pair at the bottom must never change.
+      </p>
+      <p class="m3-red-green">Red text on a green panel</p>
+      <p class="m3-blue-purple">Blue text on a purple panel</p>
+      <p class="m3-yellow-green">Yellow text on a light green panel</p>
+      <p class="m3-fine">Black text on white (already distinguishable)</p>
     </section>
 
     <section>

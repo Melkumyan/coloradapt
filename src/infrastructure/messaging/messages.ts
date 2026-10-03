@@ -1,4 +1,4 @@
-import type { AdaptationResult, AnalysisResult, UserSettings } from '@domain/models';
+import type { AdaptationPlan, AnalysisResult, UserSettings } from '@domain/models';
 
 /**
  * Every message type the extension sends between Popup / Options /
@@ -11,9 +11,9 @@ export interface MessageMap {
   UPDATE_SETTINGS: { request: Partial<UserSettings>; response: UserSettings };
   ANALYZE_PAGE: { request: undefined; response: AnalysisResult };
   GET_ANALYSIS: { request: undefined; response: AnalysisResult | null };
-  ENABLE_ADAPTATION: { request: undefined; response: AdaptationResult };
+  ENABLE_ADAPTATION: { request: undefined; response: AdaptationPlan };
   DISABLE_ADAPTATION: { request: undefined; response: null };
-  REFRESH_ADAPTATION: { request: undefined; response: AdaptationResult };
+  REFRESH_ADAPTATION: { request: undefined; response: AdaptationPlan };
 }
 
 export type MessageType = keyof MessageMap;

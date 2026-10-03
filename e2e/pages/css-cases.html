@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E css cases</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p {
+        margin: 6px 0;
+        padding: 6px;
+        background-color: #27ae60;
+        color: #c0392b;
+      }
+
+      /* --- specificity --- */
+      .spec-class {
+        color: #c0392b;
+      }
+      #spec-id {
+        color: #c0392b;
+      }
+      div.spec-chain p.inner {
+        color: #c0392b;
+      }
+      #spec-id-chain.chain > #spec-id-inner {
+        color: #c0392b;
+      }
+
+      /* --- existing !important --- */
+      .imp-class {
+        color: #c0392b !important;
+      }
+      #imp-id {
+        color: #c0392b !important;
+      }
+      #imp-id-chain.chain > #imp-id-inner {
+        color: #c0392b !important;
+      }
+
+      /* --- transitions --- */
+      .trans {
+        color: #c0392b;
+        transition: color 400ms linear;
+      }
+
+      /* --- animations --- */
+      @keyframes pulse {
+        from {
+          color: #c0392b;
+        }
+        to {
+          color: #c0391b;
+        }
+      }
+      .anim {
+        color: #c0392b;
+        animation: pulse 2s linear infinite alternate;
+      }
+      @keyframes wiggle {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(1px);
+        }
+      }
+      .anim-unrelated {
+        color: #c0392b;
+        animation: wiggle 2s linear infinite alternate;
+      }
+
+      /* --- pseudo states --- */
+      .pseudo {
+        color: #c0392b;
+      }
+      .pseudo:hover {
+        color: #c0392b;
+        background-color: #27ae60;
+        outline: 1px solid #000;
+      }
+      .hov-color:hover {
+        color: #0000ff;
+      }
+      .foc-color:focus {
+        color: #0000ff;
+      }
+      .act-color:active {
+        color: #0000ff;
+      }
+
+      /* --- opacity guard --- */
+      .op-self {
+        opacity: 0.9;
+      }
+      .op-parent {
+        opacity: 0.9;
+        background: #ffffff;
+      }
+      .op-parent p {
+        background-color: #27ae60;
+      }
+      .op-one {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="spec-class" class="spec-class">class</p>
+    <p id="spec-id">id</p>
+    <div class="spec-chain"><p id="spec-chain" class="inner">class chain</p></div>
+    <div id="spec-id-chain" class="chain"><p id="spec-id-inner">id chain</p></div>
+    <p id="spec-inline" style="color: #c0392b">inline</p>
+
+    <p id="imp-class" class="imp-class">important class</p>
+    <p id="imp-id">important id</p>
+    <div id="imp-id-chain" class="chain"><p id="imp-id-inner">important id chain</p></div>
+    <p id="imp-inline" style="color: #c0392b !important">important inline</p>
+
+    <p id="trans" class="trans">transition</p>
+    <p id="anim" class="anim">color animation</p>
+    <p id="anim-unrelated" class="anim-unrelated">unrelated animation</p>
+    <div class="anim" style="background: #27ae60">
+      <span id="anim-child">child of animated</span>
+    </div>
+
+    <p id="pseudo" class="pseudo">pseudo</p>
+    <p id="hov-color" class="hov-color" tabindex="0">hover color</p>
+    <p id="foc-color" class="foc-color" tabindex="0">focus color</p>
+    <button id="act-color" class="act-color" style="background: #27ae60; color: #c0392b">
+      active color
+    </button>
+
+    <p id="op-self" class="op-self">opacity self</p>
+    <div class="op-parent"><p id="op-parent">opacity parent</p></div>
+    <div style="opacity: 0.95">
+      <div style="opacity: 0.95"><p id="op-nested">nested opacity</p></div>
+    </div>
+    <p id="op-rgba" style="color: rgba(192, 57, 43, 0.8)">rgba text</p>
+    <p id="op-one" class="op-one">opacity one</p>
+    <p id="op-rgba-one" style="color: rgba(192, 57, 43, 1)">rgba alpha one</p>
+  </body>
+</html>

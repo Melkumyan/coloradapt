@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createContentController } from '@features/page-analysis';
-import { DEFAULT_USER_SETTINGS } from '@domain/models';
+import { DEFAULT_USER_SETTINGS, type UserSettings } from '@domain/models';
+
+const DEUTAN: UserSettings = {
+  ...DEFAULT_USER_SETTINGS,
+  visionProfile: 'deuteranopia',
+  adaptationStrength: 1,
+};
 
 /**
  * End-to-end-ish smoke test against the real demo fixture
@@ -84,10 +90,50 @@ describe('demo fixture smoke test', () => {
     const doc = loadDemoDocument();
     const controller = createContentController(doc, FROZEN_CLOCK);
 
-    controller.enableAdaptation('https://example.com/demo', DEFAULT_USER_SETTINGS);
+    controller.enableAdaptation('https://example.com/demo', DEUTAN);
     expect(doc.getElementById('coloradapt-stylesheet')).not.toBeNull();
 
     controller.disableAdaptation();
     expect(doc.getElementById('coloradapt-stylesheet')).toBeNull();
+  });
+
+  it('ON adapts the conflicting demo pairs minimally, leaves the rest, and OFF restores exactly', () => {
+    const doc = loadDemoDocument();
+    const controller = createContentController(doc, FROZEN_CLOCK);
+    const colorOf = (selector: string): string =>
+      getComputedStyle(doc.querySelector(selector) as Element).color;
+    const everyColor = (): string[] =>
+      Array.from(doc.body.querySelectorAll('*')).map((el) => getComputedStyle(el).color);
+
+    const before = everyColor();
+    const redGreenBefore = colorOf('.m3-red-green');
+
+    const { adaptation } = controller.enableAdaptation('https://example.com/demo', DEUTAN);
+
+    // Conflicting pairs are adapted...
+    expect(adaptation.summary.adapted).toBeGreaterThanOrEqual(2);
+    expect(colorOf('.m3-red-green')).not.toBe(redGreenBefore);
+    for (const change of adaptation.changes) {
+      expect(change.metrics.adaptedSimulatedDistance).toBeGreaterThan(
+        change.metrics.originalSimulatedDistance,
+      );
+      expect(change.metrics.changeDistance).toBeLessThanOrEqual(0.3 + 1e-9);
+    }
+    // ...an accessible pair and unresolved backgrounds are not.
+    const adaptedIds = new Set(adaptation.changes.map((c) => c.elementId));
+    const analysis = controller.getLastAnalysis()!;
+    for (const el of analysis.elements) {
+      if (el.analysisStatus !== 'resolved') expect(adaptedIds.has(el.id)).toBe(false);
+    }
+    const fine = doc.querySelector('.m3-fine') as Element;
+    expect(adaptedIds.has(fine.getAttribute('data-coloradapt-id') ?? '')).toBe(false);
+
+    // Adapting is idempotent...
+    const again = controller.enableAdaptation('https://example.com/demo', DEUTAN);
+    expect(again.adaptation.changes).toEqual(adaptation.changes);
+
+    // ...and OFF restores every element exactly.
+    controller.disableAdaptation();
+    expect(everyColor()).toEqual(before);
   });
 });

@@ -62,16 +62,40 @@ confirmation. No PASS tag.
 Still open: severity UI/settings field, calibrating conflict thresholds
 against the new engine, a custom-profile model.
 
-## M3 — Adaptation 🚧
+## M3 — Adaptation Engine ✅ (engineering PASS; upstream scientific confidence PARTIAL)
 
-- `AdaptationEngine.computeAdaptation` proposes lightness-only color fixes
-  for high/critical conflicts.
-- Reversible application via one injected stylesheet (`StylesheetManager`).
-- `adaptationStrength` setting influences target contrast.
+- Constrained candidate search in OKLCH (`core/adaptation`): lightness/chroma →
+  small hue → wide hue, deterministic, structurally bounded, gamut-safe, 8-bit.
+- Problem detection and adaptation target from the continuous M2 metrics
+  (simulated distance, WCAG contrast) — separate, centralized engineering thresholds.
+- Transparent scoring that prefers the smallest sufficient change; WCAG contrast
+  regression guard; neutral handling; foreground-only.
+- `AdaptationResult` (unchanged / adapted / no-safe-candidate / unsupported) with
+  model confidence (`SUPPORTED_MODEL` / `MODEL_ASSUMPTION` / `APPROXIMATION` /
+  `UNSUPPORTED`); `adaptationStrength` as OKLab interpolation.
+- DOM-free `AdaptationPlan` applied via one stylesheet; analysis always reads the
+  original styles (no compounding); only `resolved` elements are adapted;
+  per-site overrides respected; popup shows adapted/unresolved counts.
+- **M3.R1 (validation & freeze):** verified in real Chromium (Playwright E2E:
+  ON/OFF exact restoration, 5 cycles, idempotent re-analysis, profile/strength
+  switching, site settings, reload); CSS policy for specificity, `!important`
+  (the applied result is read back: `notApplied` instead of a false "adapted"),
+  transitions (no fade/flicker), animations (animated `color` skipped),
+  pseudo-states (documented), opacity guard; 49-pair deterministic benchmark with
+  hard safety assertions; quantization, minimal-change and confidence-propagation
+  tests.
+- `M3 ENGINEERING STATUS: PASS`; `UPSTREAM SCIENTIFIC CONFIDENCE: PARTIAL` (M2
+  stays PARTIAL — Machado linear-RGB assumption). Thresholds remain uncalibrated
+  engineering values. Firefox runtime E2E: NOT_RUN. See `docs/ADAPTATION_ENGINE.md`.
 
-Still open: hue-aware alternatives, adapting more than `color`
-(`border-color`, `background-color`), smarter per-role strategies (link
-underlines vs. badge backgrounds, etc.).
+Still open: background adaptation (advanced mode), `border-color`/
+`background-color`, token-aware (CSS variable) transformations, semantic
+constraints (M6).
+
+Known M3 limitations carried forward: no dynamic-content handling (M4), pseudo-state
+colors of adapted elements are overridden, inline `!important` is not adaptable.
+
+Next: **M4 — Dynamic Sites / Incremental Analysis** (not started).
 
 ## M4 — Dynamic Pages ⬜
 
@@ -122,8 +146,9 @@ Implemented in this foundation:
    color goes through contrast + simulated-vision distance checks
    (`core/conflicts`); gradient/image backgrounds are counted as
    unresolved instead of guessed.
-4. High/critical conflicts get a reversible color fix
-   (`core/adaptation`), applied via one injected stylesheet.
+4. Resolved elements are checked by the Adaptation Engine (`core/adaptation`),
+   which may produce a reversible, minimal foreground color change, applied via
+   one injected stylesheet.
 5. Popup's "Analyse page" button reports the conflict count back from the
    content script via the typed messaging layer.
 6. Toggling "Protection" off calls `DISABLE_ADAPTATION`, which removes the

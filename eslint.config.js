@@ -6,7 +6,16 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', '.output/**', '.wxt/**', 'node_modules/**', 'coverage/**'],
+    ignores: [
+      'dist/**',
+      '.output/**',
+      '.wxt/**',
+      'node_modules/**',
+      'coverage/**',
+      'benchmark-report/**',
+      'playwright-report/**',
+      'test-results/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -38,7 +47,7 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ['tests/**/*.{ts,tsx}'],
+    files: ['tests/**/*.{ts,tsx}', 'e2e/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',

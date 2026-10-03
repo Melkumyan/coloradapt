@@ -1,7 +1,7 @@
-import { useCallback, type JSX } from 'react';
+import { useCallback, useState, type JSX } from 'react';
 import { browser } from 'wxt/browser';
 import { VISION_PROFILE_INFO, VISION_PROFILES } from '@domain/models';
-import type { VisionProfile } from '@domain/models';
+import type { AdaptationPlan, UserSettings, VisionProfile } from '@domain/models';
 import { useSettings } from '@features/settings';
 import { usePageAnalysis } from '@features/page-analysis';
 import { getActiveTabId, sendToTab } from '@infrastructure/messaging';
@@ -9,6 +9,7 @@ import { getActiveTabId, sendToTab } from '@infrastructure/messaging';
 export function App(): JSX.Element {
   const { settings, loading, update } = useSettings();
   const { analysis, analyzing, error, analyze } = usePageAnalysis();
+  const [plan, setPlan] = useState<AdaptationPlan | null>(null);
 
   const toggleEnabled = useCallback(async () => {
     if (!settings) return;
@@ -18,11 +19,28 @@ export function App(): JSX.Element {
     const tabId = await getActiveTabId();
     if (tabId === undefined) return;
     if (nextEnabled) {
-      await sendToTab(tabId, 'ENABLE_ADAPTATION', undefined);
+      setPlan(await sendToTab(tabId, 'ENABLE_ADAPTATION', undefined));
     } else {
       await sendToTab(tabId, 'DISABLE_ADAPTATION', undefined);
+      setPlan(null);
     }
   }, [settings, update]);
+
+  // Profile/strength changes are saved, then the active tab re-plans from the
+  // page's original styles (REFRESH_ADAPTATION never compounds).
+  const updateAndRefresh = useCallback(
+    async (patch: Partial<UserSettings>) => {
+      await update(patch);
+      if (!settings?.enabled) return;
+      try {
+        const tabId = await getActiveTabId();
+        if (tabId !== undefined) setPlan(await sendToTab(tabId, 'REFRESH_ADAPTATION', undefined));
+      } catch {
+        // Page without a content script (e.g. a browser settings page): nothing to refresh.
+      }
+    },
+    [settings, update],
+  );
 
   const openSettings = useCallback(() => {
     void browser.runtime.openOptionsPage();
@@ -63,7 +81,9 @@ export function App(): JSX.Element {
         <select
           id="vision-profile"
           value={settings.visionProfile}
-          onChange={(event) => void update({ visionProfile: event.target.value as VisionProfile })}
+          onChange={(event) =>
+            void updateAndRefresh({ visionProfile: event.target.value as VisionProfile })
+          }
         >
           {VISION_PROFILES.map((profile) => (
             <option key={profile} value={profile}>
@@ -84,7 +104,9 @@ export function App(): JSX.Element {
           max={1}
           step={0.1}
           value={settings.adaptationStrength}
-          onChange={(event) => void update({ adaptationStrength: Number(event.target.value) })}
+          onChange={(event) =>
+            void updateAndRefresh({ adaptationStrength: Number(event.target.value) })
+          }
         />
       </section>
 
@@ -114,6 +136,21 @@ export function App(): JSX.Element {
           </p>
         )}
       </section>
+
+      {plan && settings.enabled && (
+        <section className="popup__field" aria-label="Adaptation summary">
+          <p className="popup__result">
+            Adapted: <strong>{plan.summary.adapted}</strong>
+            {' · '}Unresolved:{' '}
+            <strong>{plan.summary.unresolved + plan.summary.noSafeCandidate}</strong>
+            <br />
+            <small>
+              Problems estimated for this profile: {plan.summary.problemsDetected}. Adjustments are
+              model-guided estimates ({plan.confidence}).
+            </small>
+          </p>
+        </section>
+      )}
 
       <footer className="popup__footer">
         <button type="button" className="popup__link-button" onClick={openSettings}>

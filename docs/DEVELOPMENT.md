@@ -42,8 +42,34 @@ pnpm test         # vitest run
 pnpm test:watch   # vitest watch mode
 pnpm lint         # eslint .
 pnpm typecheck    # tsc --noEmit
-pnpm verify       # lint + typecheck + test + build, in that order
+pnpm format:check # prettier --check .
+pnpm verify       # lint + typecheck + format:check + test + build, in that order
+pnpm test:e2e     # build, then real-Chromium E2E (Playwright) — not part of verify
 ```
+
+### Real-browser E2E
+
+`pnpm test:e2e` loads the built extension (`dist/chrome-mv3`) into Chromium
+(new headless mode, `channel: 'chromium'`) and drives it through the extension's
+service worker (settings via `chrome.storage.local`, adaptation via the same
+typed messages the popup sends). One-time browser install:
+`pnpm exec playwright install chromium`. Pages are served from `e2e/pages/` on
+`127.0.0.1` (content scripts only match http/https). Rules:
+
+- no sleeps, retries, skips or loosened timeouts — wait for style flushes
+  (`settle()`), or `expect.poll` for page-load adaptation;
+- one tab per test (messages address a tab by URL; the harness refuses to guess
+  between several);
+- assert on **computed** colors, and always against the plan: the browser must
+  match what the plan says.
+
+Firefox is build-verified only (`pnpm build:firefox`); its E2E is NOT_RUN.
+
+### Adaptation benchmark
+
+`tests/benchmarks/` runs as part of `pnpm test` and writes
+`benchmark-report/adaptation-benchmark.{json,html}` (gitignored) for inspection.
+Add a pair in `adaptation-pairs.ts`; a hard-safety violation fails the suite.
 
 ## Debugging the analyzer on a real page
 
@@ -109,15 +135,19 @@ change how severity is determined, adjust `determineSeverity` and the
 thresholds in `src/core/conflicts/thresholds.ts`. Keep the function pure —
 it should only read its arguments and return a `ColorConflict | null`.
 
-## Adding a new `AdaptationRule`
+## Changing the Adaptation Engine
 
-The current `computeAdaptation` (`src/core/adaptation/adaptation-engine.ts`)
-applies one built-in strategy (lightness-only contrast fix) to every
-high/critical conflict. To add a role-specific strategy (e.g. a different
-fix for links vs. badges), branch on `ElementDescriptor.role` inside
-`computeAdaptation`, or — once there's more than one or two strategies —
-extract each into something implementing the `AdaptationRule` interface in
-`src/domain/models/adaptation.ts` and compose them.
+All optimizer tuning lives in `src/core/adaptation/constraints.ts`
+(`ENGINEERING_THRESHOLDS`, `SCORE_POLICY`, `CONFIDENCE_DESIGN_MULTIPLIER`) — do
+not inline numbers elsewhere. Search stages are in `candidate-generator.ts`, the
+score in `candidate-score.ts`, the search/strength logic in `optimizer.ts`
+(`findAdaptation`) and eligibility in `adaptation-plan.ts`. Keep all of it pure and
+deterministic (no randomness, no wall-clock budgets, no DOM). Any change to the
+thresholds should be justified in `docs/ADAPTATION_ENGINE.md` and covered by
+property-style tests (distance improved, contrast floor, valid output).
+Per-role strategies can branch on `ElementDescriptor.role` in
+`createAdaptationPlan`; the `AdaptationRule` interface in
+`src/domain/models/adaptation.ts` is reserved for composing them later.
 
 ## How messaging is structured
 

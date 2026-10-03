@@ -24,8 +24,26 @@ leaving the rest of the page's design untouched.
 
 ```text
 Web Page → Content Script → DOM Analyzer → Color Engine →
-Conflict Detector → Adaptation Engine → Injected Stylesheet
+Conflict Detector → Adaptation Engine (candidate search → AdaptationPlan) →
+Injected Stylesheet
 ```
+
+The Adaptation Engine (M3) does model-guided accessibility adaptation: for a
+selected vision profile it looks for the smallest foreground color change that
+raises the _estimated_ distinguishability, keeps WCAG contrast from regressing,
+and otherwise leaves the original color alone. It never changes backgrounds
+or unresolved (gradient/image) elements, and everything is reversible. See
+`docs/ADAPTATION_ENGINE.md`.
+
+Status: **M3 engineering PASS** (validated in real Chromium); **upstream
+scientific confidence PARTIAL** (M2 model assumption). Known limitations:
+dynamic content is not handled yet (M4); a page's own `:hover`/`:focus` colors are
+overridden on adapted elements; inline `!important` text colors cannot be adapted
+(reported, never faked); animated colors are skipped; Firefox is build-verified
+but not runtime-tested.
+
+`pnpm verify` runs lint, typecheck, format check, unit tests and the build;
+`pnpm test:e2e` additionally runs the real-browser (Chromium) suite.
 
 Popup and Options talk to a Background service worker (settings) and to
 the active tab's Content Script (analysis/adaptation) over a fully typed

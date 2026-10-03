@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E basic</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p {
+        margin: 8px 0;
+        padding: 8px;
+      }
+      #conflict {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      #accessible {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      #white-on-dark {
+        color: #ffffff;
+        background-color: #1a1a2e;
+      }
+      #green-brown {
+        color: #2e8b57;
+        background-color: #8b6914;
+      }
+      #blue-purple {
+        color: #3366cc;
+        background-color: #8844aa;
+      }
+      #cyan-gray {
+        color: #20a0a0;
+        background-color: #808080;
+      }
+      #yellow-lime {
+        color: #d4c400;
+        background-color: #8fd14f;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="conflict">Red on green</p>
+    <p id="accessible">Black on white</p>
+    <p id="white-on-dark">White on dark</p>
+    <p id="green-brown">Green on brown</p>
+    <p id="blue-purple">Blue on purple</p>
+    <p id="cyan-gray">Cyan on gray</p>
+    <p id="yellow-lime">Yellow on lime</p>
+  </body>
+</html>

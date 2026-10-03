@@ -38,3 +38,6 @@ Desktop.ini
 
 # TypeScript
 *.tsbuildinfo
+benchmark-report/
+playwright-report/
+test-results/

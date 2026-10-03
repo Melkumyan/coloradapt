@@ -42,7 +42,7 @@ algorithm needs to change, only `core/color` changes.
 | Vision Engine (`core/vision`)             | Replaceable, DOM-free color vision simulation (Brettel/Viénot/Machado + approximations); pair analysis. Holds no module-level mutable state or caches (M2.R1). See `docs/COLOR_VISION_SIMULATION.md`. |
 | DOM Analyzer (`core/analysis`)            | Bounded traversal of a document, resolving each element's effective foreground/background/role — see `docs/CSS_ANALYSIS.md`.                                                                          |
 | Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                                                                                                 |
-| Adaptation Engine (`core/adaptation`)     | Turn conflicts into a minimal set of reversible style changes; apply/restore them via one injected stylesheet.                                                                                        |
+| Adaptation Engine (`core/adaptation`)     | Constrained candidate search (OKLCH) -> `AdaptationResult` -> DOM-free `AdaptationPlan`; the stylesheet manager applies/restores a plan. See `docs/ADAPTATION_ENGINE.md`.                             |
 | Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                                                                                                    |
 | Messaging (`infrastructure/messaging`)    | Typed message contracts and a typed router, instead of ad-hoc strings.                                                                                                                                |
 | Page Analysis / Settings (`features/`)    | Content-script controller; React hooks (`useSettings`, `usePageAnalysis`) for Popup/Options.                                                                                                          |
@@ -95,15 +95,26 @@ before being dispatched, since both `runtime.onMessage` and
    gradient/image in the visible stack) are excluded from Conflict
    Detection entirely — see `ElementDescriptor.analysisStatus`. The rest
    go through Conflict Detection for the active vision profile.
-4. High/critical conflicts go through the Adaptation Engine, which computes
-   a minimally-adjusted color (lightness-only) that reaches WCAG AA
-   contrast.
+4. Every `resolved` element goes through the Adaptation Engine
+   (`createAdaptationPlan` -> `findAdaptation`): problem detection from the
+   M2 simulated distance, a bounded OKLCH candidate search, scoring, and a
+   foreground-only color that is the smallest sufficient change with no
+   material WCAG contrast regression — or `no-safe-candidate`. `partial`/
+   `unsupported` elements are never adapted. The result is a data-only
+   `AdaptationPlan`; the core never writes CSS. See
+   `docs/ADAPTATION_ENGINE.md`.
 5. Changes are applied as CSS rules in a single injected
    `<style id="coloradapt-stylesheet">`, targeting elements via a
    `data-coloradapt-id` attribute — never inline styles, never direct DOM
-   mutation of content.
+   mutation of content. Elements whose `color` is animated are not adapted. Every
+   commit suppresses `transition` for one synchronous style flush (no fade or
+   flicker), and the browser's computed color is read back: a change the cascade
+   did not honor (e.g. inline `!important`) is dropped and counted as
+   `notApplied` (`docs/ADAPTATION_ENGINE.md`, "CSS application policy").
 6. Disabling adaptation removes that one stylesheet. The page's original
-   styles were never touched, so this is an exact restore.
+   styles were never touched, so this is an exact restore. Every analysis
+   (including re-scans while adapted) runs with the stylesheet suspended, so
+   the original styles stay the source of truth and adaptation never compounds.
 
 ## Why no `<all_urls>`
 

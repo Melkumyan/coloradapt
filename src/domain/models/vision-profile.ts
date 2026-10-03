@@ -93,3 +93,30 @@ export const VISION_PROFILE_INFO: Readonly<Record<VisionProfile, VisionProfileIn
     defaultSeverity: 1,
   },
 };
+
+/**
+ * How much scientific weight the simulation behind a profile carries. Carried
+ * through the Adaptation Engine so a result never hides its provenance
+ * (docs/COLOR_VISION_SIMULATION.md, docs/ADAPTATION_ENGINE.md).
+ *
+ * - `SUPPORTED_MODEL`: a published model applied as described by its authors.
+ * - `MODEL_ASSUMPTION`: a published model whose input-space convention is an
+ *   engineering assumption (Machado 2009, linear-RGB interpretation).
+ * - `APPROXIMATION`: a documented approximation, not a validated model.
+ * - `UNSUPPORTED`: no model; automatic adaptation is refused.
+ */
+export type ModelConfidence =
+  'SUPPORTED_MODEL' | 'MODEL_ASSUMPTION' | 'APPROXIMATION' | 'UNSUPPORTED';
+
+/** `normal` has an identity "model" and is never adapted; it is listed as supported. */
+export const VISION_PROFILE_CONFIDENCE: Readonly<Record<VisionProfile, ModelConfidence>> = {
+  normal: 'SUPPORTED_MODEL',
+  protanopia: 'SUPPORTED_MODEL',
+  deuteranopia: 'SUPPORTED_MODEL',
+  tritanopia: 'SUPPORTED_MODEL',
+  protanomaly: 'MODEL_ASSUMPTION',
+  deuteranomaly: 'MODEL_ASSUMPTION',
+  tritanomaly: 'APPROXIMATION',
+  achromatopsia: 'APPROXIMATION',
+  custom: 'UNSUPPORTED',
+};

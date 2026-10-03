@@ -17,5 +17,13 @@
       "@shared/*": ["./src/shared/*"]
     }
   },
-  "include": ["src", "tests", "vitest.config.ts", "wxt.config.ts", "eslint.config.js"]
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "wxt.config.ts",
+    "eslint.config.js"
+  ]
 }

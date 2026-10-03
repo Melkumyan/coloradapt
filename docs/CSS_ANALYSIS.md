@@ -124,10 +124,10 @@ type AnalysisStatus = 'resolved' | 'partial' | 'unsupported';
   (`MAX_ANCESTOR_DEPTH`, 200) before reaching a definitive answer. Also
   excluded from conflict detection, for the same reason.
 
-Because `AdaptationEngine.computeAdaptation` only ever looks at
-`AnalysisResult.conflicts`, and unresolved/partial elements never produce
-a conflict, adaptation automatically inherits this safety — there was no
-need to add a separate guard there (see "M1 principle" below).
+Since M3 the Adaptation Engine no longer relies on conflicts: `createAdaptationPlan`
+explicitly adapts only `analysisStatus: resolved` elements, and the content layer
+also refuses elements whose computed `color` differs from the effective foreground
+(opacity/alpha). See `docs/ADAPTATION_ENGINE.md` ("Fail-safe policy").
 
 ## `html`/`body` background
 

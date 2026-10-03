@@ -17,6 +17,15 @@
 - Adaptation is applied via a single injected stylesheet, not per-element
   inline style writes, which keeps DOM mutation cost constant regardless of
   how many elements are adapted.
+- The Adaptation Engine is bounded structurally, not by wall clock: early exit
+  (no search) for pairs that are already distinguishable, at most
+  `maxCandidateEvaluations` (800) candidate evaluations per _distinct_ color
+  pair (a plan memoizes by foreground/background, so shared pairs cost once),
+  and progressive stages that stop at the first feasible one — typically
+  20–70 evaluations. Each evaluation is a handful of color conversions. The
+  analysis pass additionally reads each resolved element's computed `color`
+  once more (to refuse opacity/alpha cases) and runs with the adaptation
+  stylesheet suspended.
 - Background resolution (`core/analysis/background-resolution.ts`) memoizes
   per-element ancestor state for the duration of one analysis pass, in a
   `Map<Element, ChainState>` created fresh by `analyzeDocument`. Resolving
@@ -64,6 +73,22 @@ instead of reprocessing the whole page.
 Tests that touch the analyzer inject `now: () => 0` (M2.R1): the real
 50 ms budget in jsdom made results machine-speed dependent. The budget
 itself is tested with an injected clock.
+
+## Adaptation search and application (M3)
+
+- **Structural bounds, not clocks.** The optimizer is bounded by
+  `maxCandidateEvaluations` (800 per color pair; stage grids are ≤ 93 / 306 / 374
+  candidates), and results are memoized per distinct foreground/background pair
+  per page. No wall-clock gate exists or is wanted.
+- Benchmark (49 pairs × 3 dichromat profiles, strength 1): per searched pair the
+  candidate evaluations were median 58, p95 84, max 86; 86 of 147 rows needed no
+  search at all (already distinguishable).
+- Applying costs two forced style flushes (one with transitions suppressed) plus
+  one `getComputedStyle` read per change to verify it — the read-back is what
+  makes "adapted" mean "the browser shows it".
+- Informational only: on the demo page in headless Chromium the enable round trip
+  (analysis + planning + apply + verify) was ~20 ms on the development machine.
+  Machine-specific; do not turn it into a threshold.
 
 ## A note on jsdom vs. real browsers
 
