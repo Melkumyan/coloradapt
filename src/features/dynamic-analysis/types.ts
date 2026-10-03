@@ -1,5 +1,6 @@
 import type { AnalysisRoot } from '@core/analysis';
 import type { FullRescanReason } from '@domain/models';
+import type { PeerSeed } from '../semantics';
 
 /** What a single mutation means for ColorAdapt. */
 export type MutationKind =
@@ -7,6 +8,7 @@ export type MutationKind =
   | 'NODE_REMOVED'
   | 'STYLE_AFFECTING_ATTRIBUTE'
   | 'TEXT_CHANGE'
+  | 'SEMANTIC_CHANGE'
   | 'STYLESHEET_CHANGE'
   | 'IRRELEVANT'
   | 'COLORADAPT_INTERNAL';
@@ -26,6 +28,8 @@ export type ClassifiedMutation =
     }
   /** The element whose own text eligibility may have changed. */
   | { readonly kind: 'TEXT_CHANGE'; readonly element: Element }
+  /** An attribute or text change that can change what an element communicates (M6). */
+  | { readonly kind: 'SEMANTIC_CHANGE'; readonly element: Element; readonly attribute: string }
   | {
       readonly kind: 'STYLESHEET_CHANGE';
       /** A stylesheet `<link>` that has not loaded yet: rescan once it does. */
@@ -39,6 +43,8 @@ export interface ResolvedBatch {
   readonly roots: readonly AnalysisRoot[];
   /** Detached elements whose adaptations must be dropped. */
   readonly removed: readonly Element[];
+  /** Where elements left: their former peers may have lost what they were compared with (M6). */
+  readonly peerSeeds: readonly PeerSeed[];
   /** Set when the batch cannot be handled region by region. */
   readonly fullRescan: FullRescanReason | null;
 }

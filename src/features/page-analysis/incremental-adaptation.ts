@@ -16,15 +16,18 @@ import {
   type PlanningMemo,
   type StylesheetManager,
 } from '@core/adaptation';
+import { EMPTY_SEMANTIC_DIAGNOSTICS } from '@domain/models';
 import type {
   AdaptationChange,
   AdaptationDelta,
   AdaptationSummary,
   ElementDescriptor,
+  SemanticDiagnostics,
   SvgDiagnostics,
   SvgUnitInfo,
   UserSettings,
 } from '@domain/models';
+import type { PeerSeed, SemanticCueController } from '../semantics';
 import { findNotAdaptable } from './adaptability';
 
 /** Cap on the per-session optimizer memo (distinct color pairs); cleared when exceeded. */
@@ -38,6 +41,8 @@ export interface IncrementalPassInput {
   readonly roots: readonly AnalysisRoot[];
   /** Ids of elements that left the document; their adaptation is dropped. */
   readonly removedIds: readonly string[];
+  /** Where elements left the page: their former peers are re-examined by the semantic layer (M6). */
+  readonly peerSeeds?: readonly PeerSeed[];
 }
 
 export interface IncrementalPassResult {
@@ -60,12 +65,21 @@ export interface IncrementalAdaptation {
   summary(): AdaptationSummary;
   /** Rules currently in the injected stylesheet. */
   readonly ruleCount: number;
+  /** The injected stylesheet holds anything (color rules or semantic cue CSS): losing it needs repair. */
+  readonly hasInjectedContent: boolean;
+  /** Counters of the semantic-cue layer (docs/SEMANTIC_ACCESSIBILITY.md). */
+  semanticDiagnostics(): SemanticDiagnostics;
   /** Elements the bookkeeping currently tracks (ids only; for leak tests and diagnostics). */
   trackedCount(): number;
   /** Gauges of the inline-SVG units currently tracked. */
   svgDiagnostics(): SvgDiagnostics;
   /** Re-analyzes `input.roots` and applies only the difference. */
   update(input: IncrementalPassInput): IncrementalPassResult;
+  /**
+   * Only elements left the page and none of them held a color rule: nothing for the color layer to
+   * do, but the semantic layer re-examines their former peers (M6.R1). Not an incremental pass.
+   */
+  updatePeers(seeds: readonly PeerSeed[]): void;
   /** Re-attaches the sheet if the page removed it. */
   repairStylesheet(): boolean;
   /** The injected `<style>` element, if any (for mutation-ownership checks). */
@@ -96,6 +110,7 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
   readonly #doc: Document;
   readonly #stylesheet: StylesheetManager;
   readonly #analyzerOptions: Partial<AnalyzeDocumentOptions>;
+  readonly #semantic: SemanticCueController | null;
   #context: PlanningContext | null = null;
   #memo: PlanningMemo = new Map();
   #kinds = new Map<string, TrackedKind>();
@@ -107,10 +122,12 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     doc: Document,
     stylesheet: StylesheetManager,
     analyzerOptions: Partial<AnalyzeDocumentOptions>,
+    semantic: SemanticCueController | null = null,
   ) {
     this.#doc = doc;
     this.#stylesheet = stylesheet;
     this.#analyzerOptions = analyzerOptions;
+    this.#semantic = semantic;
   }
 
   get active(): boolean {
@@ -123,6 +140,14 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
   get styleElement(): HTMLStyleElement | null {
     return this.#stylesheet.styleElement;
+  }
+
+  get hasInjectedContent(): boolean {
+    return this.#stylesheet.hasContent;
+  }
+
+  semanticDiagnostics(): SemanticDiagnostics {
+    return this.#semantic?.diagnostics() ?? EMPTY_SEMANTIC_DIAGNOSTICS;
   }
 
   /** Starts (or restarts) tracking from a full adaptation's per-element outcomes. */
@@ -141,10 +166,16 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
       this.#track(id, notApplied.has(id) ? 'notApplied' : outcome.kind);
     }
     for (const element of elements) this.#trackSvg(element);
+    // The cue layer reads the same settled page: after the colors, with the same lifetime.
+    if (this.#semantic) {
+      this.#semantic.begin(settings);
+      this.#semantic.scanDocument();
+    }
   }
 
   /** Stops tracking and forgets everything (adaptation switched off). */
   end(): void {
+    this.#semantic?.end();
     this.#context = null;
     this.#memo = new Map();
     this.#kinds = new Map();
@@ -185,6 +216,10 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     if (!this.active || !this.#stylesheet.isDetached()) return false;
     this.#stylesheet.reattach();
     return true;
+  }
+
+  updatePeers(seeds: readonly PeerSeed[]): void {
+    if (this.#context) this.#semantic?.update([], seeds);
   }
 
   update(input: IncrementalPassInput): IncrementalPassResult {
@@ -276,6 +311,9 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
       if (!before) added.push(change);
       else if (before.adaptedValue !== change.adaptedValue) updated.push(change);
     }
+
+    // Semantics follow the same regions M4 chose; the cue layer has no observer and no scan of its own.
+    this.#semantic?.update(input.roots.slice(0, rootsConsumed), input.peerSeeds ?? []);
 
     return {
       rootsConsumed,

@@ -3,6 +3,11 @@ import { createDetailedAdaptationPlan, StylesheetManager } from '@core/adaptatio
 import { detectColorConflict } from '@core/conflicts';
 import type { AdaptationPlan, AnalysisResult, ColorConflict, UserSettings } from '@domain/models';
 import { findNotAdaptable } from './adaptability';
+import {
+  SemanticCueController,
+  type FactsEnvironment,
+  type SemanticInspection,
+} from '../semantics';
 import { IncrementalAdaptationSession, type IncrementalAdaptation } from './incremental-adaptation';
 
 /**
@@ -39,6 +44,8 @@ export interface ContentController {
    * (features/dynamic-analysis). Inactive until `enableAdaptation` has run.
    */
   readonly incremental: IncrementalAdaptation;
+  /** What the semantic layer makes of one element (read-only; for tests and debugging). */
+  inspectSemantics(element: Element): SemanticInspection;
 }
 
 /**
@@ -60,6 +67,7 @@ export interface ContentController {
 export function createContentController(
   doc: Document = document,
   analyzerOptions: Partial<AnalyzeDocumentOptions> = {},
+  semanticOptions: { readonly env?: FactsEnvironment } = {},
 ): ContentController {
   const stylesheetManager = new StylesheetManager(doc);
   // Analysis reads the page's own styles through the stylesheet manager; inline SVGs are told
@@ -72,7 +80,17 @@ export function createContentController(
   let lastAnalysis: AnalysisResult | null = null;
   /** Elements whose effective foreground cannot be reproduced by a plain `color` rule. */
   let notAdaptable = new Set<string>();
-  const session = new IncrementalAdaptationSession(doc, stylesheetManager, analyzerOptions);
+  const semantic = new SemanticCueController({
+    doc,
+    sheet: stylesheetManager,
+    ...(semanticOptions.env ? { env: semanticOptions.env } : {}),
+  });
+  const session = new IncrementalAdaptationSession(
+    doc,
+    stylesheetManager,
+    analyzerOptions,
+    semantic,
+  );
   const getStyle = analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
 
   function analyze(url: string, settings: UserSettings): AnalysisResult {
@@ -158,5 +176,6 @@ export function createContentController(
     enableAdaptation,
     disableAdaptation,
     incremental: session,
+    inspectSemantics: (element) => semantic.inspect(element),
   };
 }

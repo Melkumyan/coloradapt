@@ -139,9 +139,11 @@ describe('attribute mutations', () => {
     const records = recordMutations(() => {
       const p = document.getElementById('p')!;
       p.setAttribute('data-anything', '1');
-      p.setAttribute('title', 't');
-      p.setAttribute('aria-label', 'l');
+      p.setAttribute('tabindex', '0');
+      p.setAttribute('aria-hidden', 'false');
     });
+    // M6: `title`, `aria-label` and the state-carrying data-* are delivered now (semantic layer,
+    // see the SEMANTIC_CHANGE tests); everything else still is not.
     expect(records).toHaveLength(0);
   });
 
@@ -332,5 +334,70 @@ describe('ColorAdapt-owned mutations', () => {
     const records = recordMutations(() => document.body.appendChild(fragment));
     expect(records).toHaveLength(1);
     expect(isColorAdaptOwnedMutation(records[0]!)).toBe(false);
+  });
+});
+
+describe('semantic mutations (M6)', () => {
+  it('a change of aria-invalid / aria-selected / aria-current / data-state is SEMANTIC_CHANGE', () => {
+    document.body.innerHTML = '<div id="p" role="tab">x</div>';
+    for (const [name, value] of [
+      ['aria-invalid', 'true'],
+      ['aria-selected', 'true'],
+      ['aria-current', 'page'],
+      ['aria-pressed', 'true'],
+      ['aria-checked', 'true'],
+      ['data-state', 'error'],
+      ['required', ''],
+      ['aria-label', 'Error'],
+    ] as const) {
+      const { mutations } = classify(() => document.getElementById('p')!.setAttribute(name, value));
+      expect(kinds(mutations), name).toEqual(['SEMANTIC_CHANGE']);
+      expect(mutations[0], name).toMatchObject({
+        element: document.getElementById('p'),
+        attribute: name,
+      });
+    }
+  });
+
+  it('writing the same value back is no change', () => {
+    document.body.innerHTML = '<div id="p" aria-invalid="true">x</div>';
+    const { mutations } = classify(() => {
+      document.getElementById('p')!.setAttribute('aria-invalid', 'false');
+      document.getElementById('p')!.setAttribute('aria-invalid', 'true');
+    });
+    expect(kinds(mutations)).toEqual(['IRRELEVANT', 'IRRELEVANT']); // net no-change, then coalesced
+  });
+
+  it('semantic attributes are delivered by the production subscription', () => {
+    for (const name of [
+      'aria-invalid',
+      'aria-selected',
+      'aria-current',
+      'aria-pressed',
+      'data-state',
+      'required',
+    ]) {
+      expect(OBSERVED_ATTRIBUTES, name).toContain(name);
+    }
+  });
+
+  it('a short status text changing its words is SEMANTIC_CHANGE; other text edits are not', () => {
+    document.body.innerHTML = '<span id="p">Pending</span><span id="q">Hello</span>';
+    const status = document.getElementById('p')!.firstChild as Text;
+    const prose = document.getElementById('q')!.firstChild as Text;
+    expect(kinds(classify(() => (status.data = 'Failed')).mutations)).toEqual(['SEMANTIC_CHANGE']);
+    expect(kinds(classify(() => (status.data = 'Pending')).mutations)).toEqual(['SEMANTIC_CHANGE']);
+    expect(kinds(classify(() => (prose.data = 'Goodbye')).mutations)).toEqual(['IRRELEVANT']);
+  });
+
+  it('a cue attribute written by ColorAdapt is its own mutation, not a semantic one', () => {
+    document.body.innerHTML = '<span id="p" class="status online"></span>';
+    const records = recordMutations(
+      () => document.getElementById('p')!.setAttribute('data-coloradapt-cue', 'inner:2713:l:10'),
+      { unfiltered: true },
+    );
+    expect(records.every(isColorAdaptOwnedMutation)).toBe(true);
+    const { mutations } = classifyMutations(records, { doc: document });
+    expect(kinds(mutations)).toEqual(['COLORADAPT_INTERNAL']);
   });
 });

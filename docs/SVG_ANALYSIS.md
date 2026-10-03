@@ -394,6 +394,14 @@ units: `svgAnalyzed`, `svgAdapted`, `svgUnsupported`, `svgNotApplied`,
 `svgPaintServers`. The last analysis (`GET_ANALYSIS`) carries each unit's
 `SvgUnitInfo` (reason, paint count, targets).
 
+## Semantic cues (M6)
+
+A page-provided inline SVG next to a state (a warning triangle beside red text) is an _existing
+non-color cue_ for the semantic layer: it sees the `<svg>` (or `<img>`, `role="img"`, an icon-font
+class) among the element's descendants and adds nothing. M6 does not change this module's logic;
+`<svg>` subtrees are skipped by the semantic walker (M5 owns them). See
+`docs/SEMANTIC_ACCESSIBILITY.md`.
+
 ## Limitations (documented, not hidden)
 
 - **Multi-color artwork is never adapted**, and neither are gradients, patterns,

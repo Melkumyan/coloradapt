@@ -135,6 +135,43 @@ Measured structurally, never by time: `e2e/svg-dynamic.spec.ts` appends 500 icon
 `elementsProcessed <= 3`, 0 full rescans, 500 rules and 500 tracked units afterwards, no stale or
 duplicate rule). No millisecond threshold is asserted.
 
+## Semantic cue budgets (M6)
+
+Defined in `SEMANTIC_LIMITS` (`src/features/semantics/cue-controller.ts`). Structural, never
+wall-clock; the semantic layer has no observer and no scan of its own, it reuses the regions M4
+resolved (`docs/SEMANTIC_ACCESSIBILITY.md`).
+
+| Budget                 | Default | Meaning                                                   |
+| ---------------------- | ------- | --------------------------------------------------------- |
+| `maxWalkedPerRoot`     | 5000    | elements walked per subtree root                          |
+| `maxCandidatesPerPass` | 1500    | elements examined (computed styles read) per pass         |
+| `maxPeers`             | 24      | comparable elements looked at per candidate               |
+| `maxContrastingPeers`  | 4       | differently-stated peers whose styles are compared        |
+| `ancestorLevels`       | 3       | ancestors of a changed node that may be the semantic unit |
+| `peerLevels`           | 4       | how far up comparable elements are searched               |
+| `expansionPeers`       | 100     | members of one peer group re-examined when one changes    |
+| `maxPeerSearches`      | 300     | peer groups searched per pass (one per changed element)   |
+| `maxPeerExtras`        | 400     | peers added to a pass on top of the candidates M4 named   |
+| `maxPeerScan`          | 6000    | elements looked at in total by one pass's peer searches   |
+| `peerSourcesPerRoot`   | 24      | plain elements of an added region that name their group   |
+
+Cost model: a cheap attribute pre-filter (ARIA, role, state `data-*`, a class-name substring test,
+form fields, labels) decides which elements are examined; only those pay for a computed-style read.
+Each element is examined once per pass (peers are cached within it). A cue is one attribute write;
+the stylesheet is rewritten only when the _set of cue kinds_ changes, so 100 status rows flipping
+state in one batch cost one batch, one incremental pass, one stylesheet write, no full rescan.
+Native form events (`input`, `change`, `focusout`, `invalid`, `reset`) are coalesced by the
+batcher: a burst of keystrokes is one pass.
+
+M6.R1 (peer invalidation) adds structural counters, not timings: `semanticPeerSearches`,
+`semanticPeersReexamined`, `elementsProcessed`, `incrementalPasses`, `batches`, `fullRescans`. The
+real-Chromium stress asserts, for 100 simultaneous state flips, 100 insertions, 100 reorders and 100
+removals of status dots: one batch and one incremental pass for each of flips / insertions /
+removals, **zero** full rescans, every cue present exactly once and none stale. 500 components
+created, cued and removed five times leave no cue attribute, no queued or deferred work and no
+cue rule behind. Wall time stays informational. In jsdom the numbers mean nothing for time (see below); the E2E suite
+asserts the counters.
+
 ## What to measure before optimizing further
 
 - Time spent in `analyzeDocument` on a real, large page (e.g. a dense

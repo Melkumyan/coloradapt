@@ -65,6 +65,10 @@ export function parseUserSettings(raw: unknown): UserSettings {
       DEFAULT_USER_SETTINGS.improveStatusIndicators,
     ),
     adaptSVG: readBoolean(raw.adaptSVG, DEFAULT_USER_SETTINGS.adaptSVG),
+    semanticCuesEnabled: readBoolean(
+      raw.semanticCuesEnabled,
+      DEFAULT_USER_SETTINGS.semanticCuesEnabled,
+    ),
     adaptCharts: readBoolean(raw.adaptCharts, DEFAULT_USER_SETTINGS.adaptCharts),
     adaptImages: readBoolean(raw.adaptImages, DEFAULT_USER_SETTINGS.adaptImages),
     showWarnings: readBoolean(raw.showWarnings, DEFAULT_USER_SETTINGS.showWarnings),

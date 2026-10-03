@@ -1,14 +1,35 @@
 import { isSvgElement } from '@core/svg';
+import { STATE_DATA_ATTRIBUTES, textMayNameState } from '@core/semantics';
 import { isColorAdaptOwnedMutation, removesColorAdaptStyle } from './ownership';
 import { isClassChangeRelevant, isStyleChangeRelevant } from './style-relevance';
 import type { ClassifiedMutation } from './types';
 
 /**
+ * Attributes that change what an element communicates (docs/SEMANTIC_ACCESSIBILITY.md): the
+ * ARIA states and names the semantic layer reads, `required`, `title`, and the state-carrying
+ * `data-*` attributes. A change is `SEMANTIC_CHANGE`; nothing else about it is color related.
+ */
+export const SEMANTIC_ATTRIBUTES: ReadonlySet<string> = new Set([
+  'aria-invalid',
+  'aria-selected',
+  'aria-current',
+  'aria-checked',
+  'aria-pressed',
+  'aria-required',
+  'aria-live',
+  'aria-label',
+  'aria-describedby',
+  'title',
+  'required',
+  ...STATE_DATA_ATTRIBUTES,
+]);
+
+/**
  * Attributes the observer subscribes to on arbitrary elements. `class` and
  * `style` are the two ways a page restyles an element; `hidden`/`disabled`/
  * `aria-disabled`/`role` change eligibility; `href`/`media`/`rel` only matter
- * on `<link>` (a swapped stylesheet). Everything else, including every other
- * `data-*`, is not delivered at all.
+ * on `<link>` (a swapped stylesheet); {@link SEMANTIC_ATTRIBUTES} carry state. Everything
+ * else, including every other `data-*`, is not delivered at all.
  */
 export const OBSERVED_ATTRIBUTES: readonly string[] = [
   'class',
@@ -34,6 +55,7 @@ export const OBSERVED_ATTRIBUTES: readonly string[] = [
   'filter',
   'mask',
   'mix-blend-mode',
+  ...SEMANTIC_ATTRIBUTES,
 ];
 
 /**
@@ -182,6 +204,12 @@ function classifyAttribute(record: MutationRecord, context: ClassifyContext): Cl
       : { kind: 'STYLE_AFFECTING_ATTRIBUTE', element: target, attribute: name };
   }
 
+  if (SEMANTIC_ATTRIBUTES.has(name)) {
+    return previous === current
+      ? { kind: 'IRRELEVANT', reason: 'no-net-change' }
+      : { kind: 'SEMANTIC_CHANGE', element: target, attribute: name };
+  }
+
   switch (name) {
     case 'class':
       return isClassChangeRelevant(previous, current)
@@ -215,9 +243,15 @@ function classifyCharacterData(record: MutationRecord): ClassifiedMutation {
   // Only a switch between "no text" and "some text" can change eligibility.
   const hadText = (record.oldValue ?? '').trim().length > 0;
   const hasText = target.data.trim().length > 0;
-  return hadText === hasText
-    ? { kind: 'IRRELEVANT', reason: 'text-eligibility-unchanged' }
-    : { kind: 'TEXT_CHANGE', element };
+  if (hadText !== hasText) return { kind: 'TEXT_CHANGE', element };
+  // The words of a short status text ("Pending" -> "Failed") can change what an element says.
+  if (
+    record.oldValue !== target.data &&
+    (textMayNameState(record.oldValue ?? '') || textMayNameState(target.data))
+  ) {
+    return { kind: 'SEMANTIC_CHANGE', element, attribute: '#text' };
+  }
+  return { kind: 'IRRELEVANT', reason: 'text-eligibility-unchanged' };
 }
 
 export interface BatchClassification {
@@ -244,6 +278,7 @@ export function classifyMutations(
     NODE_REMOVED: 0,
     STYLE_AFFECTING_ATTRIBUTE: 0,
     TEXT_CHANGE: 0,
+    SEMANTIC_CHANGE: 0,
     STYLESHEET_CHANGE: 0,
     IRRELEVANT: 0,
     COLORADAPT_INTERNAL: 0,

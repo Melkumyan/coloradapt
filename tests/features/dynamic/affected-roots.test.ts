@@ -192,3 +192,38 @@ describe('collectRemovedIds', () => {
     expect(collectRemovedIds([box]).sort()).toEqual([...ownIds].sort());
   });
 });
+
+describe('resolveAffectedRoots: semantic changes (M6)', () => {
+  it('a semantic change re-examines only that element, not its subtree', () => {
+    html('<div id="tab" role="tab"><span id="inner">x</span></div>');
+    const resolved = resolveAffectedRoots(
+      [{ kind: 'SEMANTIC_CHANGE', element: byId('tab'), attribute: 'aria-selected' }],
+      options,
+    );
+    expect(resolved.fullRescan).toBeNull();
+    expect(resolved.roots).toEqual([{ element: byId('tab'), scope: 'self' }]);
+  });
+
+  it('many semantic changes under one subtree root are swallowed by it', () => {
+    html('<ul id="list"><li id="a" role="tab"></li><li id="b" role="tab"></li></ul>');
+    const resolved = resolveAffectedRoots(
+      [
+        { kind: 'SEMANTIC_CHANGE', element: byId('a'), attribute: 'aria-selected' },
+        { kind: 'SEMANTIC_CHANGE', element: byId('b'), attribute: 'aria-selected' },
+        added(byId('list')),
+      ],
+      options,
+    );
+    expect(resolved.roots.map((root) => root.element.id)).toEqual(['list']);
+  });
+
+  it('a semantic change on a detached element is ignored', () => {
+    html('<div id="a"></div>');
+    const gone = document.createElement('div');
+    const resolved = resolveAffectedRoots(
+      [{ kind: 'SEMANTIC_CHANGE', element: gone, attribute: 'aria-invalid' }],
+      options,
+    );
+    expect(resolved.roots).toEqual([]);
+  });
+});

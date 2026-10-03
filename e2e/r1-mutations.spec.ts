@@ -258,11 +258,13 @@ test.describe('R1-B. attribute churn', () => {
     // Never delivered: not in the observer's attributeFilter.
     await page.evaluate(() => {
       const el = document.getElementById('static')!;
-      el.setAttribute('title', 'a');
+      // (M6: `title`, `aria-label` and the state-carrying data-* are delivered now, as SEMANTIC_CHANGE;
+      // see semantic-dynamic.spec.ts. Everything below still is not.)
+      el.setAttribute('lang', 'en');
       el.setAttribute('name', 'n');
       el.setAttribute('data-foo', '1');
       el.setAttribute('data-react-state', 'x');
-      el.setAttribute('aria-label', 'l');
+      el.setAttribute('aria-hidden', 'false');
       el.setAttribute('tabindex', '0');
       const input = document.createElement('input');
       document.getElementById('app')!.append(input);

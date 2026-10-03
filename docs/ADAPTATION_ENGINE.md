@@ -349,6 +349,16 @@ SVG reuses this engine unchanged; `docs/SVG_ANALYSIS.md` has the details. What d
 - The analysis never sees the adaptation: SVG analysis also runs inside `withOriginalStyles`, and
   its style probe (`StylesheetManager.withProbe`) sits on top of the page's original styles.
 
+## Semantic cues (M6)
+
+M6 is not another recoloring step; `docs/SEMANTIC_ACCESSIBILITY.md` has the details. What it changes
+here is only the stylesheet: the one managed `<style>` also holds the static CSS of the cue kinds in
+use (`StylesheetManager.setCueCss`), so repair, ownership, restore and the "analysis sees the page's
+own styles" rule (`withOriginalStyles`, which suspends the whole sheet including cues) all apply
+unchanged. `ruleCount` still counts color rules only; `hasContent` also counts cue CSS. M3 may
+recolor an element and M6 still adds its cue: they are independent accessibility channels, and the
+cue is added only if the _original_ meaning was color-only.
+
 ## Real-browser validation
 
 `pnpm test:e2e` (builds, then Playwright + Chromium with the built extension

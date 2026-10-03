@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E cue layout, fonts and themes</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        color: #222222;
+        font: 16px/1.4 sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #14161a;
+          color: #e6e6e6;
+        }
+      }
+      .case {
+        margin: 0 0 10px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        color: #ffffff;
+        background-color: #7f8c8d;
+        margin-right: 6px;
+      }
+      .badge.success {
+        background-color: #1e8449;
+      }
+      .badge.error {
+        background-color: #c0392b;
+      }
+      .status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+      }
+      .status.online {
+        background-color: #27ae60;
+      }
+      .status.offline {
+        background-color: #c0392b;
+      }
+      .tab {
+        border: 0;
+        background: none;
+        font: inherit;
+        color: #555555;
+        padding: 6px 10px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .tab {
+          color: #9aa0a6;
+        }
+      }
+      .tab[aria-selected='true'] {
+        color: #0645ad;
+      }
+      @media (prefers-color-scheme: dark) {
+        .tab[aria-selected='true'] {
+          color: #8ab4f8;
+        }
+      }
+
+      .inl {
+        display: inline;
+      }
+      .iflex {
+        display: inline-flex;
+      }
+      .igrid {
+        display: inline-grid;
+      }
+      .flexrow {
+        display: flex;
+        gap: 6px;
+      }
+      .gridrow {
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: 6px;
+      }
+      .abs-box {
+        position: relative;
+        height: 34px;
+      }
+      .abs-box .badge {
+        position: absolute;
+        top: 4px;
+      }
+      .clip-room {
+        overflow: hidden;
+        white-space: nowrap;
+        width: 140px;
+        text-overflow: ellipsis;
+      }
+      .clip-tight {
+        overflow: hidden;
+        white-space: nowrap;
+        width: 46px;
+        text-overflow: ellipsis;
+      }
+      .small .badge {
+        font-size: 9px;
+      }
+      .large .badge {
+        font-size: 28px;
+      }
+      .darkbox {
+        background: #111111;
+        color: #eeeeee;
+        padding: 6px;
+      }
+      .mono .badge {
+        font-family: monospace;
+      }
+      .nofont .badge {
+        font-family: 'NoSuchFontXYZ';
+      }
+      .serif .badge {
+        font-family: Georgia, 'Times New Roman', serif;
+      }
+      .cursive .badge {
+        font-family: cursive;
+      }
+      .symbolfont .badge {
+        font-family: Webdings, Wingdings, 'Segoe MDL2 Assets';
+      }
+      .narrow {
+        width: 150px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="c-inline" class="case">
+      <span id="inline-a" class="badge success inl">Order 1</span>
+      <span id="inline-b" class="badge error inl">Order 2</span>
+    </div>
+    <div id="c-block" class="case">
+      <span id="block-a" class="badge success">Order 1</span>
+      <span id="block-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-flex" class="case flexrow">
+      <span id="flex-a" class="badge success">Order 1</span>
+      <span id="flex-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-iflex" class="case">
+      <span id="iflex-a" class="badge success iflex">Order 1</span>
+      <span id="iflex-b" class="badge error iflex">Order 2</span>
+    </div>
+    <div id="c-grid" class="case gridrow">
+      <span id="grid-a" class="badge success">Order 1</span>
+      <span id="grid-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-igrid" class="case">
+      <span id="igrid-a" class="badge success igrid">Order 1</span>
+      <span id="igrid-b" class="badge error igrid">Order 2</span>
+    </div>
+    <div id="c-abs" class="case abs-box">
+      <span id="abs-a" class="badge success" style="left: 0">Order 1</span>
+      <span id="abs-b" class="badge error" style="left: 110px">Order 2</span>
+    </div>
+    <div id="c-clip-room" class="case">
+      <span id="clip-room-a" class="badge success clip-room">Order 1</span>
+      <span id="clip-room-b" class="badge error clip-room">Order 2</span>
+    </div>
+    <div id="c-clip-tight" class="case">
+      <span id="clip-tight-a" class="badge success clip-tight">Order number 12345</span>
+      <span id="clip-tight-b" class="badge error clip-tight">Order number 67890</span>
+    </div>
+    <div id="c-small" class="case small">
+      <span id="small-a" class="badge success">Order 1</span>
+      <span id="small-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-large" class="case large">
+      <span id="large-a" class="badge success">Order 1</span>
+      <span id="large-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-dark" class="case darkbox">
+      <span id="dark-a" class="badge success">Order 1</span>
+      <span id="dark-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-dots-flex" class="case flexrow">
+      <span id="dflex-a" class="status online"></span>
+      <span id="dflex-b" class="status offline"></span>
+    </div>
+    <div id="c-dots-grid" class="case gridrow">
+      <span id="dgrid-a" class="status online"></span>
+      <span id="dgrid-b" class="status offline"></span>
+    </div>
+    <div id="c-tabs" class="case flexrow" role="tablist">
+      <button id="tabs-a" role="tab" class="tab" aria-selected="true">Home</button>
+      <button id="tabs-b" role="tab" class="tab" aria-selected="false">Docs</button>
+    </div>
+    <div id="c-narrow" class="case narrow">
+      <span id="narrow-a" class="badge success">Order number 1</span>
+      <span id="narrow-b" class="badge error">Order number 2</span>
+    </div>
+
+    <div id="c-mono" class="case mono">
+      <span id="mono-a" class="badge success">Order 1</span>
+      <span id="mono-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-nofont" class="case nofont">
+      <span id="nofont-a" class="badge success">Order 1</span>
+      <span id="nofont-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-serif" class="case serif">
+      <span id="serif-a" class="badge success">Order 1</span>
+      <span id="serif-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-cursive" class="case cursive">
+      <span id="cursive-a" class="badge success">Order 1</span>
+      <span id="cursive-b" class="badge error">Order 2</span>
+    </div>
+    <div id="c-symbolfont" class="case symbolfont">
+      <span id="symbolfont-a" class="badge success">Order 1</span>
+      <span id="symbolfont-b" class="badge error">Order 2</span>
+    </div>
+  </body>
+</html>

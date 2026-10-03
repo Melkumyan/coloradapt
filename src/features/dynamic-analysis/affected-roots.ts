@@ -1,6 +1,10 @@
 import { collectOwnedIds, type AnalysisRoot } from '@core/analysis';
 import { outermostSvg, resolveUseTarget } from '@core/svg';
+import { peerKey, type PeerSeed } from '../semantics';
 import type { ClassifiedMutation, FullRescanReason, ResolvedBatch } from './types';
+
+/** One seed per (parent, kind of element) that lost a child; more than this in one batch are not followed. */
+const MAX_PEER_SEEDS = 200;
 
 export interface ResolveOptions {
   readonly doc: Document;
@@ -75,7 +79,8 @@ function dependentUnits(unit: Element, doc: Document): Element[] {
  * - style-affecting attribute: the target's subtree, because a parent's
  *   background, opacity, color, visibility or CSS variable changes what its
  *   descendants resolve to (siblings and `:has()` are out of scope);
- * - text change: only that element (its own-text eligibility);
+ * - text change, or a change of a semantic attribute / status word: only that element (the
+ *   semantic layer looks at its nearest ancestors itself);
  * - removed element: nothing to analyze; if it really left the document its
  *   owned ids are collected for cleanup (a node that is connected again was
  *   moved, and shows up as an added root instead);
@@ -89,6 +94,8 @@ export function resolveAffectedRoots(
   const { doc } = options;
   const candidates: AnalysisRoot[] = [];
   const removed: Element[] = [];
+  const peerSeeds: PeerSeed[] = [];
+  const seededKinds = new Map<Element, Set<string>>();
   let fullRescan: FullRescanReason | null = null;
 
   /** Queues the region for a change at `element`: an SVG unit if it is inside one. */
@@ -121,6 +128,7 @@ export function resolveAffectedRoots(
         break;
       }
       case 'TEXT_CHANGE':
+      case 'SEMANTIC_CHANGE':
         if (isPageContent(mutation.element, doc)) addRegion(mutation.element, 'self');
         break;
       case 'NODE_REMOVED':
@@ -130,6 +138,17 @@ export function resolveAffectedRoots(
           const { parent } = mutation;
           if (parent && isPageContent(parent, doc) && outermostSvg(parent))
             addRegion(parent, 'self');
+          // What was next to it may have been compared with it (M6 peer invalidation): one seed
+          // per kind of element per parent, however many were removed.
+          if (parent && isPageContent(parent, doc) && !outermostSvg(parent)) {
+            const signature = `${peerKey(mutation.element)}|${mutation.element.getAttribute('class') ?? ''}`;
+            const kinds = seededKinds.get(parent) ?? new Set<string>();
+            seededKinds.set(parent, kinds);
+            if (peerSeeds.length < MAX_PEER_SEEDS && !kinds.has(signature)) {
+              kinds.add(signature);
+              peerSeeds.push({ anchor: parent, template: mutation.element });
+            }
+          }
         }
         break;
       default:
@@ -137,13 +156,13 @@ export function resolveAffectedRoots(
     }
   }
 
-  if (fullRescan) return { roots: [], removed: [], fullRescan };
+  if (fullRescan) return { roots: [], removed: [], peerSeeds: [], fullRescan };
 
   const roots = normalizeRoots(candidates);
   if (roots.length > options.maxRoots) {
-    return { roots: [], removed: [], fullRescan: 'too-many-roots' };
+    return { roots: [], removed: [], peerSeeds: [], fullRescan: 'too-many-roots' };
   }
-  return { roots, removed, fullRescan: null };
+  return { roots, removed, peerSeeds, fullRescan: null };
 }
 
 /** Owned ids inside detached subtrees, each once. */

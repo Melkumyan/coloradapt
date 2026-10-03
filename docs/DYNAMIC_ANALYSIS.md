@@ -61,7 +61,11 @@ Subscriptions are deliberately narrow:
 
 - the document subtree: `childList`; `attributes` limited by `attributeFilter`
   to `class`, `style`, `hidden`, `disabled`, `aria-disabled`, `role`, plus
-  `href`/`media`/`rel` (used only on `<link>`); `characterData` (see below).
+  `href`/`media`/`rel` (used only on `<link>`), the semantic attributes of M6
+  (`SEMANTIC_ATTRIBUTES`: `aria-invalid/-selected/-current/-checked/-pressed/-required/-live`,
+  `aria-label`, `aria-describedby`, `title`, `required` and the state-carrying `data-state`,
+  `data-status`, `data-variant`, `data-type`, `data-severity`, `data-kind`, `data-validity`,
+  `data-selected`, `data-active`, `data-invalid`); `characterData` (see below).
   Every other attribute, including every other `data-*`, is never delivered;
 - `<html>` and `<body>` themselves for **all** attributes, so a theme switch
   such as `data-theme="dark"` / `data-bs-theme` / `data-color-mode` is seen
@@ -80,15 +84,16 @@ Every record is classified explicitly (`classifyMutations`), on the **net
 change** of the batch (the first record per target and attribute supplies the
 old value, so `class A -> B -> C -> A` is nothing):
 
-| Kind                        | Meaning                                                                                                                                                        | Consequence                         |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `NODE_ADDED`                | An element entered the document                                                                                                                                | Its subtree is analyzed             |
-| `NODE_REMOVED`              | An element left the document                                                                                                                                   | Its owned ids are dropped           |
-| `STYLE_AFFECTING_ATTRIBUTE` | `class` (token set changed), `style` (a property ColorAdapt reads changed), `hidden`, `disabled`, `aria-disabled`, `role`; theme attributes on `<html>/<body>` | The target's subtree is invalidated |
-| `TEXT_CHANGE`               | Text added/removed, or a text node flipped between empty and non-empty                                                                                         | The element alone is re-analyzed    |
-| `STYLESHEET_CHANGE`         | `<style>`/`<link rel=stylesheet>` added, removed, edited, or their `href/media/rel/disabled` changed                                                           | Full rescan (see below)             |
-| `IRRELEVANT`                | Scripts/templates/meta, unrelated attributes, no net change, class reorder, `transform`/`top`-style writes, coalesced duplicates                               | Counted, nothing else               |
-| `COLORADAPT_INTERNAL`       | ColorAdapt's own writes                                                                                                                                        | Ignored                             |
+| Kind                        | Meaning                                                                                                                                                                                                                                               | Consequence                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `NODE_ADDED`                | An element entered the document                                                                                                                                                                                                                       | Its subtree is analyzed                                                                   |
+| `NODE_REMOVED`              | An element left the document                                                                                                                                                                                                                          | Its owned ids are dropped                                                                 |
+| `STYLE_AFFECTING_ATTRIBUTE` | `class` (token set changed), `style` (a property ColorAdapt reads changed), `hidden`, `disabled`, `aria-disabled`, `role`; theme attributes on `<html>/<body>`                                                                                        | The target's subtree is invalidated                                                       |
+| `TEXT_CHANGE`               | Text added/removed, or a text node flipped between empty and non-empty                                                                                                                                                                                | The element alone is re-analyzed                                                          |
+| `SEMANTIC_CHANGE` (M6)      | A change of `aria-invalid/-selected/-current/-checked/-pressed/-required/-live`, `aria-label`, `aria-describedby`, `title`, `required` or a state-carrying `data-*` (net change); or the words of a short status text changing ("Pending" → "Failed") | The element alone is re-examined (the semantic layer also looks at its nearest ancestors) |
+| `STYLESHEET_CHANGE`         | `<style>`/`<link rel=stylesheet>` added, removed, edited, or their `href/media/rel/disabled` changed                                                                                                                                                  | Full rescan (see below)                                                                   |
+| `IRRELEVANT`                | Scripts/templates/meta, unrelated attributes, no net change, class reorder, `transform`/`top`-style writes, coalesced duplicates                                                                                                                      | Counted, nothing else                                                                     |
+| `COLORADAPT_INTERNAL`       | ColorAdapt's own writes                                                                                                                                                                                                                               | Ignored                                                                                   |
 
 `style` relevance is decided on declarations **normalized by the engine** (a
 detached probe element parses both values): the first time a script touches
@@ -100,6 +105,31 @@ properties: `color`, `color-scheme`, `opacity`, `visibility`, `display`,
 loops writing `transform`/`top` never wake the analyzer.
 
 ## Self-mutation filtering
+
+**M6 note.** The semantic cues are written as one attribute, `data-coloradapt-cue`, which carries the
+`data-coloradapt-` prefix and so falls under the first rule below; the cue CSS lives in the same
+managed `<style>`. No node is ever inserted, so there is nothing else to filter. Cue writes happen
+inside the incremental pass and are drained with the rest; a regression test asserts that a settled
+page does exactly zero further work and another that the records are classified as ColorAdapt's own.
+A page deleting a `<style>` that holds only cue CSS is repaired like any other (`hasInjectedContent`).
+
+**M6 observer subscription.** The attribute filter grew by the semantic attributes (`SEMANTIC_ATTRIBUTES`);
+every other `data-*` is still not delivered. Native form validity changes without any mutation, so
+`features/semantics/native-validity-bridge.ts` installs five passive capture listeners (`input`,
+`change`, `focusout`, `invalid`, `reset`) while the pipeline runs and `semanticCuesEnabled` is on;
+they only call `DynamicPipeline.invalidate(field)`, which queues the field through the normal batch
+(`reset` names the fields of the reset form, up to 200). With the setting off there is no listener
+and no work; a refresh keeps exactly one set.
+
+**M6.R1 peer invalidation.** Whether color is the only difference between two elements depends on
+both, so the dynamic pipeline hands the semantic layer more than the roots: `ResolvedBatch.peerSeeds`
+(`{ anchor: parent, template: removed node }`, one per parent and kind of element, at most 200 per
+batch) tells it where elements left, and the layer re-examines the former peers of the removed node
+and of what was inside it. A changed element, a candidate and the first 24 elements of an added
+region name their peer group the same way. All of it is bounded (<= 300 peer searches, <= 400 extra
+peers per pass, <= 100 peers per group) and never a document scan; a pass that only removed things
+still runs and prunes cue rules nobody carries (`docs/SEMANTIC_ACCESSIBILITY.md`, "Peer
+invalidation").
 
 ColorAdapt writes exactly two things to a page: the `data-coloradapt-id`
 attribute and one `<style id="coloradapt-stylesheet">` element (inserted,
@@ -333,6 +363,11 @@ logged): `mutationRecords`, `batches`, `incrementalPasses`, `fullRescans`,
 rescan or repair is waiting on its timer). The gauges exist so retention and
 settling can be asserted from outside: after a flush everything but `state: IDLE`,
 `trackedElements` and `rules` is zero/null/false.
+
+M6 adds `semantic` (the cue counters of `docs/SEMANTIC_ACCESSIBILITY.md`: candidates, classified,
+unknown, conflicts, color-only detected, cues planned/applied/not applied/removed, passes, roots, and
+the `cuesActive` gauge, plus `semanticPeerSearches` / `semanticPeersReexamined` from M6.R1) and
+`semanticInvalidations` (elements named by the native-form-validity event bridge).
 
 Available through `controller.dynamic.diagnostics()` and, for the E2E suite,
 through two typed debug messages: `GET_DYNAMIC_DIAGNOSTICS` and

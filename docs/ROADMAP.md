@@ -165,13 +165,66 @@ overridden, inline `!important` is not adaptable.
   mutations are not delivered to the observer; a full refresh corrects the state.
 - Upstream M2 scientific status remains PARTIAL.
 
-Next: **M6 — Semantic Accessibility** (not started).
+Next after M6: **M7 — Charts & Data Visualization** (not started).
 
-## M6 — Semantic Accessibility ⬜
+## M6 — Semantic Accessibility ✅ (M6.R1 PASS)
 
-- Status/role detection beyond the current coarse heuristic
-  (success/error/warning/active-inactive/buy-sell).
-- Non-color reinforcement: icons, shapes, text labels, line-style variants.
+Details in `docs/SEMANTIC_ACCESSIBILITY.md`.
+
+- A deterministic semantic core (`core/semantics`, DOM-free): evidence with provenance and
+  strength, an explicit confidence model (HIGH / MEDIUM / LOW), conflicts that are never guessed,
+  `unknown` preferred over a wrong state. **Color alone never classifies** (hard invariant).
+- ARIA read as documented; native form semantics (`required`, `disabled`, user-touched validity);
+  boundary-aware class / `data-*` tokens; a small English + Russian status vocabulary.
+- Color-only detection from DOM/CSS structure (comparable elements, non-color style signature),
+  existing-cue detection (icons, symbols, page `::before/::after`, state words, required markers).
+- Non-color cues, only at HIGH confidence + confirmed color-only + safe placement: glyph
+  (`✓ × ! ℹ * + − ↑ ↓`), underline, outline pattern. Drawn as CSS pseudo-elements with an empty
+  alternative text from one attribute (`data-coloradapt-cue`) and one static rule set inside the
+  managed `<style>`: no node inserted, fully reversible, idempotent, no observer loop.
+- Dynamic through M4 (`SEMANTIC_CHANGE`, no observer of its own) plus one small native-validity
+  event bridge; plan == browser behavior (a cue the browser does not render is not claimed).
+- `semanticCuesEnabled` (default **true**: HIGH-only, color-only-confirmed, verified, reversible).
+- Benchmark: 55 scenarios, 0 false positives. Real-Chromium E2E for forms, tabs, alerts, dots,
+  badges, buttons, SPA state changes.
+- Not in M6: AI inference (M10), charts, canvas, images, Shadow DOM, iframes, developer audit.
+  M2 stays PARTIAL.
+
+### M6.R1 — Semantic Validation & Freeze ✅ PASS
+
+Validation, not new vocabulary. Details in `docs/SEMANTIC_ACCESSIBILITY.md`.
+
+- **Adversarial false-positive benchmark**: 144 scenarios / 172 asserted elements (traps that look
+  semantic, token traps, English and Russian negation, conflicts, non-peers, true positives,
+  already-accessible, ambiguous), pure data shared by jsdom and real Chromium. **0 automatic cues
+  that are wrong, 0 missed curated cues**, 28 automatic cues, 37 already-accessible skips. Together
+  with the 55 of M6: 199 scenarios. A real bug found and fixed on the way: `data-state="error-prone"`
+  on a `.badge` reached HIGH; a state word must now end an identifier or be followed only by
+  component / modifier words.
+- **Peer grouping**: peers must be wrapped alike (two lists under one parent are two components).
+  **Peer invalidation**: a removed or changed neighbor re-examines the rest of its group (bounded,
+  memoized, never a document scan); stale cues after a removal / state switch were a real gap and
+  are covered by regression tests and a real-Chromium run (100 flips / insertions / reorders /
+  removals: batched, zero full rescans, no duplicate and no stale cue).
+- **Accessibility tree**: Chromium's full tree (`Accessibility.getFullAXTree`) and raw accessible
+  names, descriptions and states of button, link, tab, checkbox, radio, number input, labelled
+  text box, status, alert and dot are identical with and without cues; keyboard order, clicks,
+  typing, selection, validation UI, submit and `reset` are identical. **No screen reader was run.**
+- **Glyphs and fonts**: `✓` and `ℹ` are drawn as shapes (no font dependence), other glyphs live in
+  Latin-1 / WGL4 in an explicit stack; verified with monospace, a missing font, serif, cursive and a
+  symbol font. Dark mode, forced colors (emulation), CSS zoom 100-200 % and 9 px / 28 px text.
+- **Verified placement**: a cue the browser cannot show (grid host, clipped or ellipsized label, a
+  column too narrow for the glyph) is withheld, never claimed.
+- **Settings**: default `true` re-validated against the adversarial set; migration (absent → true,
+  explicit false kept, non-boolean → default) tested in unit, store and a real profile; ON/OFF x5.
+- **Stability** (final tree): semantic suites x50 50/50, full unit suite x5 5/5 (1136 tests),
+  `pnpm verify` x3 3/3, Chromium E2E x5 5/5 (290 passed, 1 intentional skip: the hidden-tab
+  scheduler path, unchanged; 291 tests), no retries. Firefox: build PASS, runtime NOT_VERIFIED.
+- Known (environmental, not an M6 regression): `r1-fixtures` "R1-5. infinite scroll" asserts that a
+  100-root batch fits the analyzer's 50 ms budget; on a loaded or thermally throttled machine it
+  fails, on the committed M5 baseline too (4 of 5 file-level runs in a degraded session).
+  Run the E2E suite on a quiet machine.
+- Upstream M2 scientific status remains PARTIAL.
 
 ## M7 — Charts ⬜
 

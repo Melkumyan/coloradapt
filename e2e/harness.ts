@@ -33,6 +33,8 @@ export interface PageServer {
   fail(name: string): void;
   /** Requests for `/slow-<name>.css` that are still waiting. */
   waiting(name: string): number;
+  /** Serves `html` at `/<name>` (a `.html` name), for pages a test generates itself. */
+  serve(name: string, html: string): void;
   close(): Promise<void>;
 }
 
@@ -45,8 +47,15 @@ const CONTENT_TYPES: Record<string, string> = {
 /** Serves `e2e/pages/*` (and `/demo.html` = the repo's demo page) on 127.0.0.1 (content scripts only match http(s)). */
 export async function startPageServer(): Promise<PageServer> {
   const held = new Map<string, ServerResponse[]>();
+  const generated = new Map<string, string>();
   const server: Server = createServer((req, res) => {
     const name = (req.url ?? '/').split('?')[0]!.replace(/^\/+/, '') || 'index.html';
+    const made = generated.get(name);
+    if (made !== undefined) {
+      res.writeHead(200, { 'content-type': CONTENT_TYPES['.html']! });
+      res.end(made);
+      return;
+    }
     const slow = /^slow-([\w-]+)\.css$/.exec(name);
     if (slow) {
       held.set(slow[1]!, [...(held.get(slow[1]!) ?? []), res]);
@@ -77,6 +86,9 @@ export async function startPageServer(): Promise<PageServer> {
       }),
     fail: (name) => settle(name, (res) => res.writeHead(404).end('not found')),
     waiting: (name) => held.get(name)?.length ?? 0,
+    serve: (name, html) => {
+      generated.set(name, html);
+    },
     close: () => {
       for (const name of [...held.keys()]) settle(name, (res) => res.destroy());
       server.closeAllConnections();

@@ -132,6 +132,49 @@ pnpm exec playwright test e2e/svg-paint.spec.ts e2e/svg-dynamic.spec.ts e2e/svg-
 `e2e/svg-validation.spec.ts` (M5.R1) holds the cross-cutting checks: the `adaptSVG` default and
 toggle, ON/OFF x10, refresh drift, multi-paint, paint servers, budget boundaries, retention.
 
+### Semantic accessibility (M6)
+
+`e2e/semantic-cues.spec.ts` and `e2e/semantic-dynamic.spec.ts` (helpers in `e2e/semantic-kit.ts`,
+fixture `e2e/pages/semantic.html`, which also defines `window.sem` / `window.counters` for the SPA
+scenarios). They read the browser: cue attributes per id, the computed style of `::after`, rendered
+pixels, bounding boxes, `ariaSnapshot()` with and without cues, the page structure with
+`data-coloradapt-*` stripped, Tab order (two fresh pages: focus position carries over otherwise),
+and the pipeline counters through `load` / `step` / `diffCounters`.
+
+Unit tests: `tests/core/semantics/` (pure: build facts with `tests/core/semantics/helpers.ts`) and
+`tests/features/semantics/`. jsdom cannot compute pseudo-element styles, so
+`tests/features/semantics/kit.ts` simulates the browser for exactly that one question (what is in
+`::before`/`::after`: the page's, declared with `data-test-before/after`, or a ColorAdapt cue whose
+rule is really in the sheet); computed styles, selectors and the cascade stay jsdom's own.
+`controller.inspectSemantics(element)` returns the classification and cue decision without side
+effects, which is what the benchmark asserts on.
+
+M6.R1 added four more real-Chromium suites and two fixtures:
+
+- `e2e/semantic-adversarial.spec.ts` runs the 144 adversarial scenarios of
+  `tests/features/semantics/adversarial-scenarios.ts` (pure data shared with the jsdom benchmark,
+  `adversarial.test.ts`), each on its own page served by `server.serve(name, html)`. Add a scenario
+  to the data file and both engines pick it up.
+- `e2e/semantic-surface.spec.ts` (fixture `e2e/pages/semantic-a11y.html`): the full Chromium
+  accessibility tree (`Accessibility.getFullAXTree`) and raw accessible names with and without cues,
+  keyboard, pointer, typing / selection / validation / submit, native validity transitions,
+  `form.reset()`, a fresh profile (a second extension session with nothing stored), pre-M6 settings,
+  an explicit `false`, ON/OFF x5, M3 + M6.
+- `e2e/semantic-layout.spec.ts` (fixture `e2e/pages/semantic-layout.html`): layouts, zoom (CSS
+  `zoom`: browser UI zoom cannot be driven in headless Chromium), fonts, dark mode, forced colors
+  (`page.emulateMedia({ forcedColors: 'active' })`), withheld cues.
+- `e2e/semantic-peers.spec.ts`: peer invalidation, the 100-element stress, counters, retention,
+  self-mutation.
+
+No screen reader is run anywhere: "accessibility tree verified" means Chromium's tree.
+
+```bash
+# the semantic-focused suites, as used for the M6 / M6.R1 stability runs
+pnpm vitest run tests/core/semantics tests/features/semantics tests/core/adaptation/stylesheet-cue.test.ts
+pnpm exec playwright test e2e/semantic-cues.spec.ts e2e/semantic-dynamic.spec.ts   # after `pnpm build`
+pnpm exec playwright test e2e/semantic-adversarial.spec.ts e2e/semantic-surface.spec.ts e2e/semantic-layout.spec.ts e2e/semantic-peers.spec.ts
+```
+
 ### Stability runs and the hostile-cycle test
 
 Nothing in the E2E suites may depend on wall-clock timing. The one place where the pipeline itself
@@ -172,7 +215,8 @@ resolved. In short:
 
 - `src/domain` — pure types, no logic.
 - `src/core` — pure(ish) business logic (color math, DOM analysis, the isolated
-  SVG layer `core/svg`, conflict detection, adaptation). No React, no `wxt/browser`.
+  SVG layer `core/svg`, the semantic core `core/semantics`, conflict detection, adaptation).
+  No React, no `wxt/browser`.
 - `src/infrastructure` — the only layer allowed to import `wxt/browser`
   (storage, messaging).
 - `src/features` — React hooks and the content-script controllers that wire

@@ -59,6 +59,32 @@ describe('parseUserSettings', () => {
     });
   });
 
+  describe('semanticCuesEnabled (M6 migration)', () => {
+    it('is true on a fresh install: high confidence, color-only and safe placement are required anyway', () => {
+      expect(DEFAULT_USER_SETTINGS.semanticCuesEnabled).toBe(true);
+      expect(parseUserSettings(undefined).semanticCuesEnabled).toBe(true);
+    });
+
+    it('settings stored before M6 (no field) load with the product default and nothing else changes', () => {
+      const { semanticCuesEnabled: _omitted, ...beforeM6 } = DEFAULT_USER_SETTINGS;
+      const old = { ...beforeM6, visionProfile: 'tritanopia', adaptSVG: false };
+      const result = parseUserSettings(old);
+      expect(result.semanticCuesEnabled).toBe(true);
+      expect(result).toMatchObject({ visionProfile: 'tritanopia', adaptSVG: false });
+    });
+
+    it('an explicitly stored value is never overridden, true or false', () => {
+      expect(parseUserSettings({ semanticCuesEnabled: false }).semanticCuesEnabled).toBe(false);
+      expect(parseUserSettings({ semanticCuesEnabled: true }).semanticCuesEnabled).toBe(true);
+    });
+
+    it('a non-boolean stored value falls back to the default instead of rejecting the object', () => {
+      const result = parseUserSettings({ semanticCuesEnabled: 'off', enabled: false });
+      expect(result.semanticCuesEnabled).toBe(true);
+      expect(result.enabled).toBe(false);
+    });
+  });
+
   it('drops malformed site overrides but keeps valid ones', () => {
     const result = parseUserSettings({
       siteOverrides: {

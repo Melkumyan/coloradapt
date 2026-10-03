@@ -50,6 +50,19 @@ classified and left alone (`adaptSVG` is on by default; stored settings without 
 default). Rules go through the same stylesheet, are verified against
 the real computed paint, and are reversible. See `docs/SVG_ANALYSIS.md`.
 
+M6 adds a second, non-color channel where color alone carries a state. Deterministic evidence
+(ARIA, native form state, exact class/data tokens, a small English/Russian status vocabulary) is
+classified with an explicit confidence; only when the evidence is HIGH, the original page
+differs between states by color only, and a safe placement exists, ColorAdapt adds a small cue
+(`✓ × ! ℹ * + − ↑ ↓`, an underline, or an outline pattern) as a CSS pseudo-element with an empty
+alternative text (`✓` and `ℹ` are drawn as shapes, not as font glyphs). No node is inserted,
+ambiguous cases stay `unknown`, color alone never classifies anything, and it is fully reversible
+(`semanticCuesEnabled`, on by default). M6.R1 validated it against 144 adversarial scenarios in
+jsdom and in real Chromium (0 wrong automatic cues), checked that the browser's accessibility tree,
+focus order, clicks, typing and form behavior are identical with and without cues, and made peer
+verdicts follow their peers (a removed or changed neighbor takes a stale cue away). No screen reader
+was run. See `docs/SEMANTIC_ACCESSIBILITY.md`.
+
 Status: **M3 engineering PASS** (validated in real Chromium); **upstream
 scientific confidence PARTIAL** (M2 model assumption). Known limitations:
 a page's own `:hover`/`:focus` colors are
@@ -112,13 +125,13 @@ rule, an adaptation strategy, etc.).
 ```text
 src/
   domain/           Pure types (VisionProfile, ColorConflict, UserSettings, ...)
-  core/             Color engine, DOM analyzer, SVG layer, conflict detection, adaptation engine
+  core/             Color engine, DOM analyzer, SVG layer, semantic core, conflict detection, adaptation engine
   infrastructure/   Storage and messaging abstractions over the WebExtension API
   features/         React hooks + content-script controller
   entrypoints/      background, content, popup, options (WXT entrypoints)
   shared/           Cross-cutting utils/constants
 tests/              Vitest unit tests, mirroring src/
-docs/               Architecture, CSS/SVG analysis, dynamic sites, product, roadmap, privacy, security, performance, development
+docs/               Architecture, CSS/SVG analysis, semantic accessibility, dynamic sites, product, roadmap, privacy, security, performance, development
 ```
 
 ## Privacy principles

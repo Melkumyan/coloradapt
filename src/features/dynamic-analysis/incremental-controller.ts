@@ -1,11 +1,13 @@
 import { DYNAMIC_BUDGET, type DynamicBudget } from '@shared/constants';
 import {
+  EMPTY_SEMANTIC_DIAGNOSTICS,
   EMPTY_SVG_DIAGNOSTICS,
   type DynamicDiagnostics,
   type FullRescanReason,
 } from '@domain/models';
 import type { AnalysisRoot } from '@core/analysis';
 import type { IncrementalAdaptation } from '../page-analysis/incremental-adaptation';
+import type { PeerSeed } from '../semantics';
 import { collectRemovedIds, normalizeRoots, resolveAffectedRoots } from './affected-roots';
 import { classifyMutations } from './mutation-classifier';
 import { MutationBatcher, type MutationBatch } from './mutation-batcher';
@@ -32,6 +34,11 @@ export interface DynamicPipeline {
   stop(): void;
   /** Requests a full rescan through the normal (batched) path. */
   refresh(): void;
+  /**
+   * Asks for `element` (and the semantic unit around it) to be re-examined, through the normal
+   * batched path. For state that changes without a DOM mutation: native form validity.
+   */
+  invalidate(element: Element): void;
   /** `stop()`, and `start()` becomes a no-op. */
   dispose(): void;
   /** Drops queued mutations and any pending flush (a full adaptation is about to supersede them). */
@@ -85,6 +92,8 @@ function emptyCounters(): Counters {
     pendingRescan: null,
     throttleTimerActive: false,
     svg: EMPTY_SVG_DIAGNOSTICS,
+    semantic: EMPTY_SEMANTIC_DIAGNOSTICS,
+    semanticInvalidations: 0,
   };
 }
 
@@ -114,6 +123,8 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
   let lastFullRescanAt: number | null = null;
   let cancelThrottle: (() => void) | null = null;
   let repairOwed = false;
+  /** Elements named by `invalidate` (native form events) since the last batch. */
+  const invalidated = new Set<Element>();
   let lastRepairAt: number | null = null;
   let cancelRepairTimer: (() => void) | null = null;
   const pendingLinks = new Map<HTMLLinkElement, () => void>();
@@ -139,7 +150,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     for (const record of records) {
       // Our <style> disappearing while rules still exist was not our doing: it needs repair.
       // With no rules left, the removal is our own restore() and there is nothing to do.
-      const needsRepair = removesColorAdaptStyle(record) && adaptation.ruleCount > 0;
+      const needsRepair = removesColorAdaptStyle(record) && adaptation.hasInjectedContent;
       if (isColorAdaptOwnedMutation(record) && !needsRepair) {
         counters.selfMutationsIgnored += 1;
       } else {
@@ -248,11 +259,16 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       pendingFullRescan ??= 'queue-overflow';
     }
     const hadWork =
-      records.length > 0 || deferredRoots.length > 0 || pendingFullRescan !== null || repairOwed;
+      records.length > 0 ||
+      deferredRoots.length > 0 ||
+      pendingFullRescan !== null ||
+      repairOwed ||
+      invalidated.size > 0;
     if (hadWork) counters.batches += 1;
 
     let resolvedRemoved: readonly Element[] = [];
     let resolvedRoots: readonly AnalysisRoot[] = [];
+    let resolvedSeeds: readonly PeerSeed[] = [];
     if (records.length > 0) {
       const { mutations, counts } = classifyMutations(records, { doc });
       counters.selfMutationsIgnored += counts.COLORADAPT_INTERNAL;
@@ -277,10 +293,12 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       if (resolved.fullRescan) pendingFullRescan ??= resolved.fullRescan;
       resolvedRemoved = resolved.removed;
       resolvedRoots = resolved.roots;
+      resolvedSeeds = resolved.peerSeeds;
     }
 
     if (!adaptation.active) {
       // Adaptation was switched off underneath us: nothing to maintain.
+      invalidated.clear();
       deferredRoots = [];
       pendingFullRescan = null;
       repairOwed = false;
@@ -288,7 +306,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     }
     repairStylesheetIfOwed();
 
-    const roots = normalizeRoots([...deferredRoots, ...resolvedRoots]);
+    const roots = normalizeRoots([...deferredRoots, ...resolvedRoots, ...takeInvalidated()]);
     if (!pendingFullRescan && roots.length > budget.maxAffectedRoots) {
       pendingFullRescan = 'too-many-roots';
     }
@@ -300,9 +318,16 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     }
 
     const removedIds = collectRemovedIds(resolvedRemoved);
-    if (roots.length === 0 && removedIds.length === 0) return;
+    if (roots.length === 0 && removedIds.length === 0) {
+      // Nodes left and none held a color rule: only the semantic layer has anything to do (their peers).
+      if (resolvedSeeds.length > 0) {
+        adaptation.updatePeers(resolvedSeeds);
+        drainOwnMutations();
+      }
+      return;
+    }
 
-    const result = adaptation.update({ roots, removedIds });
+    const result = adaptation.update({ roots, removedIds, peerSeeds: resolvedSeeds });
     counters.incrementalPasses += 1;
     counters.affectedRoots += result.rootsConsumed;
     counters.elementsProcessed += result.elementsProcessed;
@@ -317,6 +342,17 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       batcher.request();
     }
     drainOwnMutations();
+  }
+
+  /** The regions named by `invalidate` that are still live page content. */
+  function takeInvalidated(): AnalysisRoot[] {
+    const roots: AnalysisRoot[] = [];
+    for (const element of invalidated) {
+      if (element.isConnected && doc.body?.contains(element))
+        roots.push({ element, scope: 'self' });
+    }
+    invalidated.clear();
+    return roots;
   }
 
   function drainOwnMutations(): void {
@@ -335,6 +371,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     cancelRepairTimer?.();
     cancelRepairTimer = null;
     repairOwed = false;
+    invalidated.clear();
     unwatchLinks();
     deferredRoots = [];
     pendingFullRescan = null;
@@ -355,6 +392,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       pendingRescan: pendingFullRescan,
       throttleTimerActive: cancelThrottle !== null || cancelRepairTimer !== null,
       svg: adaptation.svgDiagnostics(),
+      semantic: adaptation.semanticDiagnostics(),
     };
   }
 
@@ -377,6 +415,13 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       batcher.request();
     },
 
+    invalidate(element) {
+      if (!observer.connected || !adaptation.active) return;
+      invalidated.add(element);
+      counters.semanticInvalidations += 1;
+      batcher.request();
+    },
+
     dispose() {
       stop();
       disposed = true;
@@ -391,6 +436,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       cancelRepairTimer?.();
       cancelRepairTimer = null;
       repairOwed = false;
+      invalidated.clear();
       deferredRoots = [];
       pendingFullRescan = null;
     },
@@ -403,7 +449,12 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       try {
         for (let pass = 0; pass < budget.maxPassesPerFlush; pass += 1) {
           batcher.flush();
-          if (deferredRoots.length === 0 && pendingFullRescan === null && batcher.queued === 0) {
+          if (
+            deferredRoots.length === 0 &&
+            pendingFullRescan === null &&
+            batcher.queued === 0 &&
+            invalidated.size === 0
+          ) {
             break;
           }
         }

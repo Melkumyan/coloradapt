@@ -11,6 +11,11 @@ export interface UserSettings {
   readonly improveStatusIndicators: boolean;
   /** Adapt inline SVG icons and text (M5, docs/SVG_ANALYSIS.md). */
   readonly adaptSVG: boolean;
+  /**
+   * Add a second, non-color cue where color is the only carrier of a state and the evidence
+   * for that state is strong (M6, docs/SEMANTIC_ACCESSIBILITY.md).
+   */
+  readonly semanticCuesEnabled: boolean;
   /** Planned for M7. */
   readonly adaptCharts: boolean;
   /** Planned for M8. */
@@ -27,6 +32,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   improveLinks: true,
   improveStatusIndicators: true,
   adaptSVG: true,
+  semanticCuesEnabled: true,
   adaptCharts: false,
   adaptImages: false,
   showWarnings: true,

@@ -1,3 +1,4 @@
+import type { SemanticDiagnostics } from './semantic';
 import type { SvgDiagnostics } from './svg';
 
 /** Why the whole document is re-analyzed instead of a few regions (docs/DYNAMIC_ANALYSIS.md). */
@@ -65,4 +66,8 @@ export interface DynamicDiagnostics {
   readonly throttleTimerActive: boolean;
   /** Inline-SVG gauges (docs/SVG_ANALYSIS.md). */
   readonly svg: SvgDiagnostics;
+  /** Semantic-cue counters (docs/SEMANTIC_ACCESSIBILITY.md). */
+  readonly semantic: SemanticDiagnostics;
+  /** Full rescans' counterpart for semantics: elements re-examined by external invalidation (form events). */
+  readonly semanticInvalidations: number;
 }

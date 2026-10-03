@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E semantic cues</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        color: #222222;
+        font: 16px/1.4 sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #14161a;
+          color: #e6e6e6;
+        }
+        .tab {
+          color: #9aa0a6;
+        }
+        .tab[aria-selected='true'] {
+          color: #8ab4f8;
+        }
+        label.field {
+          color: #cccccc;
+        }
+      }
+      section {
+        margin: 0 0 14px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 0 0 4px;
+      }
+
+      /* presence dots */
+      .status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .status.online {
+        background-color: #27ae60;
+      }
+      .status.offline {
+        background-color: #c0392b;
+      }
+      .status.warning {
+        background-color: #f1c40f;
+      }
+      .status.sq {
+        border-radius: 0;
+      }
+
+      /* badges */
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        color: #ffffff;
+        font-size: 13px;
+        margin-right: 6px;
+      }
+      .badge.success {
+        background-color: #1e8449;
+      }
+      .badge.error {
+        background-color: #c0392b;
+      }
+      .badge.warning {
+        background-color: #9a6a00;
+      }
+
+      /* tabs */
+      .tab {
+        border: 0;
+        background: none;
+        font: inherit;
+        padding: 6px 10px;
+        color: #666666;
+        cursor: pointer;
+      }
+      .tab[aria-selected='true'] {
+        color: #0645ad;
+      }
+      .panel[hidden] {
+        display: none;
+      }
+
+      /* nav */
+      .nav-link {
+        text-decoration: none;
+        color: #555555;
+        margin-right: 10px;
+      }
+      .nav-link.active {
+        color: #0645ad;
+      }
+
+      /* form */
+      label.field {
+        display: block;
+        color: #333333;
+        font-size: 14px;
+      }
+      label.field.req {
+        color: #c0392b;
+      }
+      input.f {
+        border: 2px solid #888888;
+        padding: 4px;
+        margin: 2px 0 8px;
+        display: block;
+        font: inherit;
+        background: #ffffff;
+        color: #222222;
+      }
+      input.f[aria-invalid='true'] {
+        border-color: #c0392b;
+      }
+      input.native:user-invalid {
+        border-color: #c0392b;
+      }
+
+      /* alerts */
+      .alert {
+        padding: 8px;
+        margin: 4px 0;
+        border-radius: 4px;
+      }
+      .alert.error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .alert.info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+
+      /* values */
+      .delta.positive {
+        color: #1e8449;
+      }
+      .delta.negative {
+        color: #c0392b;
+      }
+
+      /* things that are only colored */
+      .logo {
+        color: #c0392b;
+        font-weight: 700;
+      }
+      .star {
+        color: #f1c40f;
+      }
+      .price.sale {
+        color: #c0392b;
+      }
+      a.green {
+        color: #1e8449;
+      }
+      .btn {
+        padding: 6px 12px;
+        font: inherit;
+      }
+      .btn-danger {
+        background-color: #c0392b;
+        color: #ffffff;
+        border: 0;
+      }
+      .btn-primary {
+        background-color: #2c3e50;
+        color: #ffffff;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="presence">
+      <h2>Presence</h2>
+      <ul id="people" style="list-style: none; padding: 0; margin: 0">
+        <li><span id="d1" class="status online"></span>Alice</li>
+        <li><span id="d2" class="status offline"></span>Bob</li>
+        <li><span id="d3" class="status warning"></span>Carol</li>
+      </ul>
+    </section>
+
+    <section id="badges">
+      <h2>Badges</h2>
+      <span id="b1" class="badge success">Order 1</span>
+      <span id="b2" class="badge error">Order 2</span>
+      <span id="b3" class="badge warning">Order 3</span>
+      <span id="b4" class="badge success">Success</span>
+      <span id="b5" class="badge error">Error</span>
+    </section>
+
+    <section id="tabs">
+      <h2>Tabs</h2>
+      <div role="tablist" id="tablist">
+        <button id="tab1" role="tab" class="tab" aria-selected="true" aria-controls="p1">
+          Home
+        </button>
+        <button id="tab2" role="tab" class="tab" aria-selected="false" aria-controls="p2">
+          Docs
+        </button>
+        <button id="tab3" role="tab" class="tab" aria-selected="false" aria-controls="p3">
+          About
+        </button>
+      </div>
+      <div id="p1" role="tabpanel" class="panel">Home panel</div>
+      <div id="p2" role="tabpanel" class="panel" hidden>Docs panel</div>
+      <div id="p3" role="tabpanel" class="panel" hidden>About panel</div>
+    </section>
+
+    <section id="nav">
+      <h2>Navigation</h2>
+      <nav>
+        <a id="nav-home" class="nav-link active" aria-current="page" href="#home">Home</a>
+        <a id="nav-about" class="nav-link" href="#about">About</a>
+      </nav>
+    </section>
+
+    <section id="forms">
+      <h2>Forms</h2>
+      <form id="js-form" novalidate>
+        <label id="lbl-email" class="field req" for="email">Email</label>
+        <input id="email" class="f" type="text" required aria-invalid="false" />
+        <label id="lbl-name" class="field" for="name">Name</label>
+        <input id="name" class="f" type="text" aria-invalid="false" />
+        <button id="save" class="btn btn-primary" type="submit">Save</button>
+        <a id="docs-link" href="/basic.html">Docs</a>
+      </form>
+      <form id="native-form">
+        <input id="nemail" class="f native" type="email" required />
+        <input id="nname" class="f native" type="text" />
+      </form>
+    </section>
+
+    <section id="alerts">
+      <h2>Alerts</h2>
+      <div id="al1" role="alert" class="alert error">Something went wrong</div>
+      <div id="al2" role="alert" class="alert info">Heads up</div>
+      <div id="al3" role="alert" class="alert error">Error: payment failed</div>
+    </section>
+
+    <section id="values">
+      <h2>Values</h2>
+      <span id="v1" class="delta positive">12%</span>
+      <span id="v2" class="delta negative">8%</span>
+      <span id="v3" class="delta positive">+5%</span>
+    </section>
+
+    <section id="decor">
+      <h2>Color without meaning</h2>
+      <div id="logo" class="logo">ACME</div>
+      <span id="star" class="star">★</span>
+      <span id="sale" class="price sale">$9.99</span>
+      <span id="regular" class="price">$19.99</span>
+      <a id="eco" class="green" href="#eco">Eco</a>
+      <button id="delete" class="btn btn-danger" type="button">Delete</button>
+      <button id="cancel" class="btn btn-primary" type="button">Cancel</button>
+      <p id="red" style="color: #ff0000">An ordinary red paragraph</p>
+    </section>
+
+    <section id="dyn">
+      <h2>Dynamic</h2>
+      <div id="rows"></div>
+    </section>
+
+    <script>
+      window.counters = { save: 0, del: 0, submitted: 0, nativeSubmitted: 0 };
+      document.getElementById('save').addEventListener('click', () => (window.counters.save += 1));
+      document.getElementById('delete').addEventListener('click', () => (window.counters.del += 1));
+      document.getElementById('js-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        window.counters.submitted += 1;
+      });
+      document.getElementById('native-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        window.counters.nativeSubmitted += 1;
+      });
+
+      // Tabs: an SPA-style selection change.
+      const tabs = [...document.querySelectorAll('[role=tab]')];
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => {
+          for (const other of tabs) {
+            const on = other === tab;
+            other.setAttribute('aria-selected', String(on));
+            document.getElementById(other.getAttribute('aria-controls')).hidden = !on;
+          }
+        });
+      }
+
+      // JS validation: aria-invalid follows the input.
+      document.getElementById('email').addEventListener('input', (event) => {
+        const ok = /^\S+@\S+\.\S+$/.test(event.target.value);
+        event.target.setAttribute('aria-invalid', String(!ok));
+      });
+
+      window.sem = {
+        setClass(id, cls) {
+          document.getElementById(id).className = cls;
+        },
+        setText(id, text) {
+          document.getElementById(id).firstChild.nodeValue = text;
+        },
+        add(html, parentId) {
+          document.getElementById(parentId || 'people').insertAdjacentHTML('beforeend', html);
+        },
+        remove(id) {
+          document.getElementById(id).remove();
+        },
+        rows(n, state) {
+          const host = document.getElementById('rows');
+          host.innerHTML = '';
+          const list = document.createElement('ul');
+          list.style.cssText = 'list-style:none;padding:0;margin:0';
+          for (let i = 0; i < n; i += 1) {
+            const li = document.createElement('li');
+            li.innerHTML = '<span class="status ' + state + '" id="r' + i + '"></span>row ' + i;
+            list.appendChild(li);
+          }
+          host.appendChild(list);
+        },
+        flipRows(state) {
+          for (const dot of document.querySelectorAll('#rows .status'))
+            dot.className = 'status ' + state;
+        },
+      };
+    </script>
+  </body>
+</html>

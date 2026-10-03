@@ -102,6 +102,11 @@ export class StylesheetManager {
   #rules = new Map<string, AdaptationChange>();
   /** Rule keys by element id *and* by owner id: one lookup finds everything an id owns. */
   #index = new Map<string, Set<string>>();
+  /**
+   * Static CSS of the semantic cues (M6): a pure function of the cue kinds currently in use,
+   * keyed on an attribute, so it never needs per-element rules. `null`: no cue on the page.
+   */
+  #cueCss: string | null = null;
 
   constructor(doc: Document = document) {
     this.#doc = doc;
@@ -171,7 +176,7 @@ export class StylesheetManager {
       else added += 1;
     }
 
-    if (this.#rules.size === 0) {
+    if (this.#isEmpty()) {
       this.restore();
       return { applied: [], notApplied: [], added, updated, removed, pruned };
     }
@@ -212,13 +217,41 @@ export class StylesheetManager {
    * framework re-rendering `<head>`). `reattach` puts them back.
    */
   isDetached(): boolean {
-    return this.#rules.size > 0 && !this.#styleElement?.isConnected;
+    return !this.#isEmpty() && !this.#styleElement?.isConnected;
   }
 
   /** Re-injects the sheet from the rule map. */
   reattach(): void {
-    if (this.#rules.size === 0) return;
+    if (this.#isEmpty()) return;
     this.#commit(this.#ensureStyleElement(), this.#css());
+  }
+
+  /** Whether the sheet holds anything at all (color rules or semantic cue CSS). */
+  get hasContent(): boolean {
+    return !this.#isEmpty();
+  }
+
+  /** The semantic-cue CSS currently in the sheet. */
+  get cueCss(): string | null {
+    return this.#cueCss;
+  }
+
+  /**
+   * Replaces the semantic-cue CSS (`null` removes it). Writes nothing when the text is unchanged;
+   * otherwise commits once, with transitions suppressed. The sheet disappears when neither color
+   * rules nor cue CSS remain.
+   */
+  setCueCss(css: string | null): void {
+    const next = css === '' ? null : css;
+    const unchanged = next === this.#cueCss;
+    this.#cueCss = next;
+    if (this.#isEmpty()) {
+      if (this.#styleElement) this.restore();
+      return;
+    }
+    const wasAttached = this.#styleElement?.isConnected === true;
+    const styleElement = this.#ensureStyleElement();
+    if (!unchanged || !wasAttached) this.#commit(styleElement, this.#css());
   }
 
   /** The `<style>` element, if one is currently injected — for mutation-ownership checks. */
@@ -227,7 +260,16 @@ export class StylesheetManager {
   }
 
   #css(): string {
-    return buildCss([...this.#rules.values()]);
+    const rules = buildCss([...this.#rules.values()]);
+    return this.#cueCss === null
+      ? rules
+      : rules === ''
+        ? this.#cueCss
+        : `${rules}\n${this.#cueCss}`;
+  }
+
+  #isEmpty(): boolean {
+    return this.#rules.size === 0 && this.#cueCss === null;
   }
 
   #verify(
@@ -266,7 +308,7 @@ export class StylesheetManager {
     for (const change of notApplied) {
       dropped += this.#deleteRulesOf(change.ownerId ?? change.elementId);
     }
-    if (this.#rules.size === 0) this.restore();
+    if (this.#isEmpty()) this.restore();
     else this.#commit(styleElement, this.#css());
     return dropped;
   }
@@ -315,7 +357,7 @@ export class StylesheetManager {
       // page's `transition: fill` has nothing to start from; then the sheet is as it was.
       this.#flushStyle();
       styleElement.textContent = previous;
-      if (!existed && this.#rules.size === 0) {
+      if (!existed && this.#isEmpty()) {
         styleElement.remove();
         this.#styleElement = null;
       }
@@ -324,6 +366,7 @@ export class StylesheetManager {
 
   restore(): void {
     this.#clearRules();
+    this.#cueCss = null;
     const styleElement = this.#styleElement;
     if (styleElement?.isConnected) {
       // Original colors return with transitions suppressed, then the sheet goes.

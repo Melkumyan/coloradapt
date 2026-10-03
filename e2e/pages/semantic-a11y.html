@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E semantic accessibility surface</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        color: #222222;
+        font: 16px/1.4 sans-serif;
+      }
+      section {
+        margin: 0 0 12px;
+      }
+      .status {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 6px;
+      }
+      .status.online {
+        background-color: #27ae60;
+      }
+      .status.offline {
+        background-color: #c0392b;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        color: #ffffff;
+        background-color: #7f8c8d;
+        margin-right: 6px;
+      }
+      .badge.success {
+        background-color: #1e8449;
+      }
+      .badge.error {
+        background-color: #c0392b;
+      }
+      .tab {
+        border: 0;
+        background: none;
+        font: inherit;
+        color: #555555;
+        padding: 6px 10px;
+      }
+      .tab[aria-selected='true'] {
+        color: #0645ad;
+      }
+      .nav-link {
+        text-decoration: none;
+        color: #555555;
+        margin-right: 10px;
+      }
+      .nav-link[aria-current] {
+        color: #0645ad;
+      }
+      .seg {
+        border: 0;
+        background: none;
+        font: inherit;
+        color: #555555;
+      }
+      .seg[aria-pressed='true'] {
+        color: #0645ad;
+      }
+      label.field {
+        display: block;
+        color: #333333;
+      }
+      label.field.req {
+        color: #c0392b;
+      }
+      input.f {
+        border: 2px solid #888888;
+        padding: 4px;
+        margin: 2px 0 8px;
+        display: block;
+        font: inherit;
+      }
+      input.f:user-invalid {
+        border-color: #c0392b;
+      }
+      .alert {
+        padding: 6px;
+        margin: 4px 0;
+      }
+      .alert.error {
+        background-color: #f8d7da;
+        color: #721c24;
+      }
+      .alert.info {
+        background-color: #d1ecf1;
+        color: #0c5460;
+      }
+      .hint {
+        font-size: 13px;
+        color: #555555;
+      }
+    </style>
+  </head>
+  <body>
+    <section id="presence" aria-label="People">
+      <span id="d1" class="status online" title="Alice is online"></span>Alice
+      <span id="d2" class="status offline" title="Bob is offline"></span>Bob
+    </section>
+
+    <section id="badges">
+      <span id="b1" class="badge success" role="status">Order 1</span>
+      <span id="b2" class="badge error" role="status">Order 2</span>
+      <span id="b3" class="badge" role="status">Order 3</span>
+    </section>
+
+    <section id="tabs">
+      <div role="tablist" aria-label="Sections">
+        <button id="tab1" role="tab" class="tab" aria-selected="true">Home</button>
+        <button id="tab2" role="tab" class="tab" aria-selected="false">Docs</button>
+        <button id="tab3" role="tab" class="tab" aria-selected="false">About</button>
+      </div>
+    </section>
+
+    <section id="nav">
+      <nav aria-label="Main">
+        <a id="nav-home" class="nav-link" aria-current="page" href="#home">Home</a>
+        <a id="nav-about" class="nav-link" href="#about">About</a>
+      </nav>
+    </section>
+
+    <section id="segs">
+      <div role="group" aria-label="Range">
+        <button id="seg1" class="seg" aria-pressed="true" type="button">Day</button>
+        <button id="seg2" class="seg" aria-pressed="false" type="button">Week</button>
+      </div>
+    </section>
+
+    <section id="alerts">
+      <div id="al1" role="alert" class="alert error" aria-describedby="hint1">
+        Something went wrong
+      </div>
+      <div id="al2" role="alert" class="alert info">Heads up</div>
+      <span id="hint1" class="hint">Try again later</span>
+    </section>
+
+    <section id="checks">
+      <input id="chk1" type="checkbox" checked /><label id="chk1-l" for="chk1">Subscribe</label>
+      <input id="chk2" type="checkbox" /><label id="chk2-l" for="chk2">Terms</label>
+      <input id="rad1" type="radio" name="size" value="s" checked /><label for="rad1">Small</label>
+      <input id="rad2" type="radio" name="size" value="l" /><label for="rad2">Large</label>
+    </section>
+
+    <section id="forms">
+      <form id="form" action="#" method="get">
+        <label id="lbl-email" class="field req" for="email">Email</label>
+        <input
+          id="email"
+          class="f"
+          type="email"
+          name="email"
+          required
+          placeholder="you@example.com"
+          aria-describedby="email-hint"
+        />
+        <span id="email-hint" class="hint">We never share it</span>
+        <label id="lbl-name" class="field" for="name">Name</label>
+        <input id="name" class="f" type="text" name="name" placeholder="Your name" />
+        <label id="lbl-age" class="field" for="age">Age</label>
+        <input id="age" class="f" type="number" name="age" min="18" required />
+        <button id="submit" type="submit">Send</button>
+        <button id="reset" type="reset">Reset</button>
+      </form>
+    </section>
+
+    <script>
+      window.log = {
+        clicks: { b1: 0, tab2: 0, link: 0, seg2: 0, chk2: 0, rad2: 0 },
+        submitted: 0,
+        invalid: 0,
+        events: [],
+      };
+      const on = (id, type, fn) => document.getElementById(id).addEventListener(type, fn);
+      on('b1', 'click', () => (window.log.clicks.b1 += 1));
+      on('nav-about', 'click', (event) => {
+        event.preventDefault();
+        window.log.clicks.link += 1;
+      });
+      on('chk2', 'click', () => (window.log.clicks.chk2 += 1));
+      on('rad2', 'click', () => (window.log.clicks.rad2 += 1));
+      const tabs = [...document.querySelectorAll('[role=tab]')];
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => {
+          if (tab.id === 'tab2') window.log.clicks.tab2 += 1;
+          for (const other of tabs) other.setAttribute('aria-selected', String(other === tab));
+        });
+      }
+      const segs = [...document.querySelectorAll('.seg')];
+      for (const seg of segs) {
+        seg.addEventListener('click', () => {
+          if (seg.id === 'seg2') window.log.clicks.seg2 += 1;
+          for (const other of segs) other.setAttribute('aria-pressed', String(other === seg));
+        });
+      }
+      const form = document.getElementById('form');
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        window.log.submitted += 1;
+      });
+      form.addEventListener(
+        'invalid',
+        () => {
+          window.log.invalid += 1;
+        },
+        true,
+      );
+      for (const type of ['focus', 'blur', 'input', 'change']) {
+        document.getElementById('email').addEventListener(type, () => window.log.events.push(type));
+      }
+    </script>
+  </body>
+</html>

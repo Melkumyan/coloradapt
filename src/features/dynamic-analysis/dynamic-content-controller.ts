@@ -1,6 +1,7 @@
 import type { AnalyzeDocumentOptions } from '@core/analysis';
 import type { UserSettings } from '@domain/models';
 import { createContentController, type ContentController } from '../page-analysis';
+import { createNativeValidityBridge, type FactsEnvironment } from '../semantics';
 import {
   createDynamicPipeline,
   type DynamicPipeline,
@@ -10,6 +11,8 @@ import {
 export interface DynamicContentController extends ContentController {
   /** The mutation pipeline: lifecycle, forced flush and diagnostics. */
   readonly dynamic: DynamicPipeline;
+  /** The native-validity event bridge (M6): installed only while semantic cues are on. For leak diagnostics. */
+  readonly semanticBridge: { readonly listening: boolean; readonly listeners: number };
 }
 
 /**
@@ -30,9 +33,13 @@ export function createDynamicContentController(
   pipelineOptions: Partial<
     Pick<DynamicPipelineOptions, 'scheduler' | 'now' | 'budget' | 'createObserver'>
   > = {},
+  semanticOptions: { readonly env?: FactsEnvironment } = {},
 ): DynamicContentController {
-  const base = createContentController(doc, analyzerOptions);
+  const base = createContentController(doc, analyzerOptions, semanticOptions);
   let lastRequest: { url: string; settings: UserSettings } | null = null;
+
+  // Native form validity changes without a mutation; the one event bridge M6 needs.
+  const validity = createNativeValidityBridge(doc, (field) => dynamic.invalidate(field));
 
   const dynamic = createDynamicPipeline({
     doc,
@@ -46,6 +53,9 @@ export function createDynamicContentController(
   return {
     ...base,
     dynamic,
+    get semanticBridge() {
+      return { listening: validity.listening, listeners: validity.listeners };
+    },
 
     analyze(url, settings) {
       const result = base.analyze(url, settings);
@@ -59,11 +69,14 @@ export function createDynamicContentController(
       lastRequest = { url, settings };
       if (settings.enabled) dynamic.start();
       else dynamic.stop();
+      if (settings.enabled && settings.semanticCuesEnabled) validity.start();
+      else validity.stop();
       dynamic.drainOwnMutations();
       return result;
     },
 
     disableAdaptation() {
+      validity.stop();
       dynamic.stop();
       lastRequest = null;
       base.disableAdaptation();

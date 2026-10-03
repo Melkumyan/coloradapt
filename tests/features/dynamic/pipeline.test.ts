@@ -264,7 +264,7 @@ describe('attribute changes', () => {
   it('ignores attributes ColorAdapt does not care about', () => {
     const { dynamic } = setup(`<p id="t" style="${CONFLICT_STYLE}">text</p>`);
     byId('t').setAttribute('data-foo', '1');
-    byId('t').setAttribute('title', 'x');
+    byId('t').setAttribute('tabindex', '0');
     byId('t').style.transform = 'translateX(3px)';
 
     const diag = dynamic.flush();

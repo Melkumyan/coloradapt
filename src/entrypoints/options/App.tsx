@@ -103,6 +103,14 @@ export function App(): JSX.Element {
           />
           Adapt inline SVG icons and text
         </label>
+        <label className="options__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.semanticCuesEnabled}
+            onChange={(event) => void update({ semanticCuesEnabled: event.target.checked })}
+          />
+          Add a second cue where color alone carries a state (✓ × ! underline)
+        </label>
         <label className="options__checkbox options__checkbox--planned">
           <input type="checkbox" checked={settings.adaptCharts} disabled />
           Adapt charts <span className="options__badge">planned</span>
