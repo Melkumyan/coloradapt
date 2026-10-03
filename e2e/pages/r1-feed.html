@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 infinite feed</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      li {
+        padding: 4px;
+        list-style: none;
+      }
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      .good {
+        color: #000000;
+        background-color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="feed-title" class="good">Feed</h1>
+    <ul id="feed"></ul>
+    <p id="sentinel" class="good">end of feed</p>
+    <script>
+      let next = 0;
+      window.feed = {
+        /** Appends n items as one fragment (n sibling roots, like an IntersectionObserver-driven loader). */
+        load(n) {
+          const frag = document.createDocumentFragment();
+          for (let i = 0; i < n; i += 1) {
+            const li = document.createElement('li');
+            li.id = 'item-' + next;
+            li.className = 'bad';
+            li.textContent = 'Item ' + next;
+            next += 1;
+            frag.appendChild(li);
+          }
+          document.getElementById('feed').appendChild(frag);
+        },
+        /** Virtualisation: drops the oldest n items. */
+        trim(n) {
+          const feed = document.getElementById('feed');
+          for (let i = 0; i < n && feed.firstElementChild; i += 1) feed.firstElementChild.remove();
+        },
+        clear() {
+          document.getElementById('feed').replaceChildren();
+        },
+        get count() {
+          return document.getElementById('feed').children.length;
+        },
+        get next() {
+          return next;
+        },
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 hostile CSS</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p,
+      li,
+      span {
+        padding: 4px;
+      }
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      /* an id chain with !important out-ranks ColorAdapt's (1,1,0) rule: detected, not fought */
+      html body div#wall p#locked.locked,
+      html body div#wall p#locked2.locked {
+        color: #c0392b !important;
+        background-color: #27ae60 !important;
+      }
+      /* high specificity but without !important loses to ColorAdapt's !important rule */
+      html body div#wall p#soft.soft {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      /* class pile-up: specificity (0,6,0), beaten by (1,1,0) */
+      .a.a.a.a.a.piled {
+        color: #c0392b !important;
+        background-color: #27ae60;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wall">
+      <p id="locked" class="locked">locked</p>
+      <p id="locked2" class="locked">locked 2</p>
+      <p id="soft" class="soft">soft</p>
+      <p id="piled" class="a a a a a piled">piled</p>
+      <p id="plain" class="bad">plain</p>
+      <p id="inline" class="bad" style="color: #c0392b !important">inline important</p>
+    </div>
+    <div id="app"></div>
+    <script>
+      function add(prefix, n, inline) {
+        const app = document.getElementById('app');
+        for (let i = 0; i < n; i += 1) {
+          const p = document.createElement('p');
+          p.id = prefix + i;
+          p.className = 'bad';
+          if (inline) p.style.cssText = 'color: #c0392b !important';
+          p.textContent = prefix + i;
+          app.appendChild(p);
+        }
+      }
+      window.addHostile = (prefix, n) => add(prefix, n, true);
+      window.addPlain = (prefix, n) => add(prefix, n, false);
+    </script>
+  </body>
+</html>

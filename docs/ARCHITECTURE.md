@@ -77,6 +77,8 @@ actually support:
 - **Extension pages → Content Script of one tab** (`browser.tabs.sendMessage`):
   `ANALYZE_PAGE`, `GET_ANALYSIS`, `ENABLE_ADAPTATION`, `DISABLE_ADAPTATION`,
   `REFRESH_ADAPTATION`. Only a content script can see/modify the page DOM.
+  Two debug-only messages, `GET_DYNAMIC_DIAGNOSTICS` and `FLUSH_DYNAMIC`, expose the
+  dynamic pipeline's local counters to the E2E suite (nothing leaves the device).
 
 Every message is validated at the receiving end with `isColorAdaptMessage`
 before being dispatched, since both `runtime.onMessage` and
@@ -111,7 +113,14 @@ before being dispatched, since both `runtime.onMessage` and
    flicker), and the browser's computed color is read back: a change the cascade
    did not honor (e.g. inline `!important`) is dropped and counted as
    `notApplied` (`docs/ADAPTATION_ENGINE.md`, "CSS application policy").
-6. Disabling adaptation removes that one stylesheet. The page's original
+6. After the first adaptation, a dynamic-site pipeline (M4,
+   `features/dynamic-analysis`) keeps it current: one `MutationObserver` ->
+   own-mutation filter -> per-frame batcher -> classifier -> affected roots ->
+   incremental analysis of those roots -> stylesheet delta. A full rescan is the
+   explicit fallback (stylesheet changes, `<html>/<body>` changes, budget
+   overflow). The observer exists only while adaptation is ON. See
+   `docs/DYNAMIC_ANALYSIS.md`.
+7. Disabling adaptation removes that one stylesheet. The page's original
    styles were never touched, so this is an exact restore. Every analysis
    (including re-scans while adapted) runs with the stylesheet suspended, so
    the original styles stay the source of truth and adaptation never compounds.

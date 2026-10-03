@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt M4.R1 blank</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p,
+      li,
+      span {
+        padding: 4px;
+      }
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      .good {
+        color: #000000;
+        background-color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 id="title" class="good">Title</h1>
+    <div id="app"></div>
+    <script>
+      // Helpers the R1 specs call from the page's own world (like a framework would).
+      window.rows = function (prefix, count, cls) {
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < count; i += 1) {
+          const p = document.createElement('p');
+          p.id = prefix + i;
+          p.className = cls || 'bad';
+          p.textContent = prefix + i;
+          frag.appendChild(p);
+        }
+        return frag;
+      };
+      /** Rows as individual, sibling roots (one record each). */
+      window.appendEach = function (prefix, count, cls) {
+        const app = document.getElementById('app');
+        for (let i = 0; i < count; i += 1) {
+          const p = document.createElement('p');
+          p.id = prefix + i;
+          p.className = cls || 'bad';
+          p.textContent = prefix + i;
+          app.appendChild(p);
+        }
+      };
+      /** `count` spans inside ONE wrapper: a single root with `count` candidates. */
+      window.appendBig = function (id, count) {
+        const wrap = document.createElement('div');
+        wrap.id = id;
+        let html = '';
+        for (let i = 0; i < count; i += 1) {
+          html += '<span id="' + id + '-' + i + '" class="bad">s' + i + '</span>';
+        }
+        wrap.innerHTML = html;
+        document.getElementById('app').appendChild(wrap);
+      };
+      /**
+       * <x-spy>: its attributeChangedCallback runs synchronously, in the page's
+       * world, when ColorAdapt tags it with data-coloradapt-id - i.e. in the
+       * middle of a ColorAdapt pass. `spawn(spy)` is the page mutating the DOM
+       * "while a pass is RUNNING".
+       */
+      window.installSpy = function (spawn) {
+        customElements.define(
+          'x-spy',
+          class extends HTMLElement {
+            static observedAttributes = ['data-coloradapt-id'];
+            attributeChangedCallback() {
+              if (this._spawned) return;
+              this._spawned = true;
+              spawn(this);
+            }
+          },
+        );
+      };
+      /** Order in which data-coloradapt-id writes become visible to the page, grouped by observer delivery. */
+      window.idLog = [];
+      (function () {
+        let delivery = 0;
+        new MutationObserver(function (records) {
+          delivery += 1;
+          for (const r of records) {
+            window.idLog.push({
+              delivery: delivery,
+              id: r.target.id,
+              value: r.target.getAttribute('data-coloradapt-id'),
+            });
+          }
+        }).observe(document.documentElement, {
+          attributes: true,
+          subtree: true,
+          attributeFilter: ['data-coloradapt-id'],
+        });
+      })();
+    </script>
+  </body>
+</html>

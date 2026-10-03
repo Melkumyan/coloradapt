@@ -159,3 +159,29 @@ export const EMPTY_ADAPTATION_SUMMARY: AdaptationSummary = {
   unresolved: 0,
   skipped: 0,
 };
+
+/**
+ * The difference one incremental pass makes to the page's adaptation:
+ * what to add or change, and which elements lose their rule. Pure data —
+ * like {@link AdaptationPlan}, applying it is the content layer's job.
+ */
+export interface AdaptationDelta {
+  /** Changes for elements that have no rule yet. */
+  readonly added: readonly AdaptationChange[];
+  /** Changes replacing an existing rule with a different value. */
+  readonly updated: readonly AdaptationChange[];
+  /** Element ids whose rule is dropped (removed, hidden, or no longer worth adapting). */
+  readonly removed: readonly string[];
+  /** Changes the browser did not honor (e.g. an inline `!important`). */
+  readonly notApplied: readonly AdaptationChange[];
+  /** Re-analyzed elements left alone because their analysis was partial/unsupported. */
+  readonly unresolved: number;
+}
+
+export const EMPTY_ADAPTATION_DELTA: AdaptationDelta = {
+  added: [],
+  updated: [],
+  removed: [],
+  notApplied: [],
+  unresolved: 0,
+};

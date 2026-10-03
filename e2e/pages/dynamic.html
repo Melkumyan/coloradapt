@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E dynamic</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p,
+      li,
+      span,
+      button {
+        padding: 4px;
+      }
+      /* red on green: a conflict for deuteranopia, adapted */
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      /* black on white: accessible, untouched */
+      .good {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      .red {
+        color: #c0392b;
+      }
+      .bg-white {
+        background-color: #ffffff;
+      }
+      .bg-green {
+        background-color: #27ae60;
+      }
+      .dim {
+        opacity: 0.5;
+      }
+      .gradient {
+        color: #c0392b;
+        background-image: linear-gradient(#27ae60, #1e8449);
+      }
+    </style>
+  </head>
+  <body>
+    <p id="static" class="bad">Static conflict</p>
+    <div id="parent" class="bg-white"><span id="child" class="red">Child text</span></div>
+    <button id="btn" class="bad">Button</button>
+    <div id="app"></div>
+    <script>
+      // Page-side helpers used by the E2E spec (they run in the page's own world,
+      // like a framework would).
+      window.rows = function (prefix, count, cls) {
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < count; i += 1) {
+          const p = document.createElement('p');
+          p.id = prefix + i;
+          p.className = cls || 'bad';
+          p.textContent = prefix + i;
+          frag.appendChild(p);
+        }
+        return frag;
+      };
+    </script>
+  </body>
+</html>

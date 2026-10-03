@@ -92,15 +92,36 @@ Still open: background adaptation (advanced mode), `border-color`/
 `background-color`, token-aware (CSS variable) transformations, semantic
 constraints (M6).
 
-Known M3 limitations carried forward: no dynamic-content handling (M4), pseudo-state
-colors of adapted elements are overridden, inline `!important` is not adaptable.
+Known M3 limitations carried forward: pseudo-state colors of adapted elements are
+overridden, inline `!important` is not adaptable.
 
-Next: **M4 — Dynamic Sites / Incremental Analysis** (not started).
+## M4 — Dynamic Sites / Incremental Analysis ✅ (engineering PASS, validated in M4.R1; tag `m4-dynamic-analysis`)
 
-## M4 — Dynamic Pages ⬜
+- One `MutationObserver` per document with explicit mutation classification
+  (`NODE_ADDED`, `NODE_REMOVED`, `STYLE_AFFECTING_ATTRIBUTE`, `TEXT_CHANGE`,
+  `STYLESHEET_CHANGE`, `IRRELEVANT`, `COLORADAPT_INTERNAL`).
+- Self-mutation policy: ColorAdapt's own writes never start analysis.
+- Per-frame batching with a bounded queue and an `IDLE/SCHEDULED/RUNNING/DIRTY` state machine.
+- Affected-root resolution with de-duplication; bounded subtree invalidation for
+  ancestor (background/opacity/visibility/CSS-variable) changes.
+- Incremental analysis (`analyzeSubtrees`), delta adaptation (`AdaptationDelta`),
+  rule-map `StylesheetManager.applyDelta`, stable per-element ids, removal cleanup.
+- Controlled, counted full-rescan fallback (stylesheets, `<html>/<body>`, overflow).
+- SPA navigation handled through the mutation pipeline (no History API hook).
+- Local diagnostics and a deterministic mutation benchmark; 128 real-Chromium scenarios
+  (23 in M4, 105 adversarial ones in M4.R1: insertion forms, attribute churn, net-zero
+  batches, text, theme switches, stylesheets and links, CSSOM limitation, self-mutation
+  and page-fight attacks, exact budget boundaries, reentrancy, lifecycle, retention
+  proxies, SPA, infinite scroll, six local real-world fixtures).
+- M4.R1 found and fixed six defects jsdom could not see (removed/disabled/`href`-swapped
+  `<link>`, a per-frame repair loop against a page that deletes our `<style>`, analyzer
+  budget losing the tail of straddling roots and depending on the clock); see
+  `docs/DYNAMIC_ANALYSIS.md` ("M4.R1 validation").
+- Not in M4: Shadow DOM, iframes, CSSOM-only restyles, SVG. NOT_VERIFIED in a real browser:
+  the hidden-tab scheduler path, `dispose()`, actual GC, Firefox runtime (build only).
+  See `docs/DYNAMIC_ANALYSIS.md`.
 
-- `MutationObserver`-driven incremental re-analysis (debounced).
-- SPA navigation handling (URL change detection without full reload).
+Next: **M5 — SVG** (not started).
 
 ## M5 — SVG ⬜
 

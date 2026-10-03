@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 dashboard</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      td,
+      th,
+      span,
+      p,
+      h2,
+      button {
+        padding: 4px;
+      }
+      .card {
+        margin: 8px 0;
+      }
+      .kpi {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      .trend {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      /* the dark theme paints red on green: a conflict that exists only under the dark attribute */
+      html[data-theme='dark'] .kpi {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      html[data-theme='dark'] .trend {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      td {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      tr.alert td {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+    </style>
+  </head>
+  <body>
+    <h2 id="title">Dashboard</h2>
+    <button id="theme-toggle" class="kpi">Toggle theme</button>
+    <div id="cards">
+      <p class="card kpi" id="kpi-users">Users <span class="trend" id="users-value">0</span></p>
+      <p class="card kpi" id="kpi-revenue">
+        Revenue <span class="trend" id="revenue-value">0</span>
+      </p>
+      <p class="card kpi" id="kpi-errors">Errors <span class="trend" id="errors-value">0</span></p>
+    </div>
+    <table>
+      <tbody id="rows"></tbody>
+    </table>
+    <script>
+      const nodes = {};
+      for (const k of ['users', 'revenue', 'errors']) {
+        const t = document.getElementById(k + '-value');
+        t.textContent = '';
+        nodes[k] = t.appendChild(document.createTextNode('0'));
+      }
+      window.dash = {
+        toggleTheme() {
+          const root = document.documentElement;
+          root.setAttribute(
+            'data-theme',
+            root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark',
+          );
+        },
+        tick(n) {
+          for (const k in nodes) nodes[k].data = String(n * 7);
+        },
+        addRows(n, alert) {
+          const body = document.getElementById('rows');
+          for (let i = 0; i < n; i += 1) {
+            const tr = document.createElement('tr');
+            if (alert) tr.className = 'alert';
+            tr.id = 'row-' + body.children.length;
+            tr.innerHTML = '<td id="' + tr.id + '-c1">cell</td><td id="' + tr.id + '-c2">cell</td>';
+            body.appendChild(tr);
+          }
+        },
+      };
+    </script>
+  </body>
+</html>

@@ -65,11 +65,49 @@ typed messages the popup sends). One-time browser install:
 
 Firefox is build-verified only (`pnpm build:firefox`); its E2E is NOT_RUN.
 
+### Dynamic sites (M4)
+
+`e2e/dynamic.spec.ts` drives `e2e/pages/dynamic.html` like a framework would
+(`replaceWith`, `replaceChildren`, appends, class/style changes) and asserts on
+computed colors plus the pipeline's structural counters. Two typed debug messages
+make it deterministic: `FLUSH_DYNAMIC` processes every pending mutation now and
+returns the counters; `GET_DYNAMIC_DIAGNOSTICS` only reads them. Prefer
+`expectEquivalentToFullRescan` (the incremental result must equal a full rescan)
+over hand-computed colors. One test (`N`) leaves the real scheduler running with
+`expect.poll`. Never add sleeps.
+
+M4.R1 adds four more Chromium suites (`e2e/r1-*.spec.ts`, shared helpers in
+`e2e/r1-kit.ts`): `r1-mutations` (insertion forms, attribute churn, net-zero batches, text,
+theme switches), `r1-stylesheets` (`<style>`/`<link>` in every way they change, the CSSOM
+limitation, the rescan throttle), `r1-pipeline` (self-mutation attack, page fights, budget
+boundaries, reentrancy, lifecycle, retention proxies, scheduler) and `r1-fixtures` (SPA,
+infinite scroll, and local React-style/feed/dashboard/CSS-in-JS/hostile-CSS/churn fixtures,
+`e2e/pages/r1-*.html`). Techniques worth knowing:
+
+- the test server answers `/slow-<name>.css` only when the test calls `server.release(name)`
+  (or `fail`), so a `<link>` loads exactly when asserted, with no sleeping;
+- `load(...).natural()` waits for the _real_ scheduler to go quiet (`state` IDLE, nothing
+  queued, deferred, owed or on a timer) instead of forcing `FLUSH_DYNAMIC`;
+- a page custom element (`<x-spy>` in `r1-blank.html`) whose `attributeChangedCallback`
+  runs synchronously when ColorAdapt tags it is the way to mutate the page _while a pass is
+  RUNNING_ (`idLog` shows which pass wrote which id);
+- counters worth quoting are attached to the report with `test.info().annotations`
+  (`counters`), not logged.
+
+Not reachable in headless Chromium, so unit-tested only: the hidden-tab scheduler path
+(`document.visibilityState` is never `hidden`).
+
+Unit tests (`tests/features/dynamic/`) inject a manual scheduler
+(`createManualScheduler`) and call `controller.dynamic.flush()`; mutation
+records come from a real jsdom `MutationObserver`. See `docs/DYNAMIC_ANALYSIS.md`.
+
 ### Adaptation benchmark
 
 `tests/benchmarks/` runs as part of `pnpm test` and writes
 `benchmark-report/adaptation-benchmark.{json,html}` (gitignored) for inspection.
 Add a pair in `adaptation-pairs.ts`; a hard-safety violation fails the suite.
+`dynamic-benchmark.test.ts` likewise writes `dynamic-benchmark.json` (mutation counters;
+wall-clock informational only).
 
 ## Debugging the analyzer on a real page
 
@@ -92,8 +130,9 @@ resolved. In short:
   conflict detection, adaptation). No React, no `wxt/browser`.
 - `src/infrastructure` — the only layer allowed to import `wxt/browser`
   (storage, messaging).
-- `src/features` — React hooks and the content-script controller that wire
-  `core` + `infrastructure` together.
+- `src/features` — React hooks and the content-script controllers that wire
+  `core` + `infrastructure` together; `features/dynamic-analysis` is the only
+  place that uses `MutationObserver`.
 - `src/entrypoints` — thin WXT entrypoints (background, content script,
   popup, options).
 

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 rapid churn</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      li,
+      p {
+        padding: 4px;
+      }
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      .good {
+        color: #000000;
+        background-color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <ul id="list"></ul>
+    <p id="ticker" class="bad">0</p>
+    <script>
+      let serial = 0;
+      /**
+       * `frames` animation frames of simultaneous churn: rows added and removed, classes
+       * flipped, text updated, a transform written every frame. Deterministic: the work of
+       * frame f depends only on f.
+       */
+      window.churn = function (frames) {
+        const list = document.getElementById('list');
+        const ticker = document.getElementById('ticker');
+        return new Promise((resolve) => {
+          let f = 0;
+          function frame() {
+            for (let i = 0; i < 4; i += 1) {
+              const li = document.createElement('li');
+              li.id = 'c' + serial;
+              li.className = serial % 3 === 0 ? 'good' : 'bad';
+              li.textContent = 'row ' + serial;
+              serial += 1;
+              list.appendChild(li);
+            }
+            while (list.children.length > 40) list.firstElementChild.remove();
+            const target = list.children[f % list.children.length];
+            if (target) target.className = target.className === 'bad' ? 'good' : 'bad';
+            ticker.firstChild.nodeValue = String(f);
+            ticker.style.transform = 'translateX(' + (f % 7) + 'px)';
+            f += 1;
+            if (f < frames) requestAnimationFrame(frame);
+            else resolve(serial);
+          }
+          requestAnimationFrame(frame);
+        });
+      };
+    </script>
+  </body>
+</html>

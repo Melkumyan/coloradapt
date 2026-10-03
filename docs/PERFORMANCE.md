@@ -5,9 +5,9 @@
 - Never walk the entire DOM. The DOM Analyzer only queries a narrow,
   explicit CSS selector (`core/analysis/constants.ts#ANALYZER_SELECTOR`) of
   tags/roles/classes likely to carry meaningful color information.
-- Never run a full analysis pass on every mutation. Dynamic re-analysis
-  (M4, not yet wired up) is designed to go through a debounce, not a
-  per-mutation handler.
+- Never run a full analysis pass on every mutation. Dynamic re-analysis (M4)
+  batches mutations per frame, re-analyzes only the affected regions, and treats
+  a full rescan as a counted fallback (`docs/DYNAMIC_ANALYSIS.md`).
 - Hard budgets, not best-effort: every analysis pass is bounded by both an
   element count and a wall-clock duration, and stops early (reporting
   `truncated: true`) rather than running unbounded.
@@ -43,21 +43,44 @@
 
 Defined in `src/shared/constants/performance.ts`:
 
-| Budget               | Default | Rationale                                                                                                   |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| `maxElements`        | 1500    | Upper bound on elements inspected in one pass; large enough for most real pages, small enough to stay fast. |
-| `maxDurationMs`      | 50 ms   | A single analysis pass should not visibly block the page.                                                   |
-| `mutationDebounceMs` | 500 ms  | Planned (M4): minimum gap between `MutationObserver`-triggered re-analyses.                                 |
+| Budget          | Default | Rationale                                                                                                   |
+| --------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `maxElements`   | 1500    | Upper bound on elements inspected in one pass; large enough for most real pages, small enough to stay fast. |
+| `maxDurationMs` | 50 ms   | A single analysis pass should not visibly block the page.                                                   |
 
 These are tuning knobs, not hard architectural constraints — revisit them
 with real profiling data as the analyzer grows (SVG, charts, images).
 
-## Incremental analysis (planned, M4)
+## Dynamic pipeline budgets (M4)
 
-The `ELEMENT_ID_ATTRIBUTE` (`data-coloradapt-id`) that the analyzer already
-assigns is the hook for future incremental analysis: a re-analysis pass can
-skip elements that already carry this attribute and haven't changed,
-instead of reprocessing the whole page.
+Defined in `DYNAMIC_BUDGET` (`src/shared/constants/performance.ts`). All are
+structural; none changes what is computed, only how it is batched or escalated:
+
+| Budget                          | Default | Meaning                                                                                                   |
+| ------------------------------- | ------- | --------------------------------------------------------------------------------------------------------- |
+| `maxQueuedRecords`              | 5000    | Queued mutation records; more than this and the queue is coalesced into one full rescan (5001 = overflow) |
+| `maxAffectedRoots`              | 512     | Distinct regions per batch; more than this and the batch becomes one full rescan (513 = rescan)           |
+| `fullRescanMinIntervalMs`       | 500 ms  | Spacing between mutation-driven full rescans. Throttle only: a rescan is postponed, never dropped         |
+| `stylesheetRepairMinIntervalMs` | 500 ms  | Spacing between repairs of our `<style>` the page deleted. Throttle only: postponed, never dropped        |
+| `maxPassesPerFlush`             | 64      | Safety bound for a forced flush                                                                           |
+
+(`ANALYSIS_BUDGET.mutationDebounceMs` from M0 was removed: nothing is debounced by time;
+batching is per animation frame.)
+
+The incremental-analysis hook anticipated here turned out to be different from
+"skip tagged elements": ids are only identity; what bounds the work is _which
+regions_ are analyzed. `analyzeSubtrees` takes explicit roots. The element budget
+(`maxElements`, 1500) is structural: a root that does not fit next to the others is left
+whole for the next pass, and only a single root above 1500 is cut. The 50 ms
+`maxDurationMs` only decides whether a _further_ root is started in a pass; it never cuts a
+root short (M4.R1: it used to, which made the result depend on how long the first forced
+style recalculation took). The M3 full analysis keeps its original 50 ms/1500 budget. Model,
+counters and benchmark: `docs/DYNAMIC_ANALYSIS.md` ("Performance model").
+
+The benchmark (`tests/benchmarks/dynamic-benchmark.test.ts`, report in
+`benchmark-report/dynamic-benchmark.json`) asserts counters only: 500 synchronous
+inserts = 1 pass; 1000 inserts = 1 full rescan; 1 insert into a 1000-row page = 1 element
+analyzed. Wall-clock is recorded for information and never asserted.
 
 ## What to measure before optimizing further
 

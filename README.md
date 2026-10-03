@@ -35,12 +35,19 @@ and otherwise leaves the original color alone. It never changes backgrounds
 or unresolved (gradient/image) elements, and everything is reversible. See
 `docs/ADAPTATION_ENGINE.md`.
 
+M4 keeps the adaptation correct on dynamic sites (React/Vue/Angular/SPA,
+infinite scroll): a `MutationObserver` pipeline classifies DOM changes, batches
+them per frame, resolves the affected regions and re-adapts only those,
+updating the stylesheet by delta; a full rescan is a counted fallback. See
+`docs/DYNAMIC_ANALYSIS.md`.
+
 Status: **M3 engineering PASS** (validated in real Chromium); **upstream
 scientific confidence PARTIAL** (M2 model assumption). Known limitations:
-dynamic content is not handled yet (M4); a page's own `:hover`/`:focus` colors are
+a page's own `:hover`/`:focus` colors are
 overridden on adapted elements; inline `!important` text colors cannot be adapted
 (reported, never faked); animated colors are skipped; Firefox is build-verified
-but not runtime-tested.
+but not runtime-tested; CSSOM-only restyles (`insertRule`, `adoptedStyleSheets`),
+Shadow DOM and iframes are not tracked (`docs/DYNAMIC_ANALYSIS.md`).
 
 `pnpm verify` runs lint, typecheck, format check, unit tests and the build;
 `pnpm test:e2e` additionally runs the real-browser (Chromium) suite.

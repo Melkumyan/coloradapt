@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 CSS-in-JS</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p,
+      span {
+        padding: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script>
+      let n = 0;
+      let speedy = null;
+      function render(id, cls) {
+        const p = document.createElement('p');
+        p.id = id;
+        p.className = cls;
+        p.textContent = id;
+        document.getElementById('app').appendChild(p);
+      }
+      window.styled = {
+        /** An emotion/styled-components component in "normal" mode: one <style> per component. */
+        component(id, rules) {
+          const cls = 'css-' + (n += 1).toString(36);
+          const style = document.createElement('style');
+          style.setAttribute('data-emotion', 'css');
+          style.appendChild(document.createTextNode('.' + cls + ' { ' + rules + ' }'));
+          document.head.appendChild(style);
+          render(id, cls);
+          return cls;
+        },
+        /** "speedy" mode (the production default): rules go in through the CSSOM, with no mutation. */
+        speedyComponent(id, rules) {
+          if (!speedy) {
+            speedy = document.createElement('style');
+            speedy.setAttribute('data-emotion', 'speedy');
+            document.head.appendChild(speedy);
+          }
+          const cls = 'sp-' + (n += 1).toString(36);
+          speedy.sheet.insertRule('.' + cls + ' { ' + rules + ' }', speedy.sheet.cssRules.length);
+          render(id, cls);
+          return cls;
+        },
+      };
+    </script>
+  </body>
+</html>

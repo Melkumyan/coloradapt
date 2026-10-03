@@ -2,7 +2,7 @@ import type { AdaptationChange } from '@domain/models';
 import { ELEMENT_ID_ATTRIBUTE } from '@core/analysis';
 import { parseColor } from '@core/color';
 
-const STYLE_ELEMENT_ID = 'coloradapt-stylesheet';
+export const STYLE_ELEMENT_ID = 'coloradapt-stylesheet';
 
 /**
  * Tolerance when comparing the browser's computed color with the planned one.
@@ -42,6 +42,22 @@ function buildCss(changes: readonly AdaptationChange[]): string {
   return changes.map(buildRule).join('\n');
 }
 
+export interface RuleDelta {
+  /** Rules to add, or to replace when the element already has one. */
+  readonly upsert: readonly AdaptationChange[];
+  /** Element ids whose rule is dropped. Unknown ids are ignored. */
+  readonly remove: readonly string[];
+}
+
+export interface DeltaApplyResult extends ApplyResult {
+  /** Rules that did not exist before and are now in the sheet. */
+  readonly added: number;
+  /** Existing rules replaced by a different value. */
+  readonly updated: number;
+  /** Rules dropped — requested removals plus upserts the browser did not honor. */
+  readonly removed: number;
+}
+
 export interface ApplyResult {
   /** Changes whose planned value the browser reports as the element's computed value. */
   readonly applied: readonly AdaptationChange[];
@@ -63,35 +79,145 @@ export interface ApplyResult {
  *
  * `apply` reads the browser's computed values back and reports what was not
  * honored: a plan is never trusted over the real cascade.
+ *
+ * The current rule per element lives in a map keyed by element id, so a
+ * rule can be upserted or removed individually (`applyDelta`) and can never
+ * be duplicated: updating one element 100 times leaves one rule. The sheet
+ * text is regenerated from that map only when the delta changes something.
  */
 export class StylesheetManager {
   #doc: Document;
   #styleElement: HTMLStyleElement | null = null;
+  #rules = new Map<string, AdaptationChange>();
 
   constructor(doc: Document = document) {
     this.#doc = doc;
   }
 
+  /** Replaces every rule with `changes`. */
   apply(changes: readonly AdaptationChange[]): ApplyResult {
     if (changes.length === 0) {
       this.restore();
       return { applied: [], notApplied: [] };
     }
 
+    this.#rules = new Map(changes.map((change) => [change.elementId, change]));
     const styleElement = this.#ensureStyleElement();
-    this.#commit(styleElement, buildCss(changes));
+    this.#commit(styleElement, this.#css());
 
+    const { applied, notApplied } = this.#verify(changes);
+    this.#dropUnapplied(notApplied, styleElement);
+    return { applied, notApplied };
+  }
+
+  /**
+   * Updates individual rules without touching the others. `nodes` (element by
+   * id) saves the document-wide lookup when the caller already holds them.
+   * Re-submitting an unchanged rule rewrites nothing but is still verified
+   * against the browser, so a page that has since out-ranked it is noticed.
+   */
+  applyDelta(delta: RuleDelta, nodes?: ReadonlyMap<string, Element>): DeltaApplyResult {
+    let removed = 0;
+    let dirty = false;
+    for (const id of delta.remove) {
+      if (this.#rules.delete(id)) {
+        removed += 1;
+        dirty = true;
+      }
+    }
+
+    let added = 0;
+    let updated = 0;
+    for (const change of delta.upsert) {
+      const existing = this.#rules.get(change.elementId);
+      if (existing?.property === change.property && existing.adaptedValue === change.adaptedValue) {
+        continue;
+      }
+      this.#rules.set(change.elementId, change);
+      dirty = true;
+      if (existing) updated += 1;
+      else added += 1;
+    }
+
+    if (this.#rules.size === 0) {
+      this.restore();
+      return { applied: [], notApplied: [], added, updated, removed };
+    }
+    // Content changed, or the page deleted our <style> out from under us.
+    const wasAttached = this.#styleElement?.isConnected === true;
+    const styleElement = this.#ensureStyleElement();
+    if (dirty || !wasAttached) {
+      this.#commit(styleElement, this.#css());
+    }
+
+    const { applied, notApplied } = this.#verify(delta.upsert, nodes);
+    removed += this.#dropUnapplied(notApplied, styleElement);
+    return { applied, notApplied, added, updated, removed };
+  }
+
+  /** Whether an adaptation rule currently exists for `elementId`. */
+  has(elementId: string): boolean {
+    return this.#rules.has(elementId);
+  }
+
+  /** The change behind a rule, if that element has one. */
+  ruleFor(elementId: string): AdaptationChange | undefined {
+    return this.#rules.get(elementId);
+  }
+
+  /** Number of rules currently in the sheet. */
+  get ruleCount(): number {
+    return this.#rules.size;
+  }
+
+  /** Ids with a rule (a snapshot; for diagnostics and tests). */
+  ruleIds(): string[] {
+    return [...this.#rules.keys()];
+  }
+
+  /**
+   * True when rules exist but the page removed our `<style>` element (e.g. a
+   * framework re-rendering `<head>`). `reattach` puts them back.
+   */
+  isDetached(): boolean {
+    return this.#rules.size > 0 && !this.#styleElement?.isConnected;
+  }
+
+  /** Re-injects the sheet from the rule map. */
+  reattach(): void {
+    if (this.#rules.size === 0) return;
+    this.#commit(this.#ensureStyleElement(), this.#css());
+  }
+
+  /** The `<style>` element, if one is currently injected — for mutation-ownership checks. */
+  get styleElement(): HTMLStyleElement | null {
+    return this.#styleElement;
+  }
+
+  #css(): string {
+    return buildCss([...this.#rules.values()]);
+  }
+
+  #verify(
+    changes: readonly AdaptationChange[],
+    nodes?: ReadonlyMap<string, Element>,
+  ): { applied: AdaptationChange[]; notApplied: AdaptationChange[] } {
     const applied: AdaptationChange[] = [];
     const notApplied: AdaptationChange[] = [];
     for (const change of changes) {
-      (this.#isApplied(change) ? applied : notApplied).push(change);
-    }
-
-    if (notApplied.length > 0) {
-      if (applied.length === 0) this.restore();
-      else this.#commit(styleElement, buildCss(applied));
+      (this.#isApplied(change, nodes?.get(change.elementId)) ? applied : notApplied).push(change);
     }
     return { applied, notApplied };
+  }
+
+  /** Removes the rules the browser did not honor; returns how many existed. */
+  #dropUnapplied(notApplied: readonly AdaptationChange[], styleElement: HTMLStyleElement): number {
+    if (notApplied.length === 0) return 0;
+    let dropped = 0;
+    for (const change of notApplied) if (this.#rules.delete(change.elementId)) dropped += 1;
+    if (this.#rules.size === 0) this.restore();
+    else this.#commit(styleElement, this.#css());
+    return dropped;
   }
 
   /**
@@ -118,6 +244,7 @@ export class StylesheetManager {
   }
 
   restore(): void {
+    this.#rules.clear();
     const styleElement = this.#styleElement;
     if (styleElement?.isConnected) {
       // Original colors return with transitions suppressed, then the sheet goes.
@@ -141,9 +268,9 @@ export class StylesheetManager {
     if (view) void view.getComputedStyle(this.#doc.documentElement).color;
   }
 
-  #isApplied(change: AdaptationChange): boolean {
+  #isApplied(change: AdaptationChange, known?: Element): boolean {
     const view = this.#doc.defaultView;
-    const node = this.#doc.querySelector(selectorFor(change));
+    const node = known?.isConnected ? known : this.#doc.querySelector(selectorFor(change));
     if (!view || !node) return false;
 
     const computed = parseColor(view.getComputedStyle(node).getPropertyValue(change.property));

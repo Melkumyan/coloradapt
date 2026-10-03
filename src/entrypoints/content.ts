@@ -1,5 +1,5 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
-import { createContentController } from '@features/page-analysis';
+import { createDynamicContentController } from '@features/dynamic-analysis';
 import { resolveEffectiveSettings } from '@features/settings';
 import { getHostname } from '@infrastructure/browser';
 import { registerMessageRouter, sendToBackground } from '@infrastructure/messaging';
@@ -7,7 +7,7 @@ import { registerMessageRouter, sendToBackground } from '@infrastructure/messagi
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
   main() {
-    const controller = createContentController(document);
+    const controller = createDynamicContentController(document);
     const getEffectiveSettings = async () =>
       resolveEffectiveSettings(
         await sendToBackground('GET_SETTINGS', undefined),
@@ -25,6 +25,8 @@ export default defineContentScript({
       },
       REFRESH_ADAPTATION: async () =>
         controller.enableAdaptation(location.href, await getEffectiveSettings()).adaptation,
+      GET_DYNAMIC_DIAGNOSTICS: () => Promise.resolve(controller.dynamic.diagnostics()),
+      FLUSH_DYNAMIC: () => Promise.resolve(controller.dynamic.flush()),
     });
 
     void getEffectiveSettings().then((settings) => {

@@ -1,4 +1,9 @@
-import type { AdaptationPlan, AnalysisResult, UserSettings } from '@domain/models';
+import type {
+  AdaptationPlan,
+  AnalysisResult,
+  DynamicDiagnostics,
+  UserSettings,
+} from '@domain/models';
 
 /**
  * Every message type the extension sends between Popup / Options /
@@ -14,6 +19,10 @@ export interface MessageMap {
   ENABLE_ADAPTATION: { request: undefined; response: AdaptationPlan };
   DISABLE_ADAPTATION: { request: undefined; response: null };
   REFRESH_ADAPTATION: { request: undefined; response: AdaptationPlan };
+  /** Debug/test channel: dynamic-pipeline counters. Local only, never sent anywhere. */
+  GET_DYNAMIC_DIAGNOSTICS: { request: undefined; response: DynamicDiagnostics };
+  /** Debug/test channel: process every pending mutation now, then report the counters. */
+  FLUSH_DYNAMIC: { request: undefined; response: DynamicDiagnostics };
 }
 
 export type MessageType = keyof MessageMap;
@@ -26,6 +35,8 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
   'ENABLE_ADAPTATION',
   'DISABLE_ADAPTATION',
   'REFRESH_ADAPTATION',
+  'GET_DYNAMIC_DIAGNOSTICS',
+  'FLUSH_DYNAMIC',
 ];
 
 export interface ColorAdaptMessage<T extends MessageType = MessageType> {

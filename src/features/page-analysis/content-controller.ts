@@ -1,19 +1,9 @@
-import {
-  analyzeDocument,
-  ELEMENT_ID_ATTRIBUTE,
-  toAnalysisResult,
-  type AnalyzeDocumentOptions,
-} from '@core/analysis';
-import { createAdaptationPlan, StylesheetManager } from '@core/adaptation';
-import { parseColor } from '@core/color';
+import { analyzeDocument, toAnalysisResult, type AnalyzeDocumentOptions } from '@core/analysis';
+import { createDetailedAdaptationPlan, StylesheetManager } from '@core/adaptation';
 import { detectColorConflict } from '@core/conflicts';
-import type {
-  AdaptationPlan,
-  AnalysisResult,
-  ColorConflict,
-  ElementDescriptor,
-  UserSettings,
-} from '@domain/models';
+import type { AdaptationPlan, AnalysisResult, ColorConflict, UserSettings } from '@domain/models';
+import { findNotAdaptable } from './adaptability';
+import { IncrementalAdaptationSession, type IncrementalAdaptation } from './incremental-adaptation';
 
 /**
  * Development-only, opt-in diagnostics: logs a one-line analysis summary
@@ -36,36 +26,6 @@ function logDebugSummary(doc: Document, result: AnalysisResult): void {
   });
 }
 
-/** Max per-channel difference (0-1) for "effective color == computed `color`". */
-const COLOR_MATCH_TOLERANCE = 1.5 / 255;
-
-/**
- * Elements (as `Element`s) that a running animation drives `color` on —
- * CSS `@keyframes` or Web Animations. Their computed color is a snapshot of a
- * moving value, so no color derived from it can be stable (and a
- * `!important` adaptation would silently freeze the page's animation).
- * Environments without `getAnimations` (jsdom) have none.
- */
-function colorAnimationTargets(doc: Document): Set<Element> {
-  const targets = new Set<Element>();
-  if (typeof doc.getAnimations !== 'function') return targets;
-  for (const animation of doc.getAnimations()) {
-    const effect = animation.effect;
-    if (!(effect instanceof KeyframeEffect) || !effect.target || effect.pseudoElement) continue;
-    if (effect.getKeyframes().some((keyframe) => 'color' in keyframe)) {
-      targets.add(effect.target);
-    }
-  }
-  return targets;
-}
-
-function isAnimatedOrInheritsAnimation(node: Element, animated: ReadonlySet<Element>): boolean {
-  for (let current: Element | null = node; current; current = current.parentElement) {
-    if (animated.has(current)) return true;
-  }
-  return false;
-}
-
 export interface ContentController {
   analyze(url: string, settings: UserSettings): AnalysisResult;
   getLastAnalysis(): AnalysisResult | null;
@@ -74,6 +34,11 @@ export interface ContentController {
     settings: UserSettings,
   ): { analysis: AnalysisResult; adaptation: AdaptationPlan };
   disableAdaptation(): void;
+  /**
+   * Region-by-region re-adaptation, used by the dynamic pipeline
+   * (features/dynamic-analysis). Inactive until `enableAdaptation` has run.
+   */
+  readonly incremental: IncrementalAdaptation;
 }
 
 /**
@@ -100,41 +65,8 @@ export function createContentController(
   let lastAnalysis: AnalysisResult | null = null;
   /** Elements whose effective foreground cannot be reproduced by a plain `color` rule. */
   let notAdaptable = new Set<string>();
-
-  /**
-   * The effective foreground already folds in `opacity` and color alpha.
-   * Writing that composite into `color` would apply them twice, so any
-   * element whose computed `color` differs from its effective foreground is
-   * left alone (fail-safe), as is every element whose `color` is animated.
-   */
-  function findNotAdaptable(elements: readonly ElementDescriptor[]): Set<string> {
-    const nodes = new Map<string, Element>();
-    for (const node of doc.querySelectorAll(`[${ELEMENT_ID_ATTRIBUTE}]`)) {
-      const id = node.getAttribute(ELEMENT_ID_ATTRIBUTE);
-      if (id) nodes.set(id, node);
-    }
-
-    const getStyle = analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
-    const animated = colorAnimationTargets(doc);
-    const unsafe = new Set<string>();
-    for (const element of elements) {
-      const node = nodes.get(element.id);
-      if (node && animated.size > 0 && isAnimatedOrInheritsAnimation(node, animated)) {
-        unsafe.add(element.id);
-        continue;
-      }
-      const computed = node ? parseColor(getStyle(node).color || '') : null;
-      const fg = element.colorPair.foreground;
-      const matches =
-        computed !== null &&
-        computed.alpha >= 0.999 &&
-        Math.abs(computed.r - fg.r) <= COLOR_MATCH_TOLERANCE &&
-        Math.abs(computed.g - fg.g) <= COLOR_MATCH_TOLERANCE &&
-        Math.abs(computed.b - fg.b) <= COLOR_MATCH_TOLERANCE;
-      if (!matches) unsafe.add(element.id);
-    }
-    return unsafe;
-  }
+  const session = new IncrementalAdaptationSession(doc, stylesheetManager, analyzerOptions);
+  const getStyle = analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
 
   function analyze(url: string, settings: UserSettings): AnalysisResult {
     const { pass, unsafe } = stylesheetManager.withOriginalStyles(() => {
@@ -142,7 +74,9 @@ export function createContentController(
       return {
         pass: analysisPass,
         unsafe: findNotAdaptable(
+          doc,
           analysisPass.elements.filter((element) => element.analysisStatus === 'resolved'),
+          getStyle,
         ),
       };
     });
@@ -180,7 +114,7 @@ export function createContentController(
         notAdaptable.has(element.id) ? { ...element, analysisStatus: 'partial' } : element,
       ),
     };
-    const planned = createAdaptationPlan(planningInput, settings);
+    const { plan: planned, outcomes } = createDetailedAdaptationPlan(planningInput, settings);
     // The browser has the last word: a change whose computed color is not the
     // planned one (e.g. an inline `!important`) is dropped, never reported as adapted.
     const { applied, notApplied } = stylesheetManager.apply(planned.changes);
@@ -196,10 +130,16 @@ export function createContentController(
               notApplied: notApplied.length,
             },
           };
+    if (settings.enabled) {
+      session.begin(settings, outcomes, new Set(notApplied.map((change) => change.elementId)));
+    } else {
+      session.end();
+    }
     return { analysis, adaptation };
   }
 
   function disableAdaptation(): void {
+    session.end();
     stylesheetManager.restore();
   }
 
@@ -208,5 +148,6 @@ export function createContentController(
     getLastAnalysis: () => lastAnalysis,
     enableAdaptation,
     disableAdaptation,
+    incremental: session,
   };
 }

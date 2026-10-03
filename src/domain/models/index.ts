@@ -7,3 +7,4 @@ export * from './analysis';
 export * from './adaptation';
 export * from './site-profile';
 export * from './settings';
+export * from './dynamic';

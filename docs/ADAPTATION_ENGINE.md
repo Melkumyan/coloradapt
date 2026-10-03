@@ -418,8 +418,9 @@ red/green 1.20:1 → 1.70:1).
 - **Hover/focus/active colors of adapted elements are overridden** (see "CSS
   application policy"); inline `!important` and multi-id `!important` rules are
   not adaptable (reported as `notApplied`); animated `color` is skipped.
-- **Dynamic content is not handled (M4).** Elements inserted after load are not
-  adapted — there is deliberately no `MutationObserver` in M3.
+- **Dynamic content** is handled from M4 on, outside this engine (the engine has no
+  `MutationObserver`): `docs/DYNAMIC_ANALYSIS.md`. Its per-element planning is exposed
+  as `planElement` for the incremental path.
 - Chromium only in E2E; Firefox is build-verified but its runtime behavior is
   `NOT_RUN`.
 - The benchmark palette is hand-picked and solvable by lightness alone; it says

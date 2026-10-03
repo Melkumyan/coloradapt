@@ -86,6 +86,85 @@ function toChange(elementId: string, result: AdaptedAdaptation): AdaptationChang
   };
 }
 
+/** What the planner decided for one element. Only `adapted` carries a change. */
+export type ElementOutcome =
+  | { readonly kind: 'adapted'; readonly change: AdaptationChange }
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'noSafeCandidate' }
+  | { readonly kind: 'unresolved' }
+  | { readonly kind: 'skipped' };
+
+export type PlanningMemo = Map<string, AdaptationResult>;
+
+/** Normalized planning inputs derived once from the settings. */
+export interface PlanningContext {
+  readonly settings: UserSettings;
+  readonly profile: UserSettings['visionProfile'];
+  readonly strength: number;
+  readonly options: CreateAdaptationPlanOptions;
+}
+
+export function createPlanningContext(
+  settings: UserSettings,
+  options: CreateAdaptationPlanOptions = {},
+): PlanningContext {
+  return {
+    settings,
+    profile: settings.visionProfile,
+    strength: Number.isFinite(settings.adaptationStrength)
+      ? clamp01(settings.adaptationStrength)
+      : 0,
+    options,
+  };
+}
+
+/**
+ * Plans one element in isolation — the unit both the full plan and the
+ * incremental (delta) path are built from. `memo` caches optimizer results
+ * per distinct color pair and may be shared across calls with one context.
+ */
+export function planElement(
+  element: ElementDescriptor,
+  context: PlanningContext,
+  memo: PlanningMemo,
+): ElementOutcome {
+  if (!context.settings.enabled) return { kind: 'skipped' };
+  const eligibility = classify(element, context.settings);
+  if (eligibility === 'skipped') return { kind: 'skipped' };
+  if (eligibility === 'unresolved') return { kind: 'unresolved' };
+
+  const { foreground, background } = element.colorPair;
+  const key = `${colorKey(foreground)}|${colorKey(background)}`;
+  let result = memo.get(key);
+  if (!result) {
+    result = findAdaptation({
+      foreground,
+      background,
+      profile: context.profile,
+      strength: context.strength,
+      constraints: context.options.constraints,
+    });
+    memo.set(key, result);
+  }
+
+  switch (result.status) {
+    case 'adapted':
+      return { kind: 'adapted', change: toChange(element.id, result) };
+    case 'unchanged':
+      return { kind: 'unchanged' };
+    case 'no-safe-candidate':
+      return { kind: 'noSafeCandidate' };
+    case 'unsupported':
+      return { kind: 'unresolved' };
+  }
+}
+
+export interface DetailedAdaptationPlan {
+  readonly plan: AdaptationPlan;
+  /** Per-element decision, by element id — the seed of incremental bookkeeping. */
+  readonly outcomes: ReadonlyMap<string, ElementOutcome>;
+}
+
 /**
  * Builds a DOM-independent {@link AdaptationPlan} from an analysis: runs the
  * foreground optimizer once per distinct color pair (many elements share
@@ -96,76 +175,73 @@ function toChange(elementId: string, result: AdaptedAdaptation): AdaptationChang
  * background. A foreground used on several backgrounds, or a shared CSS
  * variable, is never optimized jointly (docs/ADAPTATION_ENGINE.md).
  */
+export function createDetailedAdaptationPlan(
+  analysis: AnalysisResult,
+  settings: UserSettings,
+  options: CreateAdaptationPlanOptions = {},
+): DetailedAdaptationPlan {
+  const context = createPlanningContext(settings, options);
+  const confidence = VISION_PROFILE_CONFIDENCE[context.profile];
+
+  const counts = { ...EMPTY_COUNTS };
+  const changes: AdaptationChange[] = [];
+  const outcomes = new Map<string, ElementOutcome>();
+  const memo: PlanningMemo = new Map();
+
+  if (settings.enabled) {
+    for (const element of analysis.elements) {
+      const outcome = planElement(element, context, memo);
+      outcomes.set(element.id, outcome);
+      countOutcome(counts, outcome);
+      if (outcome.kind === 'adapted') changes.push(outcome.change);
+    }
+  }
+
+  const plan: AdaptationPlan = {
+    profile: context.profile,
+    confidence,
+    strength: context.strength,
+    changes,
+    summary: toSummary(counts),
+  };
+  return { plan, outcomes };
+}
+
 export function createAdaptationPlan(
   analysis: AnalysisResult,
   settings: UserSettings,
   options: CreateAdaptationPlanOptions = {},
 ): AdaptationPlan {
-  const profile = settings.visionProfile;
-  const strength = Number.isFinite(settings.adaptationStrength)
-    ? clamp01(settings.adaptationStrength)
-    : 0;
-  const confidence = VISION_PROFILE_CONFIDENCE[profile];
+  return createDetailedAdaptationPlan(analysis, settings, options).plan;
+}
 
-  const counts = {
-    adapted: 0,
-    unchanged: 0,
-    noSafeCandidate: 0,
-    notApplied: 0,
-    unresolved: 0,
-    skipped: 0,
-  };
-  const changes: AdaptationChange[] = [];
+/** Mutable tallies of {@link ElementOutcome} kinds (plus `notApplied`, set by the content layer). */
+export interface OutcomeCounts {
+  adapted: number;
+  unchanged: number;
+  noSafeCandidate: number;
+  notApplied: number;
+  unresolved: number;
+  skipped: number;
+}
 
-  if (settings.enabled) {
-    const memo = new Map<string, AdaptationResult>();
+const EMPTY_COUNTS: Readonly<OutcomeCounts> = {
+  adapted: 0,
+  unchanged: 0,
+  noSafeCandidate: 0,
+  notApplied: 0,
+  unresolved: 0,
+  skipped: 0,
+};
 
-    for (const element of analysis.elements) {
-      const eligibility = classify(element, settings);
-      if (eligibility === 'skipped') {
-        counts.skipped += 1;
-        continue;
-      }
-      if (eligibility === 'unresolved') {
-        counts.unresolved += 1;
-        continue;
-      }
+export function createOutcomeCounts(): OutcomeCounts {
+  return { ...EMPTY_COUNTS };
+}
 
-      const { foreground, background } = element.colorPair;
-      const key = `${colorKey(foreground)}|${colorKey(background)}`;
-      let result = memo.get(key);
-      if (!result) {
-        result = findAdaptation({
-          foreground,
-          background,
-          profile,
-          strength,
-          constraints: options.constraints,
-        });
-        memo.set(key, result);
-      }
+export function countOutcome(counts: OutcomeCounts, outcome: ElementOutcome, delta = 1): void {
+  counts[outcome.kind] += delta;
+}
 
-      switch (result.status) {
-        case 'adapted':
-          counts.adapted += 1;
-          changes.push(toChange(element.id, result));
-          break;
-        case 'unchanged':
-          counts.unchanged += 1;
-          break;
-        case 'no-safe-candidate':
-          counts.noSafeCandidate += 1;
-          break;
-        case 'unsupported':
-          counts.unresolved += 1;
-          break;
-      }
-    }
-  }
-
-  const summary: AdaptationSummary = {
-    ...counts,
-    problemsDetected: counts.adapted + counts.noSafeCandidate,
-  };
-  return { profile, confidence, strength, changes, summary };
+export function toSummary(counts: Readonly<OutcomeCounts>): AdaptationSummary {
+  return { ...counts, problemsDetected: counts.adapted + counts.noSafeCandidate };
 }

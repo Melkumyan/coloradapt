@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt R1 React-style SPA</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 16px sans-serif;
+      }
+      p,
+      li,
+      span,
+      a,
+      button,
+      h2 {
+        padding: 4px;
+      }
+      .bad {
+        color: #c0392b;
+        background-color: #27ae60;
+      }
+      .good {
+        color: #000000;
+        background-color: #ffffff;
+      }
+      nav a {
+        display: inline-block;
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // A tiny React-style renderer: virtual nodes, keyed children, in-place text and
+      // attribute patching, replaceChild when the type changes. Deterministic, no timers.
+      (function () {
+        function h(type, props) {
+          const kids = [];
+          for (let i = 2; i < arguments.length; i += 1) {
+            const k = arguments[i];
+            (Array.isArray(k) ? k : [k]).forEach((c) =>
+              kids.push(typeof c === 'object' ? c : { type: '#text', text: String(c) }),
+            );
+          }
+          return { type: type, props: props || {}, kids: kids };
+        }
+        function setProp(el, k, v) {
+          if (k === 'key') return;
+          if (k === 'className') el.className = v;
+          else if (k === 'style') el.style.cssText = v;
+          else el.setAttribute(k, v);
+        }
+        function create(v) {
+          if (v.type === '#text') return document.createTextNode(v.text);
+          const el = document.createElement(v.type);
+          for (const k in v.props) setProp(el, k, v.props[k]);
+          v.kids.forEach((c) => el.appendChild(create(c)));
+          return el;
+        }
+        function patchProps(el, o, n) {
+          for (const k in n) if (o[k] !== n[k]) setProp(el, k, n[k]);
+          for (const k in o) {
+            if (k in n || k === 'key') continue;
+            if (k === 'className') el.removeAttribute('class');
+            else if (k === 'style') el.removeAttribute('style');
+            else el.removeAttribute(k);
+          }
+        }
+        function patchChildren(dom, o, n) {
+          const keyed = n.length > 0 && n.every((c) => c.props && c.props.key !== undefined);
+          if (keyed) {
+            const old = new Map();
+            o.forEach((c, i) => old.set(c.props.key, { v: c, dom: dom.childNodes[i] }));
+            const nodes = n.map((c) => {
+              const prev = old.get(c.props.key);
+              if (prev) {
+                old.delete(c.props.key);
+                patch(dom, prev.dom, prev.v, c);
+                return prev.dom;
+              }
+              return create(c);
+            });
+            old.forEach((p) => dom.removeChild(p.dom));
+            nodes.forEach((node, i) => {
+              if (dom.childNodes[i] !== node) dom.insertBefore(node, dom.childNodes[i] || null);
+            });
+            return;
+          }
+          const len = Math.max(o.length, n.length);
+          const doms = Array.from(dom.childNodes);
+          for (let i = 0; i < len; i += 1) patch(dom, doms[i], o[i], n[i]);
+        }
+        function patch(parent, dom, o, n) {
+          if (!o) parent.appendChild(create(n));
+          else if (!n) parent.removeChild(dom);
+          else if (o.type !== n.type) parent.replaceChild(create(n), dom);
+          else if (n.type === '#text') {
+            if (o.text !== n.text) dom.nodeValue = n.text;
+          } else {
+            patchProps(dom, o.props, n.props);
+            patchChildren(dom, o.kids, n.kids);
+          }
+        }
+        window.React = {
+          h: h,
+          createRoot: function (container) {
+            let current = null;
+            return {
+              render: function (vnode) {
+                if (!current) container.appendChild(create(vnode));
+                else patch(container, container.firstChild, current, vnode);
+                current = vnode;
+              },
+            };
+          },
+        };
+      })();
+    </script>
+    <script>
+      const h = React.h;
+      const items = (prefix, n, cls) =>
+        Array.from({ length: n }, (_, i) =>
+          h('li', { key: prefix + i, id: prefix + i, className: cls || 'bad' }, prefix + i),
+        );
+      const state = { view: 'home', count: 0 };
+      const views = {
+        home: () =>
+          h(
+            'main',
+            { id: 'view', 'data-view': 'home' },
+            h('h2', { id: 'home-title', className: 'bad' }, 'Home'),
+            h('ul', { id: 'home-list' }, items('home-', 12)),
+          ),
+        about: () =>
+          h(
+            'section',
+            { id: 'view', 'data-view': 'about' },
+            h('h2', { id: 'about-title', className: 'bad' }, 'About us'),
+            h('p', { id: 'about-text', className: 'bad' }, 'About text'),
+            h('p', { id: 'about-fine', className: 'good' }, 'fine'),
+          ),
+        settings: () =>
+          h(
+            'article',
+            { id: 'view', 'data-view': 'settings' },
+            h('h2', { id: 'settings-title', className: 'bad' }, 'Settings'),
+            h('ul', { id: 'settings-list' }, items('set-', 6)),
+          ),
+      };
+      const nav = () =>
+        h(
+          'nav',
+          { id: 'shell-nav' },
+          h('a', { id: 'nav-home', href: '#home', className: 'bad' }, 'Home'),
+          h('a', { id: 'nav-about', href: '#about', className: 'bad' }, 'About'),
+          h('a', { id: 'nav-settings', href: '#settings', className: 'bad' }, 'Settings'),
+        );
+      function app() {
+        return h(
+          'div',
+          { id: 'shell' },
+          nav(),
+          h('span', { id: 'counter', className: 'bad' }, 'count ' + state.count),
+          views[state.view](),
+          h(
+            'footer',
+            { id: 'shell-footer' },
+            h('p', { id: 'footer-text', className: 'bad' }, 'footer'),
+          ),
+        );
+      }
+      const root = React.createRoot(document.getElementById('root'));
+      const render = () => root.render(app());
+      render();
+      window.spa = {
+        /** A route change: pushState (nothing observes it) and re-render the view. */
+        go(view) {
+          state.view = view;
+          history.pushState({ view }, '', '/r1-react.html?view=' + view);
+          render();
+        },
+        /** The same render without touching history at all. */
+        show(view) {
+          state.view = view;
+          render();
+        },
+        tick(n) {
+          state.count = n;
+          render();
+        },
+        back() {
+          history.back();
+        },
+      };
+      window.addEventListener('popstate', (e) => {
+        state.view = (e.state && e.state.view) || 'home';
+        render();
+      });
+      window.reorderHome = function () {
+        // reversal of a list: every row is moved, none is created or destroyed
+        const ul = document.getElementById('home-list');
+        Array.from(ul.children)
+          .reverse()
+          .forEach((r) => ul.appendChild(r));
+      };
+    </script>
+  </body>
+</html>

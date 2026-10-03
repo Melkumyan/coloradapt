@@ -25,7 +25,7 @@ ColorAdapt should be able to reason about:
   vision profile (M1-M2 — implemented; M2 uses published CVD models, see `docs/COLOR_VISION_SIMULATION.md`).
 - Reversible UI color adaptation (M3 — implemented in this foundation as a
   minimal lightness-based fix).
-- Dynamic pages / SPAs (M4).
+- Dynamic pages / SPAs (M4): handled by the mutation pipeline, see `docs/DYNAMIC_ANALYSIS.md`.
 - SVG icons and vector graphics (M5).
 - Semantic roles — success/error/warning/active/buy/sell/status — so that
   color-only meaning can be reinforced with icons, shapes, or text, not
