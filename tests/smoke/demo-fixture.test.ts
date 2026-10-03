@@ -31,18 +31,18 @@ function loadDemoDocument(): Document {
 }
 
 /**
- * jsdom's `getComputedStyle` is dramatically slower than a real browser's
- * (tens of milliseconds for a page this size vs. sub-millisecond), so
- * production's 50ms budget would truncate this fixture after a handful
- * of elements for reasons that have nothing to do with the analyzer's
- * correctness. Give it room instead of asserting against a flaky clock.
+ * jsdom's `getComputedStyle` is dramatically slower than a real browser's,
+ * so a wall-clock budget would truncate this fixture depending on machine
+ * load. A frozen clock makes the analyzer's time budget inert and the
+ * result deterministic; the budget itself is covered with an injected clock
+ * in tests/core/analysis/performance.test.ts.
  */
-const GENEROUS_BUDGET = { maxDurationMs: 5000 };
+const FROZEN_CLOCK = { now: () => 0 };
 
 describe('demo fixture smoke test', () => {
   it('analyzes the demo page without throwing, finds conflicts, and flags unresolved backgrounds', () => {
     const doc = loadDemoDocument();
-    const controller = createContentController(doc, GENEROUS_BUDGET);
+    const controller = createContentController(doc, FROZEN_CLOCK);
 
     const result = controller.analyze('https://example.com/demo', DEFAULT_USER_SETTINGS);
 
@@ -56,7 +56,7 @@ describe('demo fixture smoke test', () => {
 
   it('classifies the gradient/image/mixed fixture sections correctly', () => {
     const doc = loadDemoDocument();
-    const controller = createContentController(doc, GENEROUS_BUDGET);
+    const controller = createContentController(doc, FROZEN_CLOCK);
     const result = controller.analyze('https://example.com/demo', DEFAULT_USER_SETTINGS);
 
     const gradientEl = result.elements.find((el) => el.backgroundKind === 'gradient');
@@ -73,7 +73,7 @@ describe('demo fixture smoke test', () => {
 
   it('flags the disabled button and disabled input in the fixture', () => {
     const doc = loadDemoDocument();
-    const controller = createContentController(doc, GENEROUS_BUDGET);
+    const controller = createContentController(doc, FROZEN_CLOCK);
     const result = controller.analyze('https://example.com/demo', DEFAULT_USER_SETTINGS);
 
     const disabledElements = result.elements.filter((el) => el.disabled);
@@ -82,7 +82,7 @@ describe('demo fixture smoke test', () => {
 
   it('enables and disables adaptation on the demo page without leaving stray stylesheets', () => {
     const doc = loadDemoDocument();
-    const controller = createContentController(doc, GENEROUS_BUDGET);
+    const controller = createContentController(doc, FROZEN_CLOCK);
 
     controller.enableAdaptation('https://example.com/demo', DEFAULT_USER_SETTINGS);
     expect(doc.getElementById('coloradapt-stylesheet')).not.toBeNull();

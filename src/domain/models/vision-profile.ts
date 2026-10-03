@@ -88,7 +88,8 @@ export const VISION_PROFILE_INFO: Readonly<Record<VisionProfile, VisionProfileIn
   custom: {
     id: 'custom',
     label: 'Custom profile',
-    description: 'User-defined simulation parameters.',
+    description:
+      'Not yet supported: no color vision simulation is applied (treated as normal vision).',
     defaultSeverity: 1,
   },
 };

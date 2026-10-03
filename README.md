@@ -101,6 +101,9 @@ understanding) are tracked in `docs/ROADMAP.md`.
 
 ## Scientific accuracy note
 
-Vision simulations here are simplified, heuristic estimates for
+Vision simulations use published color vision deficiency models
+(Brettel 1997, Machado 2009) plus two explicitly labeled approximations
+(tritanomaly, achromatopsia), applied in linear RGB. They are estimates for
 accessibility purposes — not a medical model of any individual's actual
-perception, and not a diagnostic tool. See `docs/PRODUCT.md`.
+perception, and not a diagnostic tool. See `docs/COLOR_VISION_SIMULATION.md`
+for sources, policies, and limitations.

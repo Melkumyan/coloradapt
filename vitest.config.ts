@@ -18,5 +18,9 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     globals: false,
+    // Hang guard only. No assertion depends on elapsed time (the analyzer's
+    // clock is injected in tests), but jsdom's getComputedStyle is slow on a
+    // cold worker and vitest's 5s default trips under CPU oversubscription.
+    testTimeout: 30_000,
   },
 });

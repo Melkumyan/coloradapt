@@ -34,8 +34,8 @@ describe('analyzeDocument', () => {
 
   it('reuses the same id across repeated analysis passes on the same element', () => {
     const root = setUpDom();
-    const first = analyzeDocument({ root });
-    const second = analyzeDocument({ root });
+    const first = analyzeDocument({ root, now: () => 0 });
+    const second = analyzeDocument({ root, now: () => 0 });
 
     const firstIds = first.elements.map((el) => el.id).sort();
     const secondIds = second.elements.map((el) => el.id).sort();
@@ -44,7 +44,7 @@ describe('analyzeDocument', () => {
 
   it('respects the maxElements budget', () => {
     const root = setUpDom();
-    const { elements, truncated } = analyzeDocument({ root, maxElements: 1 });
+    const { elements, truncated } = analyzeDocument({ root, maxElements: 1, now: () => 0 });
     expect(elements).toHaveLength(1);
     expect(truncated).toBe(true);
   });

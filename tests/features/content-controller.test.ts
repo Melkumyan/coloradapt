@@ -11,7 +11,7 @@ function setUpLowContrastPage(): void {
 describe('createContentController', () => {
   it('analyze() reports detected conflicts without touching the stylesheet', () => {
     setUpLowContrastPage();
-    const controller = createContentController(document);
+    const controller = createContentController(document, { now: () => 0 });
 
     const result = controller.analyze('https://example.com', DEFAULT_USER_SETTINGS);
 
@@ -26,7 +26,7 @@ describe('createContentController', () => {
         Could be anything
       </p>
     `;
-    const controller = createContentController(document);
+    const controller = createContentController(document, { now: () => 0 });
 
     const result = controller.analyze('https://example.com', DEFAULT_USER_SETTINGS);
 
@@ -36,7 +36,7 @@ describe('createContentController', () => {
 
   it('enableAdaptation() applies a stylesheet, disableAdaptation() restores the original state', () => {
     setUpLowContrastPage();
-    const controller = createContentController(document);
+    const controller = createContentController(document, { now: () => 0 });
 
     const { adaptation } = controller.enableAdaptation(
       'https://example.com',

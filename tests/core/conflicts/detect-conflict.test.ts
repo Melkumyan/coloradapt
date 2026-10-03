@@ -42,7 +42,7 @@ describe('detectColorConflict', () => {
       'protanopia',
     );
     expect(conflict?.contrast).toBeGreaterThan(0);
-    expect(conflict?.perceptualDistance).toBeGreaterThanOrEqual(0);
+    expect(conflict?.vision.simulatedDistance).toBeGreaterThanOrEqual(0);
     expect(conflict?.reason.length).toBeGreaterThan(0);
   });
 });

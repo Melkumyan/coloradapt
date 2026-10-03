@@ -1,5 +1,6 @@
 import type { ColorConflict, ColorPair, ConflictSeverity, VisionProfile } from '@domain/models';
-import { calculateContrast, calculatePerceptualDistance, simulateVision } from '@core/color';
+import { calculateContrast } from '@core/color';
+import { simulatePair } from '@core/vision';
 import { CONTRAST_THRESHOLDS, PERCEPTUAL_DISTANCE_THRESHOLDS } from './thresholds';
 
 function determineSeverity(contrast: number, perceptualDistance: number): ConflictSeverity | null {
@@ -43,18 +44,19 @@ function describeReason(
 /**
  * Estimates whether a foreground/background pair is likely to be a poor
  * combination for the given vision profile, combining WCAG contrast with
- * perceptual distance under a vision simulation. Returns `null` when no
+ * perceptual distance under a vision simulation (kept as separate signals:
+ * `contrast` is WCAG, `vision` is the color vision simulation result). Returns `null` when no
  * conflict is detected. This is a heuristic estimate, not a diagnosis.
  */
 export function detectColorConflict(
   elementId: string,
   pair: ColorPair,
   profile: VisionProfile,
+  visionSeverity?: number,
 ): ColorConflict | null {
   const contrast = calculateContrast(pair.foreground, pair.background);
-  const simulatedForeground = simulateVision(pair.foreground, profile);
-  const simulatedBackground = simulateVision(pair.background, profile);
-  const perceptualDistance = calculatePerceptualDistance(simulatedForeground, simulatedBackground);
+  const vision = simulatePair(pair.foreground, pair.background, profile, visionSeverity);
+  const perceptualDistance = vision.simulatedDistance;
 
   const severity = determineSeverity(contrast, perceptualDistance);
   if (!severity) return null;
@@ -63,9 +65,7 @@ export function detectColorConflict(
     elementId,
     foreground: pair.foreground,
     background: pair.background,
-    simulatedForeground,
-    simulatedBackground,
-    perceptualDistance,
+    vision,
     contrast,
     severity,
     reason: describeReason(severity, contrast, perceptualDistance),

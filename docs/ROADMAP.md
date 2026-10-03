@@ -32,15 +32,28 @@ Explicit M1 policy (documented limitation, not a silent gap — see
 `docs/CSS_ANALYSIS.md`'s "Known limitations"): pseudo-elements,
 `::placeholder`, Shadow DOM, and iframes are not analyzed.
 
-## M2 — Vision Simulation 🚧
+## M2 — Color Vision Simulation ✅ (pending review/freeze)
 
-- Protanopia/deuteranopia/tritanopia/achromatopsia simulated via simplified
-  matrices; anomaly variants via severity interpolation.
-- OKLab perceptual distance.
+- `core/vision`: sRGB -> linear RGB -> model -> clip -> sRGB pipeline.
+- Brettel 1997 (protanopia/deuteranopia/tritanopia, two half-planes),
+  Machado 2009 (protanomaly/deuteranomaly), Viénot 1999 as an alternative
+  protan/deutan model.
+- Tritanomaly (interpolated Brettel) and achromatopsia (luminance) are
+  explicit, labeled approximations.
+- Validated severity in `[0, 1]`, alpha preserved, explicit clipping policy.
+- `simulatePair` -> `VisionAnalysis` (original/simulated distance, loss, model),
+  carried on `ColorConflict.vision`; WCAG contrast stays a separate signal.
+- Reference vectors cross-validated against DaltonLens (dev-only tooling in
+  `scripts/reference/`).
+- The M1 heuristic matrices were removed.
 
-Still open: replacing the simplified matrices with a more rigorous model
-(e.g. Brettel/Viénot/Machado) — the architecture (`core/color/simulate.ts`)
-is isolated specifically so this swap doesn't ripple outward.
+M2.R1 (regression stabilization & scientific review): flaky wall-clock tests
+made deterministic, constants cross-checked against libDaltonLens, Machado
+linear-RGB documented as a model assumption. Severity stays engine-level;
+conflict thresholds stay uncalibrated.
+
+Still open: severity UI/settings field, calibrating conflict thresholds
+against the new engine, a custom-profile model.
 
 ## M3 — Adaptation 🚧
 

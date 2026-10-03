@@ -1,4 +1,5 @@
 import type { ColorValue } from './color';
+import type { VisionAnalysis } from './vision-analysis';
 
 export type ConflictSeverity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -18,10 +19,8 @@ export interface ColorConflict {
   readonly elementId: string;
   readonly foreground: ColorValue;
   readonly background: ColorValue;
-  readonly simulatedForeground: ColorValue;
-  readonly simulatedBackground: ColorValue;
-  /** Perceptual distance (OKLab Euclidean) between simulated colors. */
-  readonly perceptualDistance: number;
+  /** Color vision simulation of the pair; independent of the WCAG `contrast` below. */
+  readonly vision: VisionAnalysis;
   /** WCAG 2.x contrast ratio (1-21) between the original colors. */
   readonly contrast: number;
   readonly severity: ConflictSeverity;

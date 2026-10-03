@@ -36,15 +36,16 @@ algorithm needs to change, only `core/color` changes.
 
 ## Modules
 
-| Module                                    | Responsibility                                                                                                               |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Color Engine (`core/color`)               | Parse/convert/compare colors; alpha-composite; simulate vision profiles; find accessible alternatives.                       |
-| DOM Analyzer (`core/analysis`)            | Bounded traversal of a document, resolving each element's effective foreground/background/role — see `docs/CSS_ANALYSIS.md`. |
-| Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                        |
-| Adaptation Engine (`core/adaptation`)     | Turn conflicts into a minimal set of reversible style changes; apply/restore them via one injected stylesheet.               |
-| Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                           |
-| Messaging (`infrastructure/messaging`)    | Typed message contracts and a typed router, instead of ad-hoc strings.                                                       |
-| Page Analysis / Settings (`features/`)    | Content-script controller; React hooks (`useSettings`, `usePageAnalysis`) for Popup/Options.                                 |
+| Module                                    | Responsibility                                                                                                                                                                                        |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Color Engine (`core/color`)               | Parse/convert/compare colors; sRGB transfer functions; alpha-composite; OKLab distance; find accessible alternatives.                                                                                 |
+| Vision Engine (`core/vision`)             | Replaceable, DOM-free color vision simulation (Brettel/Viénot/Machado + approximations); pair analysis. Holds no module-level mutable state or caches (M2.R1). See `docs/COLOR_VISION_SIMULATION.md`. |
+| DOM Analyzer (`core/analysis`)            | Bounded traversal of a document, resolving each element's effective foreground/background/role — see `docs/CSS_ANALYSIS.md`.                                                                          |
+| Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                                                                                                 |
+| Adaptation Engine (`core/adaptation`)     | Turn conflicts into a minimal set of reversible style changes; apply/restore them via one injected stylesheet.                                                                                        |
+| Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                                                                                                    |
+| Messaging (`infrastructure/messaging`)    | Typed message contracts and a typed router, instead of ad-hoc strings.                                                                                                                                |
+| Page Analysis / Settings (`features/`)    | Content-script controller; React hooks (`useSettings`, `usePageAnalysis`) for Popup/Options.                                                                                                          |
 
 ## Data flow — analysis & adaptation
 

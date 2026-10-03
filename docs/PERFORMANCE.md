@@ -61,6 +61,10 @@ instead of reprocessing the whole page.
 - Stylesheet rule count vs. render/reflow cost when many elements are
   adapted at once.
 
+Tests that touch the analyzer inject `now: () => 0` (M2.R1): the real
+50 ms budget in jsdom made results machine-speed dependent. The budget
+itself is tested with an injected clock.
+
 ## A note on jsdom vs. real browsers
 
 `tests/smoke/demo-fixture.test.ts` and `tests/core/analysis/performance.test.ts`

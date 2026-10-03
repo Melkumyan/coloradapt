@@ -41,7 +41,7 @@ function analyzeChain(layers: Layer[]) {
       backgroundImage: 'none',
       ...styles.get(el),
     }) as CSSStyleDeclaration;
-  const { elements } = analyzeDocument({ root: document.body, getStyle });
+  const { elements } = analyzeDocument({ root: document.body, getStyle, now: () => 0 });
   const descriptor = elements.find((e) => e.hasTextContent);
   expect(descriptor).toBeDefined();
   void leaf;
@@ -115,7 +115,7 @@ describe('opacity group compositing', () => {
         visibility: 'visible',
         opacity: el === document.body ? '0.5' : '1',
       }) as CSSStyleDeclaration;
-    const { elements } = analyzeDocument({ root: document.body, getStyle });
+    const { elements } = analyzeDocument({ root: document.body, getStyle, now: () => 0 });
     const p = elements.find((e) => e.tagName === 'p');
     expect(p?.analysisStatus).toBe('partial');
   });

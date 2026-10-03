@@ -1,4 +1,5 @@
 export * from './vision-profile';
+export * from './vision-analysis';
 export * from './color';
 export * from './conflict';
 export * from './element';

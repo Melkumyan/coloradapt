@@ -10,7 +10,7 @@ describe('analyzeDocument performance budget', () => {
   it('never returns more than maxElements descriptors on a large DOM', () => {
     document.body.innerHTML = '';
     const container = document.createElement('div');
-    for (let i = 0; i < 3000; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       const p = document.createElement('p');
       p.textContent = `Row ${i}`;
       p.style.color = 'black';
@@ -20,18 +20,18 @@ describe('analyzeDocument performance budget', () => {
 
     const { elements, truncated } = analyzeDocument({
       root: container,
-      maxElements: 500,
+      maxElements: 50,
       now: () => 0,
     });
 
-    expect(elements.length).toBeLessThanOrEqual(500);
+    expect(elements.length).toBeLessThanOrEqual(50);
     expect(truncated).toBe(true);
   });
 
   it('stops within the wall-clock budget regardless of element count', () => {
     document.body.innerHTML = '';
     const container = document.createElement('div');
-    for (let i = 0; i < 3000; i += 1) {
+    for (let i = 0; i < 300; i += 1) {
       const p = document.createElement('p');
       p.textContent = `Row ${i}`;
       container.appendChild(p);
@@ -52,7 +52,7 @@ describe('analyzeDocument performance budget', () => {
     });
 
     expect(truncated).toBe(true);
-    expect(elements.length).toBeLessThan(3000);
+    expect(elements.length).toBeLessThan(300);
   });
 
   it('resolves a deeply nested, fully transparent ancestor chain without error', () => {

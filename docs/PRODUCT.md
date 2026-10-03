@@ -22,7 +22,7 @@ reversible adjustment there.
 ColorAdapt should be able to reason about:
 
 - Foreground/background contrast and color-distance under a simulated
-  vision profile (M1-M2 — implemented in this foundation, as a heuristic).
+  vision profile (M1-M2 — implemented; M2 uses published CVD models, see `docs/COLOR_VISION_SIMULATION.md`).
 - Reversible UI color adaptation (M3 — implemented in this foundation as a
   minimal lightness-based fix).
 - Dynamic pages / SPAs (M4).
@@ -53,8 +53,9 @@ See `docs/ROADMAP.md` for the milestone breakdown.
 
 ## Scientific framing — what ColorAdapt is not
 
-ColorAdapt's vision simulations are simplified estimates used for
-accessibility heuristics. They are:
+ColorAdapt's vision simulations are model-based estimates (published
+models plus labeled approximations) used for accessibility analysis. They
+are:
 
 - **Not** a medical diagnosis or assessment tool.
 - **Not** a precise reproduction of any individual's actual perception —
