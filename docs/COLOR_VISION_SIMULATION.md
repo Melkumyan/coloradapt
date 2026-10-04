@@ -249,7 +249,7 @@ smoke test hit vitest's 5 s default. Production behavior was correct: the
 budget is a feature. Fix: tests inject a frozen clock (`now: () => 0`); the
 budget itself is tested with an injected advancing clock; the large-DOM
 test uses 300 rows / `maxElements: 50` (same structural assertion);
-`testTimeout` is now an explicit 30 s hang guard.
+`testTimeout` is now an explicit hang guard (30 s; 60 s since M8, when more test files began sharing the workers).
 
 Policy: no assertion may depend on elapsed time or machine speed; pass an
 injected clock to anything with a time budget. M2 code has no module-level

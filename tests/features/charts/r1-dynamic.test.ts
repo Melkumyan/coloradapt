@@ -278,32 +278,38 @@ describe('retention: many charts, several cycles, nothing left', () => {
     (id: string) => scatterChartSvg(SIX.slice(0, 3), { id }),
   ];
 
-  it('100 charts x 3 cycles: ids never collide while they live, and removal leaves 0 owners, defs, rules', () => {
-    const { charts, scan, mount } = setup();
-    for (let cycle = 0; cycle < 3; cycle += 1) {
-      for (let i = 0; i < 100; i += 1) mount(kinds[i % kinds.length]!(`c${cycle}-${i}`));
-      scan();
-      const ids = [...document.querySelectorAll('[id]')].map((el) => el.id);
-      expect(new Set(ids).size).toBe(ids.length);
-      const defs = document.querySelectorAll('defs[data-coloradapt-chart-node]');
-      expect(defs.length).toBeGreaterThanOrEqual(75);
-      const patternIds = [...document.querySelectorAll('pattern')].map((p) => p.id);
-      expect(patternIds.length).toBeGreaterThan(0);
-      expect(new Set(patternIds).size).toBe(patternIds.length);
-      document.body.innerHTML = '';
-      charts.update([]);
-      expect(charts.diagnostics()).toMatchObject({
-        chartOwners: 0,
-        chartDefs: 0,
-        chartOverlays: 0,
-        chartRules: 0,
-        chartPending: 0,
-        chartWatched: 0,
-      });
-      expect(nodes()).toBe(0);
-      expect(document.getElementById('coloradapt-stylesheet')).toBeNull();
-    }
-  });
+  // 300 charts in jsdom: ~12 s alone (identical on M7 and M8), ~30 s when every
+  // worker is busy. Stress category: its own hang guard, the global stays 30 s.
+  it(
+    '100 charts x 3 cycles: ids never collide while they live, and removal leaves 0 owners, defs, rules',
+    { timeout: 90_000 },
+    () => {
+      const { charts, scan, mount } = setup();
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        for (let i = 0; i < 100; i += 1) mount(kinds[i % kinds.length]!(`c${cycle}-${i}`));
+        scan();
+        const ids = [...document.querySelectorAll('[id]')].map((el) => el.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        const defs = document.querySelectorAll('defs[data-coloradapt-chart-node]');
+        expect(defs.length).toBeGreaterThanOrEqual(75);
+        const patternIds = [...document.querySelectorAll('pattern')].map((p) => p.id);
+        expect(patternIds.length).toBeGreaterThan(0);
+        expect(new Set(patternIds).size).toBe(patternIds.length);
+        document.body.innerHTML = '';
+        charts.update([]);
+        expect(charts.diagnostics()).toMatchObject({
+          chartOwners: 0,
+          chartDefs: 0,
+          chartOverlays: 0,
+          chartRules: 0,
+          chartPending: 0,
+          chartWatched: 0,
+        });
+        expect(nodes()).toBe(0);
+        expect(document.getElementById('coloradapt-stylesheet')).toBeNull();
+      }
+    },
+  );
 
   it('a chart removed and a look-alike inserted gets fresh ownership (no stale reference is reused)', () => {
     const { charts, scan, mount } = setup();

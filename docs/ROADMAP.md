@@ -279,9 +279,71 @@ adapted.
   event targets).
 - Frozen as `m7-charts`. Next: M8 — Image Adaptation (not started).
 
-## M8 — Image Adaptation ⬜
+## M8 — Image Adaptation ✅ (frozen as `m8-image-adaptation` by M8.R1)
 
-- Image color analysis and optional correction.
+Details in `docs/IMAGE_ADAPTATION.md`. Principle: **a safe unchanged image beats a speculative
+correction.**
+
+- A dedicated pure core (`core/images`: bounded sampling, deterministic OKLab clusters, pairwise M2
+  analysis, classification with confidence and evidence, a leave-it-alone policy, the monochrome-icon
+  plan) and a browser layer (`features/images`: discovery, readability, an offscreen-canvas reader,
+  a memory-only cache that owns and revokes every object URL, the controller).
+- Recolored: only a functional **monochrome `<img>` icon** classified HIGH (small, one chromatic
+  cluster, transparent, with functional context), over a known solid background, with a replaceable
+  source. M3 `findAdaptation` + a cluster-aware OKLab remap (alpha copied byte for byte, neutrals
+  untouched, no halo) + verification (same size and alpha, M2 distance strictly better).
+- Never recolored: photographs, logos, screenshots, decorative images, status bitmaps (pixels stay,
+  M6 owns the non-color cue: semantic cue > recolor), raster charts and diagrams (detected,
+  untouched), multi-paint UI bitmaps, anything MEDIUM/LOW. Unsupported: `srcset`/`<picture>`,
+  `<input type=image>`, CSS backgrounds (detect-only), SVG through `<img>`, animated images (by URL
+  and by bytes), image maps, CSS filter/blend/mask/opacity, cross-origin without CORS (tainted canvas
+  respected, nothing worked around).
+- No own observer: M4 regions + one capture-phase `load`/`error` listener; `src` stays out of
+  `OBSERVED_ATTRIBUTES`. Generations discard stale async results; one image, one adaptation; OFF restores
+  the page's `src` exactly; refresh is idempotent (the original is always what is read).
+- `adaptImages` default **false** (live in the Options page; explicit stored values never overridden,
+  tested). Per-site `adaptImages` is consulted since M8.R1 (narrowing, see below).
+- Benchmark: 119 scenarios, 72 curated false-positive cases, **0 transformations**; 19/19 supported
+  icons adapted with better simulated distinguishability and identical geometry/alpha.
+- Validation at M8: 1711 unit tests; image-focused tests x50 **50/50**; full suite x5 **5/5**; `pnpm
+verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5** (M7.R1: 480 / 1 / 0;
+  M8 added 29). Firefox: build passes, runtime NOT_VERIFIED.
+- Observed in Chromium: an extension's blob URL is not blocked by a strict page `img-src` (the
+  rollback on a load error is therefore unit-tested only); the privacy test compares the hosts with the
+  layer on and off because antivirus software injects its own requests into pages.
+- Not in M8: OCR, AI image understanding, object/face recognition, photograph recoloring, backend or
+  upload, canvas patching, video, animated-image rewriting, Shadow DOM, iframes. M2 stays PARTIAL.
+
+### M8.R1 — Image Validation & Freeze ✅
+
+- **Timeout investigation**: the M7 300-chart retention test takes ~12.4 s alone on both the frozen M7
+  commit and M8 (same structural work); ~30 s only when every worker is busy. Contention, not a
+  regression. The global `testTimeout` went back to 30 s; that one test has its own 90 s guard.
+- **Per-site `adaptImages`** is now live: `effective = global AND site override`, no override = global
+  (a site can narrow, never widen); tested for the four cases + no override, and in Chromium with two
+  hostnames open together.
+- **Brand protection**: `HIGH` needs positive functional evidence (a control-like name or, when
+  unnamed, an `icon` class/path); button/link/non-empty alt are no longer evidence. Logo vocabulary,
+  path tokens, container labels and index home links widened. Real icons named without a functional
+  word are deliberate misses.
+- **Benchmark**: 195 scenarios (was 119): 124 curated false-positive cases, **0 transformations**,
+  photos/logos/brand traps transformed **0**, 36/36 supported icons adapted with better distinguishability
+  and identical geometry/alpha, 3 documented conservative misses, 0 classification conflicts.
+- **OS theme**: one `matchMedia` listener while active, bounded re-evaluation of background-dependent
+  images; a page choice of `srcset`/`<picture>` over an adapted image releases our bitmap.
+- **Real Chromium**: forced Blob load failure (page revokes our URL and reloads the image: rollback, no
+  loop, 0 owners), strict CSP fixtures, A to B to C races with reversed answers, profile switch, theme
+  switch with `emulateMedia`, redirects both ways, wrong CORS, malformed/oversized data URLs, brand and
+  low-color-photo fixtures, 127/128/129 px and 15 % transparency boundaries.
+- **Unit**: staged races (remove/OFF/profile change in flight), cache 31/32/33 and the pixel line,
+  queue boundary 402/403/404 (400 queued + 3 reading), concurrency never above 3, 500 images x 3 cycles,
+  ObjectURL invariant (`created - revoked == live`, 0 after OFF), listener lifecycle, attribute
+  preservation.
+- `adaptImages` stays **false** by default.
+- Validation: 1748 unit tests; image-focused tests x50 **50/50**; full suite x5 **5/5**; the 300-chart test
+  x20 isolated **20/20**; `pnpm verify` x3 **3/3**; Chromium E2E **526 passed / 1 skipped / 0 failed**, x5
+  **5/5** (M8: 509 / 1 / 0; R1 added 17). Firefox: build passes, runtime NOT_VERIFIED. M2 stays PARTIAL.
+- Next: M9 — Developer Audit (not started).
 
 ## M9 — Developer Audit ⬜
 

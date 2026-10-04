@@ -59,6 +59,17 @@ Canvas charts are detected and left alone (a chart with, or with possible, an HT
 claimed. Everything is reversible, verified against the browser and flows through the M4 pipeline
 (`adaptCharts`, on by default). See `docs/CHARTS.md`.
 
+M8 adds a deliberately narrow, **off-by-default** image layer (`adaptImages`): it recolors only small
+single-color functional bitmap icons that are classified with high confidence, are readable by the
+browser's own same-origin/CORS rules and sit on a known solid background. Photographs, logos,
+screenshots, decorative images, status bitmaps, raster charts and anything uncertain are left
+exactly as the page made them. Image pixels are read and processed locally and never leave the
+browser. Generated bitmaps are shown through object URLs ColorAdapt owns and revokes; everything is
+reversible, idempotent and flows through the M4 pipeline. M8.R1 validated it (195 benchmark
+scenarios, 0 photographs or logos transformed, a brand-protection rule that requires positive
+functional evidence, per-site `adaptImages`, OS-theme invalidation, forced Blob failure and CSP in
+real Chromium). See `docs/IMAGE_ADAPTATION.md`.
+
 M6 adds a second, non-color channel where color alone carries a state. Deterministic evidence
 (ARIA, native form state, exact class/data tokens, a small English/Russian status vocabulary) is
 classified with an explicit confidence; only when the evidence is HIGH, the original page

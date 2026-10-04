@@ -19,5 +19,8 @@ export function resolveEffectiveSettings(
     visionProfile: site.visionProfile,
     adaptationStrength: site.intensity,
     improveUIColors: settings.improveUIColors && site.adaptUI,
+    // Narrowing only, like adaptUI: a site can switch image adaptation off, never on behind the
+    // global opt-in (the layer is off by default and a wrongly changed image is the costly error).
+    adaptImages: settings.adaptImages && site.adaptImages,
   };
 }

@@ -59,6 +59,33 @@ describe('parseUserSettings', () => {
     });
   });
 
+  describe('adaptImages (M8)', () => {
+    it('is false on a fresh install: image changes are opt-in', () => {
+      expect(DEFAULT_USER_SETTINGS.adaptImages).toBe(false);
+      expect(parseUserSettings(undefined).adaptImages).toBe(false);
+    });
+
+    it('settings stored before M8 (no field) load with false and nothing else changes', () => {
+      const { adaptImages: _omitted, ...beforeM8 } = DEFAULT_USER_SETTINGS;
+      const result = parseUserSettings({ ...beforeM8, visionProfile: 'protanopia' });
+      expect(result.adaptImages).toBe(false);
+      expect(result.visionProfile).toBe('protanopia');
+    });
+
+    it('an explicit value is never overridden, true or false', () => {
+      expect(parseUserSettings({ adaptImages: true }).adaptImages).toBe(true);
+      expect(parseUserSettings({ adaptImages: false }).adaptImages).toBe(false);
+    });
+
+    it('an invalid value falls back to false instead of rejecting the object', () => {
+      for (const invalid of ['yes', 1, null, {}, []]) {
+        const result = parseUserSettings({ adaptImages: invalid, enabled: false });
+        expect(result.adaptImages).toBe(false);
+        expect(result.enabled).toBe(false);
+      }
+    });
+  });
+
   describe('semanticCuesEnabled (M6 migration)', () => {
     it('is true on a fresh install: high confidence, color-only and safe placement are required anyway', () => {
       expect(DEFAULT_USER_SETTINGS.semanticCuesEnabled).toBe(true);

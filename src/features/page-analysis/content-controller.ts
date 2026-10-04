@@ -3,6 +3,7 @@ import { createDetailedAdaptationPlan, StylesheetManager } from '@core/adaptatio
 import { detectColorConflict } from '@core/conflicts';
 import type { AdaptationPlan, AnalysisResult, ColorConflict, UserSettings } from '@domain/models';
 import { ChartController, type ChartEnvironment } from '../charts';
+import { ImageController, type ImageEnvironment, type ImageInfo } from '../images';
 import { findNotAdaptable } from './adaptability';
 import {
   SemanticCueController,
@@ -52,6 +53,10 @@ export interface ContentController {
    * "Resize and geometry"). The dynamic pipeline binds it while it runs; `null` unbinds.
    */
   bindChartInvalidation(invalidate: ((svg: Element) => void) | null): void;
+  /** Resolves once no image read, build or queued evaluation is outstanding (tests and flushes). */
+  settleImages(): Promise<void>;
+  /** What the image layer made of one image (read-only; for tests and debugging). */
+  inspectImage(element: Element): ImageInfo | null;
 }
 
 /**
@@ -73,7 +78,11 @@ export interface ContentController {
 export function createContentController(
   doc: Document = document,
   analyzerOptions: Partial<AnalyzeDocumentOptions> = {},
-  semanticOptions: { readonly env?: FactsEnvironment; readonly chartEnv?: ChartEnvironment } = {},
+  semanticOptions: {
+    readonly env?: FactsEnvironment;
+    readonly chartEnv?: ChartEnvironment;
+    readonly imageEnv?: ImageEnvironment;
+  } = {},
 ): ContentController {
   const stylesheetManager = new StylesheetManager(doc);
   // The chart layer (M7) decides which SVGs are its own; the SVG analyzer asks it before adapting one.
@@ -98,12 +107,20 @@ export function createContentController(
     sheet: stylesheetManager,
     ...(semanticOptions.env ? { env: semanticOptions.env } : {}),
   });
+  // Raster images (M8): off unless `adaptImages`, and then recolors one narrow kind of image (docs/IMAGE_ADAPTATION.md).
+  const images = new ImageController({
+    doc,
+    sheet: stylesheetManager,
+    ...(semanticOptions.imageEnv ? { env: semanticOptions.imageEnv } : {}),
+    ...(analyzerOptions.getStyle ? { getStyle: analyzerOptions.getStyle } : {}),
+  });
   const session = new IncrementalAdaptationSession(
     doc,
     stylesheetManager,
     analyzerOptions,
     semantic,
     charts,
+    images,
   );
   const getStyle = analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
 
@@ -199,5 +216,7 @@ export function createContentController(
     incremental: session,
     inspectSemantics: (element) => semantic.inspect(element),
     bindChartInvalidation: (invalidate) => charts.bindInvalidation(invalidate),
+    settleImages: () => images.settle(),
+    inspectImage: (element) => images.inspect(element),
   };
 }

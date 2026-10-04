@@ -1,6 +1,7 @@
 import { DYNAMIC_BUDGET, type DynamicBudget } from '@shared/constants';
 import {
   EMPTY_CHART_DIAGNOSTICS,
+  EMPTY_IMAGE_DIAGNOSTICS,
   EMPTY_SEMANTIC_DIAGNOSTICS,
   EMPTY_SVG_DIAGNOSTICS,
   type DynamicDiagnostics,
@@ -95,6 +96,7 @@ function emptyCounters(): Counters {
     svg: EMPTY_SVG_DIAGNOSTICS,
     semantic: EMPTY_SEMANTIC_DIAGNOSTICS,
     charts: EMPTY_CHART_DIAGNOSTICS,
+    images: EMPTY_IMAGE_DIAGNOSTICS,
     semanticInvalidations: 0,
   };
 }
@@ -403,6 +405,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       svg: adaptation.svgDiagnostics(),
       semantic: adaptation.semanticDiagnostics(),
       charts: adaptation.chartDiagnostics(),
+      images: adaptation.imageDiagnostics(),
     };
   }
 

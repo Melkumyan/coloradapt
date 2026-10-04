@@ -16,19 +16,25 @@ import {
   type PlanningMemo,
   type StylesheetManager,
 } from '@core/adaptation';
-import { EMPTY_CHART_DIAGNOSTICS, EMPTY_SEMANTIC_DIAGNOSTICS } from '@domain/models';
+import {
+  EMPTY_CHART_DIAGNOSTICS,
+  EMPTY_IMAGE_DIAGNOSTICS,
+  EMPTY_SEMANTIC_DIAGNOSTICS,
+} from '@domain/models';
 import type {
   AdaptationChange,
   ChartDiagnostics,
   AdaptationDelta,
   AdaptationSummary,
   ElementDescriptor,
+  ImageDiagnostics,
   SemanticDiagnostics,
   SvgDiagnostics,
   SvgUnitInfo,
   UserSettings,
 } from '@domain/models';
 import type { ChartController } from '../charts';
+import type { ImageController } from '../images';
 import type { PeerSeed, SemanticCueController } from '../semantics';
 import { findNotAdaptable } from './adaptability';
 
@@ -75,6 +81,8 @@ export interface IncrementalAdaptation {
   semanticDiagnostics(): SemanticDiagnostics;
   /** Counters and gauges of the chart layer (docs/CHARTS.md). */
   chartDiagnostics(): ChartDiagnostics;
+  /** Counters and gauges of the raster-image layer (docs/IMAGE_ADAPTATION.md). */
+  imageDiagnostics(): ImageDiagnostics;
   /** Elements the bookkeeping currently tracks (ids only; for leak tests and diagnostics). */
   trackedCount(): number;
   /** Gauges of the inline-SVG units currently tracked. */
@@ -118,6 +126,7 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
   readonly #analyzerOptions: Partial<AnalyzeDocumentOptions>;
   readonly #semantic: SemanticCueController | null;
   readonly #charts: ChartController | null;
+  readonly #images: ImageController | null;
   #context: PlanningContext | null = null;
   #memo: PlanningMemo = new Map();
   #kinds = new Map<string, TrackedKind>();
@@ -131,12 +140,14 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     analyzerOptions: Partial<AnalyzeDocumentOptions>,
     semantic: SemanticCueController | null = null,
     charts: ChartController | null = null,
+    images: ImageController | null = null,
   ) {
     this.#doc = doc;
     this.#stylesheet = stylesheet;
     this.#analyzerOptions = analyzerOptions;
     this.#semantic = semantic;
     this.#charts = charts;
+    this.#images = images;
   }
 
   get active(): boolean {
@@ -161,6 +172,10 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
   chartDiagnostics(): ChartDiagnostics {
     return this.#charts?.diagnostics() ?? EMPTY_CHART_DIAGNOSTICS;
+  }
+
+  imageDiagnostics(): ImageDiagnostics {
+    return this.#images?.diagnostics() ?? EMPTY_IMAGE_DIAGNOSTICS;
   }
 
   /** Starts (or restarts) tracking from a full adaptation's per-element outcomes. */
@@ -190,12 +205,18 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
       this.#charts.scanDocument();
       this.#charts.endPass();
     }
+    // Images last: they read the settled page (background colors after the color rules).
+    if (this.#images) {
+      this.#images.begin(settings);
+      this.#images.scanDocument();
+    }
   }
 
   /** Stops tracking and forgets everything (adaptation switched off). */
   end(): void {
     this.#semantic?.end();
     this.#charts?.end();
+    this.#images?.end();
     this.#context = null;
     this.#memo = new Map();
     this.#kinds = new Map();
@@ -243,6 +264,8 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     this.#semantic?.update([], seeds);
     // A removed chart still has artifacts (rules) to drop; a legend that left changes its chart's neighbourhood.
     this.#charts?.update([], [...seeds.map((seed) => seed.anchor), ...departures]);
+    // Images that left the page give their generated bitmaps back.
+    this.#images?.update([]);
   }
 
   update(input: IncrementalPassInput): IncrementalPassResult {
@@ -343,6 +366,9 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
         ...(input.peerSeeds ?? []).map((seed) => seed.anchor),
         ...(input.departures ?? []),
       ]) ?? rootsConsumed;
+
+    // Images keep their own queue; they never hand a region back.
+    this.#images?.update(input.roots.slice(0, rootsConsumed));
 
     return {
       rootsConsumed: Math.min(rootsConsumed, chartsConsumed),

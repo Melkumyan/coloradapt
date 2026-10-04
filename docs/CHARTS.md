@@ -579,3 +579,13 @@ fixtures.
 - Direct-label detection needs layout; without it no series is called labelled.
 - One SVG is one chart: a dashboard drawn in one `<svg>` with several plots is `unknown`/mixed.
 - Chromium only is verified; Firefox runtime is NOT_VERIFIED.
+
+## Raster charts (M8)
+
+A chart delivered as a bitmap (`<img src="chart.png">`) is **not** an M7 chart and is not adapted
+by M8 either: series identity and legend mapping cannot be reconstructed without OCR or computer
+vision. With `adaptImages` on, the image layer detects likely raster charts (a chart/graph word in
+alt, class or file name — HIGH — or a chart-like structure: neutral ground, several flat colored
+regions — MEDIUM), counts them (`rasterCharts`), marks them `unsupported` / `chart-raster` and
+leaves every pixel as it is. Ownership does not overlap: M7 owns structured inline SVG, M8 owns
+nothing it detects here. Canvas charts remain M7 detect-only. See `docs/IMAGE_ADAPTATION.md`.

@@ -119,9 +119,14 @@ export function App(): JSX.Element {
           />
           Make chart series distinguishable without color (line styles, markers, patterns)
         </label>
-        <label className="options__checkbox options__checkbox--planned">
-          <input type="checkbox" checked={settings.adaptImages} disabled />
-          Adapt images <span className="options__badge">planned</span>
+        <label className="options__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.adaptImages}
+            onChange={(event) => void update({ adaptImages: event.target.checked })}
+          />
+          Adapt functional images (small single-color bitmap icons only; photos, logos, screenshots
+          and charts are never changed)
         </label>
       </section>
 

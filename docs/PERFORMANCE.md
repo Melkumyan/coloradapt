@@ -251,3 +251,35 @@ browser's — a budget tuned for production would truncate almost
 immediately under jsdom for reasons that have nothing to do with the
 analyzer's own cost. Don't use jsdom timing to tune `ANALYSIS_BUDGET`;
 profile in an actual browser instead.
+
+## Images (M8)
+
+Structural bounds, no wall-clock gates (`docs/IMAGE_ADAPTATION.md`, "Sampling and thresholds"):
+
+- an analysis surface of at most 262 144 pixels and 512 px per side, however large the image
+  (a 12-megapixel photo is analyzed on a ≤ 512×512 surface); images over 64 megapixels are not
+  decoded at all; a transformed bitmap never exceeds 1 000 000 pixels and only ≤ 128 px icons are
+  transformed;
+- at most 3 concurrent reads, 400 queued images (the rest `queue-full`), 500 images taken per
+  region, 5000 elements scanned per region for CSS backgrounds;
+- one analysis per distinct source (shared by every image that shows it, 256 kept), one generated
+  bitmap per source + context + profile (32 entries / 2 000 000 pixels), pixel buffers released as
+  soon as statistics or a bitmap are made (no `ImageData` is retained);
+- representative page (`tests/features/images/stress.test.ts`): 100 small icons over 10 sources, 20
+  medium images and 1 large photo cause at most 10 transform reads and 21 analysis reads, 10
+  bitmaps, every read within the surface budget; 100 images replaced, removed and put back end with
+  0 owned URLs, 0 pending reads, 0 queued images.
+- With `adaptImages` off the layer costs nothing: no listener, no scan, no read.
+- M8.R1 limits, exact: one pass takes 403 images (400 queued + 3 reading) and marks the next
+  `queue-full`; at most 500 images are tracked per pass; reads never exceed 3 at once (instrumented,
+  also under 60-image and 500-image stress); the cache holds 32 entries / 2 000 000 pixels with LRU
+  eviction (31/32/33 entries and the pixel line are tested; a shown bitmap evicted from the lookup
+  keeps its URL until its last image lets go); `created - revoked` equals the live owned URLs at
+  every settled point, and equals 0 after OFF. 500 images x 3 cycles end with 0 owners, URLs, cache
+  entries, reads and queue.
+- The OS-theme listener costs one style read per background-dependent image on an actual scheme
+  change, and nothing otherwise.
+- **Test timeout**: the 300-chart retention test (`tests/features/charts/r1-dynamic.test.ts`) takes
+  ~12.4 s alone on both M7 (`3a3e8d4`) and M8 (the same structural work), and ~30 s only when all
+  workers are busy: contention, not a regression. The global Vitest `testTimeout` stays 30 s; only
+  that test has its own 90 s hang guard.

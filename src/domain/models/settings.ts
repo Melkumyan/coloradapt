@@ -21,7 +21,12 @@ export interface UserSettings {
    * tell apart, and keep their legends in step (M7, docs/CHARTS.md).
    */
   readonly adaptCharts: boolean;
-  /** Planned for M8. */
+  /**
+   * Recolor functional raster images (M8, docs/IMAGE_ADAPTATION.md): only small single-color bitmap icons that
+   * are classified with high confidence and readable by the browser's own rules. Photographs, logos,
+   * screenshots and charts are never changed. Off by default: image changes carry more risk than SVG or
+   * chart cues, and the layer reads image pixels (locally) only when this is on.
+   */
   readonly adaptImages: boolean;
   readonly showWarnings: boolean;
   readonly siteOverrides: Readonly<Record<string, SiteProfile>>;

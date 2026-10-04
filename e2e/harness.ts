@@ -34,7 +34,22 @@ export interface PageServer {
   /** Requests for `/slow-<name>.css` that are still waiting. */
   waiting(name: string): number;
   /** Serves `html` at `/<name>` (a `.html` name), for pages a test generates itself. */
-  serve(name: string, html: string): void;
+  serve(name: string, html: string, headers?: Record<string, string>): void;
+  /** Serves `body` at `/<name>` with the given content type (images and other binary fixtures). */
+  serveRaw(
+    name: string,
+    body: Buffer | string,
+    type: string,
+    headers?: Record<string, string>,
+    status?: number,
+  ): void;
+  /**
+   * Answers `/<name>` only once the returned function is called (the response is the body given
+   * to `serveRaw` for that name): stages a slow image without sleeping.
+   */
+  hold(name: string): () => void;
+  /** Requests received for `/<name>`. */
+  hits(name: string): number;
   close(): Promise<void>;
 }
 
@@ -47,13 +62,23 @@ const CONTENT_TYPES: Record<string, string> = {
 /** Serves `e2e/pages/*` (and `/demo.html` = the repo's demo page) on 127.0.0.1 (content scripts only match http(s)). */
 export async function startPageServer(): Promise<PageServer> {
   const held = new Map<string, ServerResponse[]>();
-  const generated = new Map<string, string>();
+  const raw = new Map<
+    string,
+    { body: Buffer | string; type: string; headers: Record<string, string>; status: number }
+  >();
+  const gates = new Map<string, Array<() => void>>();
+  const counts = new Map<string, number>();
   const server: Server = createServer((req, res) => {
     const name = (req.url ?? '/').split('?')[0]!.replace(/^\/+/, '') || 'index.html';
-    const made = generated.get(name);
-    if (made !== undefined) {
-      res.writeHead(200, { 'content-type': CONTENT_TYPES['.html']! });
-      res.end(made);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+    const served = raw.get(name);
+    if (served !== undefined) {
+      const respond = () => {
+        res.writeHead(served.status, { 'content-type': served.type, ...served.headers });
+        res.end(served.body);
+      };
+      if (gates.has(name)) gates.get(name)!.push(respond);
+      else respond();
       return;
     }
     const slow = /^slow-([\w-]+)\.css$/.exec(name);
@@ -86,11 +111,24 @@ export async function startPageServer(): Promise<PageServer> {
       }),
     fail: (name) => settle(name, (res) => res.writeHead(404).end('not found')),
     waiting: (name) => held.get(name)?.length ?? 0,
-    serve: (name, html) => {
-      generated.set(name, html);
+    serve: (name, html, headers = {}) => {
+      raw.set(name, { body: html, type: CONTENT_TYPES['.html']!, headers, status: 200 });
     },
+    serveRaw: (name, body, type, headers = {}, status = 200) => {
+      raw.set(name, { body, type, headers, status });
+    },
+    hold: (name) => {
+      gates.set(name, []);
+      return () => {
+        const waiting = gates.get(name) ?? [];
+        gates.delete(name);
+        for (const respond of waiting) respond();
+      };
+    },
+    hits: (name) => counts.get(name) ?? 0,
     close: () => {
       for (const name of [...held.keys()]) settle(name, (res) => res.destroy());
+      for (const name of [...gates.keys()]) for (const respond of gates.get(name) ?? []) respond();
       server.closeAllConnections();
       return new Promise<void>((resolve) => server.close(() => resolve()));
     },

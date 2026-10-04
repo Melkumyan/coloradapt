@@ -16,6 +16,13 @@ alone — there is no backend for it to send data to.
   browser's own sync feature is separately enabled by the user at the OS/
   browser level, is subject to that browser's own sync privacy terms — not
   anything ColorAdapt adds).
+- **Image pixels stay in the browser.** With the optional image layer (`adaptImages`, off by
+  default) ColorAdapt reads the pixels of images the page already displays, locally, to analyze and
+  recolor a few kinds of icons. Pixels, statistics and generated bitmaps are never uploaded, never
+  stored in extension storage, never sent to a proxy or an API; generated bitmaps live in memory only
+  and are revoked when no longer shown. See `docs/IMAGE_ADAPTATION.md`. M8.R1 re-checked it: the manifest permissions are unchanged since
+  `m7-charts` (`storage`, `http(s)` host access), the image layer adds no host, no upload and no
+  analytics, and with it on the set of hosts the page contacts is the same as with it off (E2E).
 - **No telemetry.** There is no analytics or crash-reporting SDK in this
   project, and none is planned as a default-on feature.
 - **No account, no registration, no login.** The extension works

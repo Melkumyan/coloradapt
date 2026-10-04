@@ -575,3 +575,13 @@ state word in a short title is only LOW evidence and is never applied.
   pixels, light/dark, click / typing / submit / link navigation / Tab order / Enter on a tab, layout
   boxes, the accessibility tree, DOM restoration, ON/OFF ×10, refresh ×5, no feedback loop, SPA
   state changes, native validity, 100 rows, M3 interplay.
+
+## Images (M8)
+
+M6 and the image layer divide the work on images by one rule: **a semantic non-color cue beats a
+pixel recolor.** A status bitmap (`<img class="status error" ...>`) keeps its pixels (`unchanged` /
+`status-defers-to-semantics`); M6's outline pattern for images remains the one cue it gets. The
+image layer never adds a marker, an overlay or a wrapper, and never rewrites `alt`, `aria-label` or
+`title` (an `overlay-cue` action exists in the vocabulary and is never produced). A monochrome icon
+that M8 recolors is not a state-bearing element for M6 and receives no cue from either layer twice.
+See `docs/IMAGE_ADAPTATION.md`, "Status graphics".

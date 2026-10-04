@@ -2,6 +2,7 @@ import type { AnalyzeDocumentOptions } from '@core/analysis';
 import type { UserSettings } from '@domain/models';
 import { createContentController, type ContentController } from '../page-analysis';
 import type { ChartEnvironment } from '../charts';
+import type { ImageEnvironment } from '../images';
 import { createNativeValidityBridge, type FactsEnvironment } from '../semantics';
 import {
   createDynamicPipeline,
@@ -34,7 +35,11 @@ export function createDynamicContentController(
   pipelineOptions: Partial<
     Pick<DynamicPipelineOptions, 'scheduler' | 'now' | 'budget' | 'createObserver'>
   > = {},
-  semanticOptions: { readonly env?: FactsEnvironment; readonly chartEnv?: ChartEnvironment } = {},
+  semanticOptions: {
+    readonly env?: FactsEnvironment;
+    readonly chartEnv?: ChartEnvironment;
+    readonly imageEnv?: ImageEnvironment;
+  } = {},
 ): DynamicContentController {
   const base = createContentController(doc, analyzerOptions, semanticOptions);
   let lastRequest: { url: string; settings: UserSettings } | null = null;

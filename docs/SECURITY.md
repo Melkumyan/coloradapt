@@ -59,6 +59,30 @@ The content script reads values out of an arbitrary, untrusted web page
   functions, class instances, or anything that could enable prototype
   pollution via structured clone.
 
+## Image layer (M8)
+
+- No new permission and no new host access: images are read only through the browser's own
+  same-origin/CORS rules. A tainted canvas (`SecurityError`) is respected: no analysis, no change, no
+  other route, no proxy. The byte sniff of a cross-origin image is a CORS fetch only when the page
+  itself requested that image with a `crossorigin` attribute.
+- Only an owned offscreen canvas is used; `CanvasRenderingContext2D.prototype` and the page's canvases
+  are never touched. No `innerHTML`, `eval`, dynamic or remote code, and no script is injected into
+  the page.
+- Generated bitmaps are object URLs created and revoked by ColorAdapt only; a page's own `blob:` URL
+  is never revoked. The page's own `src` is kept in memory and restored exactly.
+- Validated in Chromium (M8.R1): a bitmap forced to fail (its URL revoked from the page, then the
+  image reloaded) is rolled back to the page's `src` without a retry loop; strict page CSP
+  (`img-src 'none'`, `default-src 'self'`) leaves a consistent page and no loop (Chromium lets a
+  content script's blob URL through `img-src`, observed; no universal CSP compatibility is
+  claimed); same-origin redirects to another origin without CORS, cross-origin redirects back,
+  wrong-CORS images and malformed/oversized `data:` URLs end unread or unchanged with no escaped
+  `SecurityError`. The browser's own decision (canvas taint, CORS) is authoritative, never the
+  initial URL. No proxy and no fallback fetch exist. The OS-theme `matchMedia` listener reads no
+  page data and sends nothing.
+- Bounded work and memory: a decode ceiling, an analysis surface of at most 262 144 pixels, an
+  allocation ceiling for transformed bitmaps, bounded queue, concurrency and cache
+  (`docs/IMAGE_ADAPTATION.md`).
+
 ## Prototype pollution / unsafe parsing
 
 - `infrastructure/storage/schema.ts` parses values read back from

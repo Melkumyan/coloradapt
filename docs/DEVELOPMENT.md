@@ -209,7 +209,43 @@ pnpm build:e2e && npx playwright test e2e/chart-*.spec.ts
   diagram, icon, canvas) with hover/click/legend-toggle handlers. Pixels are read from screenshots,
   never OCR.
 
+### Images (M8)
+
+```bash
+npx vitest run tests/core/images tests/features/images tests/benchmarks/image-benchmark.test.ts
+pnpm build:e2e && npx playwright test e2e/image-*.spec.ts
+```
+
+- `tests/core/images`: the pure core on synthetic pixels (`pixels.ts` painters: discs, flat logos,
+  photograph-like noise, raster charts, screenshot-like text strokes) and hand-built facts
+  (`facts.ts`).
+- `tests/features/images`: the controller and the M4 pipeline in jsdom. jsdom decodes nothing, so
+  `fake-env.ts` is the browser's side (URL table, object-URL registry, gates that hold a read to stage
+  races) and `kit.ts` gives images `naturalWidth`/`complete` with `defineProperty`. `stress.test.ts`
+  has the representative page (100 icons + 20 medium + 1 large) and the 100-node replace/remove/
+  reinsert cycle.
+- `tests/benchmarks/image-benchmark.test.ts` (+ `image-scenarios.ts`): 119 scenarios through the real
+  controller per profile; writes `benchmark-report/images.json` (gitignored). Hard gate: 0
+  transformations in the false-positive group.
+- `tests/features/images/r1.test.ts` (M8.R1): staged races (A to B to C, remove/OFF/profile change in
+  flight), cache and queue boundaries, ObjectURL accounting, listeners, theme change.
+  `tests/benchmarks/image-scenarios-r1.ts` adds the brand-trap, functional-icon, photograph, artwork,
+  screenshot and threshold scenarios (195 in total).
+- `e2e/image-r1.spec.ts` (M8.R1): per-site precedence, a forced Blob load failure (the page revokes
+  our URL and reloads the image), CSP, races, profile change, `emulateMedia` theme change, redirects
+  and CORS (`server.serveRaw(..., status)` serves a 302), brand/photo/threshold fixtures.
+- `e2e/image-adapt.spec.ts`, `e2e/image-policy.spec.ts`, `e2e/image-kit.ts`: real Chromium with real
+  PNG/APNG/GIF/SVG/JPEG fixtures (the PNG encoder is in `image-kit.ts`; the JPEG is made by the
+  browser's canvas). `server.serveRaw` serves binaries with headers, `server.hold(name)` stages a slow
+  download, a second `startPageServer()` is another origin. Rendered pixels are read through a canvas
+  and element screenshots; take any "before" screenshot with `adaptImages: false` (the layer is
+  asynchronous, a "before" taken after loading may already be adapted). Wait with `whenIdle`, never
+  sleep.
+
 ### Stability runs and the hostile-cycle test
+
+Stress tests that are slow only under contention get their own `{ timeout }` (the 300-chart
+retention test: 90 s); the global Vitest timeout stays 30 s. See `docs/PERFORMANCE.md`.
 
 Nothing in the E2E suites may depend on wall-clock timing. The one place where the pipeline itself
 reads a clock, the spaced repair of ColorAdapt's `<style>`, is asserted through counters

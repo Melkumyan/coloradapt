@@ -1,4 +1,5 @@
 import type { ChartDiagnostics } from './chart';
+import type { ImageDiagnostics } from './image';
 import type { SemanticDiagnostics } from './semantic';
 import type { SvgDiagnostics } from './svg';
 
@@ -71,6 +72,8 @@ export interface DynamicDiagnostics {
   readonly semantic: SemanticDiagnostics;
   /** Chart counters and gauges (docs/CHARTS.md). */
   readonly charts: ChartDiagnostics;
+  /** Raster-image counters and gauges (docs/IMAGE_ADAPTATION.md). */
+  readonly images: ImageDiagnostics;
   /** Full rescans' counterpart for semantics: elements re-examined by external invalidation (form events). */
   readonly semanticInvalidations: number;
 }

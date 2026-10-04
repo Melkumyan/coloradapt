@@ -600,3 +600,27 @@ What each suite proves (all in Chromium):
 NOT_VERIFIED in a real browser: the hidden-tab scheduler path (headless Chromium never
 reports `hidden`; unit-tested), `dispose()` (not reachable from the content script;
 unit-tested), actual garbage collection (proxies and a code audit only), Firefox (build only).
+
+## Images (M8)
+
+The image layer has no observer of its own. The regions M4 re-analyzes are also handed to
+`ImageController.update` (images in them are re-checked by a cheap key: source, natural size, load
+state, and the background if the decision depends on it); images that left the page are released on
+the same passes (the parents that lost a child). Two things M4 cannot see are covered without a
+second observer:
+
+- an image finishing to load, failing, or changing `src`/`srcset`/`<picture>` (none of those is an
+  observed attribute, but each fires `load` or `error`): one capture-phase listener on the
+  document, installed only while the layer is active;
+- a page theme change: a style-affecting mutation of an ancestor re-analyzes the images in that
+  region; a full rescan re-evaluates all of them. The cache key includes the background.
+
+- an OS color-scheme change that flips a page ground through CSS (no mutation): one
+  `matchMedia` `change` listener while the layer is active, re-checking only the background-dependent
+  images (M8.R1);
+- an adapted image that the page gives a `srcset`/`<picture>` choice: the next `load` shows a
+  `currentSrc` other than ours and the image is re-evaluated (our bitmap released).
+
+`src` is deliberately not in `OBSERVED_ATTRIBUTES`: the image layer's own `src` writes therefore
+produce no mutation records and cannot wake the pipeline (and `data-coloradapt-image` is an own
+attribute, filtered like the others). `DynamicDiagnostics.images` carries the image counters.

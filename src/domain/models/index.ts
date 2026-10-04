@@ -11,3 +11,4 @@ export * from './settings';
 export * from './dynamic';
 export * from './semantic';
 export * from './chart';
+export * from './image';
