@@ -165,7 +165,7 @@ overridden, inline `!important` is not adaptable.
   mutations are not delivered to the observer; a full refresh corrects the state.
 - Upstream M2 scientific status remains PARTIAL.
 
-Next after M6: **M7 — Charts & Data Visualization** (not started).
+Next after M6: **M7 — Charts & Data Visualization** (frozen by M7.R1 below).
 
 ## M6 — Semantic Accessibility ✅ (M6.R1 PASS)
 
@@ -220,17 +220,64 @@ Validation, not new vocabulary. Details in `docs/SEMANTIC_ACCESSIBILITY.md`.
 - **Stability** (final tree): semantic suites x50 50/50, full unit suite x5 5/5 (1136 tests),
   `pnpm verify` x3 3/3, Chromium E2E x5 5/5 (290 passed, 1 intentional skip: the hidden-tab
   scheduler path, unchanged; 291 tests), no retries. Firefox: build PASS, runtime NOT_VERIFIED.
-- Known (environmental, not an M6 regression): `r1-fixtures` "R1-5. infinite scroll" asserts that a
-  100-root batch fits the analyzer's 50 ms budget; on a loaded or thermally throttled machine it
-  fails, on the committed M5 baseline too (4 of 5 file-level runs in a degraded session).
-  Run the E2E suite on a quiet machine.
+- Known at the time (environmental, not an M6 regression; **fixed in M7**, below): `r1-fixtures`
+  "R1-5. infinite scroll" asserted that a 100-root batch fits the analyzer's 50 ms budget.
 - Upstream M2 scientific status remains PARTIAL.
 
-## M7 — Charts ⬜
+## M7 — Charts & Data Visualization ✅ (M7.R1 validation & freeze: PASS)
 
-- SVG chart color/pattern adaptation.
-- Canvas investigation (likely requires opt-in, given Canvas content isn't
-  introspectable the way DOM/SVG are).
+Details in `docs/CHARTS.md`.
+
+- **R1-5 made deterministic first.** Root cause: `analyzeSubtrees` defers every root after the
+  first once `now() - startedAt > maxDurationMs` (50 ms), so on a loaded machine a 100-root batch was
+  split over two passes and the exact per-pass counters of R1-5 failed. Fix, without touching
+  production semantics: the content script reads the build mode, and the E2E build
+  (`pnpm build:e2e` = `wxt build --mode e2e`, output `dist/chrome-mv3-e2e`) runs the analyzer on a
+  logical clock (`now: () => 0`), so which roots a pass handles depends only on the structural budgets
+  (1500 elements, 512 roots). The shipped build (`pnpm build`) is unchanged and keeps the real clock.
+  No sleep, retry, larger timeout or looser range. R1-5 x100: **100/100**.
+- A DOM-free chart core: facts -> classification (HIGH/MEDIUM/LOW/UNKNOWN, blockers) -> series ->
+  SVG legend mapping (key > token > color, else `ambiguous` and nothing is written) -> pairwise M2
+  analysis (series against series) -> a deterministic `ChartAdaptationPlan` with identity-stable
+  assignment (line style x marker, scatter shape, pattern) and honest `encoding-exhausted`.
+- Browser layer: owned `<defs>`, legend sample overlays, attributes + one static CSS portion (scatter shapes are `clip-path` / hollow rings on the points), legend synchronized,
+  verified against the browser (a mismatch rolls the whole chart back), reversible, idempotent, no
+  observer (M4 regions; self-mutations filtered; budget hand-back).
+- Ownership: M5 asks `owns(svg)` before planning; an owned chart is `chart-owned` and gets no color
+  rule. Heatmap, area, stacked bars, HTML legends, gradients (sequential/diverging), filters/masks/
+  animations: detected, not adapted. Canvas: classified (`canvas-chart` / `canvas-unknown`), never
+  touched, never patched.
+- `adaptCharts` default **true** (HIGH-confidence only; 0 false-positive claims in the benchmark and
+  the Chromium fixtures); migration tested (absent -> default, explicit values never overridden).
+- Benchmark: 39 chart scenarios, 0 unresolved pairs after, 0 false-positive claims. Real Chromium:
+  pixels, accessibility tree, hover/click/keyboard, dynamic series, CSS specificity, canvas, limits.
+- Not in M7: AI chart understanding, OCR, image recoloring, general Canvas interception, Shadow DOM,
+  iframes, HTML legend adaptation, data extraction, chart redesign. M2 stays PARTIAL.
+
+### M7.R1 — Chart Validation & Freeze ✅ PASS
+
+Legend correctness over chart coverage: a chart whose marks and legend cannot be kept in step is not
+adapted.
+
+- **HTML legend guard**: structural evidence (names, swatches, pseudo-elements, borders, glyphs, text
+  colored like a series, toggles, `aria-controls`, relations) near the chart refuses it whole; 15 variants
+  x above / below / beside in real Chromium; interactive HTML legends are never touched. A legend that
+  comes, goes, is recolored or moves is a change in the chart's neighbourhood and re-reads it (M4 passes
+  parents that lost a child, deleted or moved).
+- **Atomic ownership**: partial or disagreeing legend mapping inside the SVG refuses the chart whole.
+- **Resize / geometry bridge**: one `ResizeObserver` and one scoped `MutationObserver` (`d`/`points`) for
+  the tracked charts only, signalling M4; hatches and markers keep their pixel size; marker density is
+  re-checked; no leak across off / on, removal, `adaptCharts` off.
+- **Ordered palettes**: diverging and ordered scales are refused like sequential ones. **False
+  positives**: real Chromium found a network diagram, a calendar, an infographic and a timeline claimed
+  once they carried a `chart` id; axis evidence tightened (axis-aligned lines, aligned labels outside the
+  marks, two-dimensional scatter). 0 false-positive ownership in 23 curated traps (jsdom) and 16 in
+  Chromium.
+- **Benchmark**: 150 scenarios (143 charts + 7 canvases); 528 problematic pairs, 0 unresolved after,
+  0 legend-sync failures. E2E 480 passed / 1 skipped / 0 failed (M7.R1 added 131).
+- Investigated and left documented: dashed-line and clipped-point hit areas (no overlay that changes
+  event targets).
+- Frozen as `m7-charts`. Next: M8 — Image Adaptation (not started).
 
 ## M8 — Image Adaptation ⬜
 

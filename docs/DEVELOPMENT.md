@@ -49,13 +49,21 @@ pnpm test:e2e     # build, then real-Chromium E2E (Playwright) — not part of v
 
 ### Real-browser E2E
 
-`pnpm test:e2e` loads the built extension (`dist/chrome-mv3`) into Chromium
+`pnpm test:e2e` builds the **E2E variant** (`pnpm build:e2e` = `wxt build --mode e2e` ->
+`dist/chrome-mv3-e2e`) and loads it into Chromium
 (new headless mode, `channel: 'chromium'`) and drives it through the extension's
 service worker (settings via `chrome.storage.local`, adaptation via the same
 typed messages the popup sends). One-time browser install:
 `pnpm exec playwright install chromium`. Pages are served from `e2e/pages/` on
 `127.0.0.1` (content scripts only match http/https). Rules:
 
+- the E2E variant differs from the shipped build in one thing of ours: the content script runs the
+  analyzer on a logical clock (`now: () => 0`, `features/page-analysis/build-mode.ts`), so the 50 ms
+  analysis budget cannot split a batch on a slow machine; structural budgets (elements, roots) still
+  apply. Production keeps the real clock. (`wxt.config.ts` pins `DEV=false`, `PROD=true` and
+  `NODE_ENV=production` for this mode; WXT's own runtime still logs slightly more in a non-production
+  mode.) Why: the old `R1-5` test asserted exact per-pass counters that the 50 ms budget could split
+  on a loaded machine (docs/ROADMAP.md, M7);
 - no sleeps, retries, skips or loosened timeouts — wait for style flushes
   (`settle()`), or `expect.poll` for page-load adaptation;
 - one tab per test (messages address a tab by URL; the harness refuses to guess
@@ -175,6 +183,32 @@ pnpm exec playwright test e2e/semantic-cues.spec.ts e2e/semantic-dynamic.spec.ts
 pnpm exec playwright test e2e/semantic-adversarial.spec.ts e2e/semantic-surface.spec.ts e2e/semantic-layout.spec.ts e2e/semantic-peers.spec.ts
 ```
 
+### Charts (M7)
+
+```bash
+npx vitest run tests/core/charts tests/features/charts tests/benchmarks/chart-benchmark.test.ts
+pnpm build:e2e && npx playwright test e2e/chart-*.spec.ts
+```
+
+- `tests/core/charts`: the pure core on hand-built facts (`builders.ts`).
+- `tests/features/charts`: the controller and the pipeline in jsdom; `engine.ts` stands in for the
+  browser's CSS cascade (inheritance, `!important`, specificity) and layout (`data-box`), and has
+  markup generators for line/bar/scatter/pie/heatmap/area/stacked and non-chart SVGs.
+- `tests/benchmarks/chart-benchmark.test.ts` (+ `chart-scenarios.ts`, `chart-scenarios-r1.ts`): 150
+  scenarios (143 charts + 7 canvases, M7 and M7.R1); writes `benchmark-report/chart-benchmark.json` with
+  charts / supported / adapted / already distinguishable / unsupported / ambiguous / false-positive
+  ownership / legend-sync failures / encoding-exhausted, pairs before / after by dash / marker / pattern,
+  per category and per profile, and the structural counters.
+- `tests/features/charts/r1-*.test.ts`, `fixtures-r1.ts`: the M7.R1 jsdom suites (bridge, legends,
+  dynamic) and fixtures (non-charts, HTML legend variants, canvases, boundary padding).
+- `e2e/chart-r1-*.spec.ts`, `e2e/r1-fixtures.ts`: the M7.R1 real-browser suites (legends, resize and
+  geometry, library-shaped output and non-charts, interaction and accessibility); pages are served with
+  `server.serve`.
+- `e2e/pages/charts.html` + `e2e/chart-kit.ts`: deterministic plain-SVG fixtures built by
+  `window.chartKit` (line, bar, stacked, scatter, pie/donut, heatmap, area, logo, map-like,
+  diagram, icon, canvas) with hover/click/legend-toggle handlers. Pixels are read from screenshots,
+  never OCR.
+
 ### Stability runs and the hostile-cycle test
 
 Nothing in the E2E suites may depend on wall-clock timing. The one place where the pipeline itself
@@ -215,13 +249,15 @@ resolved. In short:
 
 - `src/domain` — pure types, no logic.
 - `src/core` — pure(ish) business logic (color math, DOM analysis, the isolated
-  SVG layer `core/svg`, the semantic core `core/semantics`, conflict detection, adaptation).
+  SVG layer `core/svg`, the semantic core `core/semantics`, the chart core `core/charts`,
+  conflict detection, adaptation).
   No React, no `wxt/browser`.
 - `src/infrastructure` — the only layer allowed to import `wxt/browser`
   (storage, messaging).
 - `src/features` — React hooks and the content-script controllers that wire
   `core` + `infrastructure` together; `features/dynamic-analysis` is the only
-  place that uses `MutationObserver`.
+  place that uses `MutationObserver`; `features/charts` (M7) reads chart SVGs and applies
+  chart plans (no observer of its own).
 - `src/entrypoints` — thin WXT entrypoints (background, content script,
   popup, options).
 

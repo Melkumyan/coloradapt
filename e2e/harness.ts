@@ -17,7 +17,7 @@ declare const chrome: {
 };
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const EXTENSION_PATH = path.join(ROOT, 'dist', 'chrome-mv3');
+const EXTENSION_PATH = path.join(ROOT, 'dist', 'chrome-mv3-e2e');
 const PAGES_DIR = path.join(import.meta.dirname, 'pages');
 const DEMO_PAGE = path.join(ROOT, 'demo', 'index.html');
 const SETTINGS_KEY = 'coloradapt:settings';

@@ -1,5 +1,6 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { createDynamicContentController } from '@features/dynamic-analysis';
+import { analyzerOptionsForMode } from '@features/page-analysis';
 import { resolveEffectiveSettings } from '@features/settings';
 import { getHostname } from '@infrastructure/browser';
 import { registerMessageRouter, sendToBackground } from '@infrastructure/messaging';
@@ -7,7 +8,10 @@ import { registerMessageRouter, sendToBackground } from '@infrastructure/messagi
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
   main() {
-    const controller = createDynamicContentController(document);
+    // The E2E build runs the analyzer on a logical clock (docs/DEVELOPMENT.md); every other build,
+    // the shipped one included, uses the real clock.
+    const mode = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE;
+    const controller = createDynamicContentController(document, analyzerOptionsForMode(mode));
     const getEffectiveSettings = async () =>
       resolveEffectiveSettings(
         await sendToBackground('GET_SETTINGS', undefined),

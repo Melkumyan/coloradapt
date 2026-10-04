@@ -39,6 +39,7 @@ const COLOR_TOLERANCE = 1.5 / 255;
 
 /** Reasons in the order they are reported when several apply. */
 const REASON_PRIORITY: readonly SvgUnsupportedReason[] = [
+  'chart-owned',
   'foreign-object',
   'embedded-image',
   'animated',
@@ -70,6 +71,8 @@ export interface SvgAnalysisEnvironment {
   readonly probe?: SvgStyleProbe;
   /** Elements a running animation drives a paint property on (CSS or Web Animations). */
   readonly animatedTargets?: ReadonlySet<Element>;
+  /** The chart layer's answer to "is this SVG yours?" (M7); an owned SVG is never adapted here. */
+  readonly isChartOwned?: (svg: Element) => boolean;
 }
 
 export interface SvgUnitResult {
@@ -428,6 +431,7 @@ function finishUnit(draft: Draft, env: SvgAnalysisEnvironment): SvgUnitResult {
   const paintCount = distinct.size;
 
   const reasons = new Set(draft.reasons);
+  if (env.isChartOwned?.(root)) reasons.add('chart-owned');
   if (
     paintCount >= 2 &&
     textCount >= SVG_BUDGET.chartLikeMinTextElements &&

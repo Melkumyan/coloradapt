@@ -2,6 +2,7 @@ import { analyzeDocument, toAnalysisResult, type AnalyzeDocumentOptions } from '
 import { createDetailedAdaptationPlan, StylesheetManager } from '@core/adaptation';
 import { detectColorConflict } from '@core/conflicts';
 import type { AdaptationPlan, AnalysisResult, ColorConflict, UserSettings } from '@domain/models';
+import { ChartController, type ChartEnvironment } from '../charts';
 import { findNotAdaptable } from './adaptability';
 import {
   SemanticCueController,
@@ -46,6 +47,11 @@ export interface ContentController {
   readonly incremental: IncrementalAdaptation;
   /** What the semantic layer makes of one element (read-only; for tests and debugging). */
   inspectSemantics(element: Element): SemanticInspection;
+  /**
+   * Lets the chart layer ask for a pass over one chart whose size or path structure changed (docs/CHARTS.md,
+   * "Resize and geometry"). The dynamic pipeline binds it while it runs; `null` unbinds.
+   */
+  bindChartInvalidation(invalidate: ((svg: Element) => void) | null): void;
 }
 
 /**
@@ -67,15 +73,22 @@ export interface ContentController {
 export function createContentController(
   doc: Document = document,
   analyzerOptions: Partial<AnalyzeDocumentOptions> = {},
-  semanticOptions: { readonly env?: FactsEnvironment } = {},
+  semanticOptions: { readonly env?: FactsEnvironment; readonly chartEnv?: ChartEnvironment } = {},
 ): ContentController {
   const stylesheetManager = new StylesheetManager(doc);
+  // The chart layer (M7) decides which SVGs are its own; the SVG analyzer asks it before adapting one.
+  const charts = new ChartController({
+    doc,
+    sheet: stylesheetManager,
+    ...(semanticOptions.chartEnv ? { env: semanticOptions.chartEnv } : {}),
+  });
   // Analysis reads the page's own styles through the stylesheet manager; inline SVGs are told
   // apart (currentColor / inherited / explicit) by a probe that goes through the same <style>.
   analyzerOptions = {
     ...analyzerOptions,
     probeStyles:
       analyzerOptions.probeStyles ?? ((css, read) => stylesheetManager.withProbe(css, read)),
+    isChartOwned: analyzerOptions.isChartOwned ?? ((svg: Element) => charts.owns(svg)),
   };
   let lastAnalysis: AnalysisResult | null = null;
   /** Elements whose effective foreground cannot be reproduced by a plain `color` rule. */
@@ -90,10 +103,12 @@ export function createContentController(
     stylesheetManager,
     analyzerOptions,
     semantic,
+    charts,
   );
   const getStyle = analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
 
   function analyze(url: string, settings: UserSettings): AnalysisResult {
+    charts.configure(settings);
     const { pass, unsafe } = stylesheetManager.withOriginalStyles(() => {
       const analysisPass = analyzeDocument({ ...analyzerOptions, root: doc });
       return {
@@ -171,11 +186,18 @@ export function createContentController(
   }
 
   return {
-    analyze,
+    analyze(url, settings) {
+      try {
+        return analyze(url, settings);
+      } finally {
+        charts.endPass();
+      }
+    },
     getLastAnalysis: () => lastAnalysis,
     enableAdaptation,
     disableAdaptation,
     incremental: session,
     inspectSemantics: (element) => semantic.inspect(element),
+    bindChartInvalidation: (invalidate) => charts.bindInvalidation(invalidate),
   };
 }

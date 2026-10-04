@@ -113,6 +113,27 @@ inside the incremental pass and are drained with the rest; a regression test ass
 page does exactly zero further work and another that the records are classified as ColorAdapt's own.
 A page deleting a `<style>` that holds only cue CSS is repaired like any other (`hasInjectedContent`).
 
+**M7 chart layer.** There is no second observer: `ChartController.update(roots)` is called by the
+incremental session with the roots M4 resolved, and a region inside an inline SVG is treated as the
+SVG it belongs to. What M7 writes is covered by the self-mutation filter: every attribute starts with
+`data-coloradapt-`, and a child-list record whose every added/removed node is ColorAdapt's `<style>`
+or carries `data-coloradapt-chart-node` (the owned `<defs>` and decorative overlays) is ColorAdapt's
+own. The observer subscription grew by `stroke-dasharray`, `marker-start/mid/end`, `data-series`
+and `data-series-name` (`SVG_PAINT_ATTRIBUTES`), and `stroke-dasharray` joined the relevant inline
+style properties: a dash is one of the channels that tell series apart. `ChartController.update`
+returns how many regions it handled; the session reports the smaller of that and the color pass's
+`rootsConsumed`, so a chart-heavy region goes back to the batcher whole (budget hand-back). When only
+elements left the page, `updatePeers` also lets the chart layer drop the artifacts of a removed chart.
+M7.R1 adds two things to the same flow. `ResolvedBatch.departures` lists the parents that lost a child,
+deleted _or moved_ (bounded to 64 per batch); `update(roots, anchors)` / `updatePeers(seeds, departures)`
+hand them to the chart layer, which re-reads every tracked chart whose legend neighbourhood (the parent and
+grandparent of its `<svg>`) contains a root or an anchor - a legend that appears, goes, is recolored or moves
+cannot leave an adapted chart behind. And `invalidate(element, 'chart')` is how the chart layer's resize /
+geometry bridge (`ResizeObserver` for the tracked charts, a `MutationObserver` scoped to them for `d` and
+`points`) asks for a pass over one chart: the same batched path as every other pass, counted by the chart
+diagnostics (`resizeSignals`, `geometrySignals`), not by `semanticInvalidations`. `d` and `points` are
+deliberately not in `OBSERVED_ATTRIBUTES`: a page animating them would flood the page-wide observer.
+
 **M6 observer subscription.** The attribute filter grew by the semantic attributes (`SEMANTIC_ATTRIBUTES`);
 every other `data-*` is still not delivered. Native form validity changes without any mutation, so
 `features/semantics/native-validity-bridge.ts` installs five passive capture listeners (`input`,
@@ -363,6 +384,8 @@ logged): `mutationRecords`, `batches`, `incrementalPasses`, `fullRescans`,
 rescan or repair is waiting on its timer). The gauges exist so retention and
 settling can be asserted from outside: after a flush everything but `state: IDLE`,
 `trackedElements` and `rules` is zero/null/false.
+
+M7 adds `charts` (the chart-layer counters and leak gauges of `docs/CHARTS.md`: `chartsDetected`, `chartsSupported`, `chartsUnsupported`, `seriesAnalyzed`, `seriesAdapted`, `legendsMapped`, `patternsCreated`, `markersCreated`, `overlaysCreated`, `chartNotApplied`, `canvasCharts`, `canvasUnknown`, `chartPasses`, `chartPassesSkipped`, `marksScanned`, and the gauges `chartOwners`, `chartDefs`, `chartOverlays`, `chartRules`, `chartPending`; M7.R1: `chartWatched`, `watchSubscriptions`, `resizeSignals`, `geometrySignals`, `legendItemsScanned`, `seriesEvaluated`).
 
 M6 adds `semantic` (the cue counters of `docs/SEMANTIC_ACCESSIBILITY.md`: candidates, classified,
 unknown, conflicts, color-only detected, cues planned/applied/not applied/removed, passes, roots, and

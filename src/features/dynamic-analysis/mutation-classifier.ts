@@ -55,6 +55,13 @@ export const OBSERVED_ATTRIBUTES: readonly string[] = [
   'filter',
   'mask',
   'mix-blend-mode',
+  // What tells chart series apart without color (M7, docs/CHARTS.md).
+  'stroke-dasharray',
+  'marker-start',
+  'marker-mid',
+  'marker-end',
+  'data-series',
+  'data-series-name',
   ...SEMANTIC_ATTRIBUTES,
 ];
 
@@ -76,6 +83,12 @@ const SVG_PAINT_ATTRIBUTES: ReadonlySet<string> = new Set([
   'filter',
   'mask',
   'mix-blend-mode',
+  'stroke-dasharray',
+  'marker-start',
+  'marker-mid',
+  'marker-end',
+  'data-series',
+  'data-series-name',
 ]);
 
 /** On `<html>`/`<body>` any theme-switch attribute (`data-theme`, `data-bs-theme`, ...) counts. */

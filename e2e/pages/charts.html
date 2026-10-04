@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ColorAdapt E2E charts</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #ffffff;
+        font: 14px sans-serif;
+        color: #222;
+      }
+      .wrap {
+        display: inline-block;
+        position: relative;
+        margin: 4px;
+        vertical-align: top;
+      }
+      .legend-html {
+        list-style: none;
+        margin: 4px 0 0;
+        padding: 0;
+        display: flex;
+        gap: 12px;
+      }
+      .legend-html .sw {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin-right: 4px;
+        vertical-align: middle;
+      }
+      #tip {
+        position: fixed;
+        left: 520px;
+        top: 8px;
+        padding: 2px 6px;
+        border: 1px solid #888;
+        background: #fff;
+      }
+      .legend-item {
+        cursor: pointer;
+      }
+      .legend-item:focus {
+        outline: 2px solid #1a73e8;
+      }
+      canvas {
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="tip" hidden></p>
+    <div id="host"></div>
+    <script>
+      const NS = 'http://www.w3.org/2000/svg';
+      const W = 480;
+      const H = 320;
+      const PLOT = { x0: 50, x1: 440, y0: 20, y1: 270 };
+
+      function el(tag, attrs, parent) {
+        const node = document.createElementNS(NS, tag);
+        for (const [k, v] of Object.entries(attrs || {}))
+          if (v !== null && v !== undefined) node.setAttribute(k, v);
+        if (parent) parent.appendChild(node);
+        return node;
+      }
+      function txt(parent, attrs, content) {
+        const t = el('text', attrs, parent);
+        t.textContent = content;
+        return t;
+      }
+
+      /** Deterministic pseudo-random numbers (an LCG): fixtures never vary between runs. */
+      function rng(seed) {
+        let s = seed >>> 0;
+        return () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+      }
+
+      window.__log = { hovered: [], clicked: [], toggled: [] };
+      const tip = document.getElementById('tip');
+
+      function root(opts, cls) {
+        const wrap = document.createElement('div');
+        wrap.className = 'wrap';
+        wrap.id = opts.id + '-wrap';
+        const svg = el('svg', {
+          id: opts.id,
+          class: cls,
+          width: W,
+          height: H,
+          viewBox: `0 0 ${W} ${H}`,
+        });
+        if (opts.label) svg.setAttribute('aria-label', opts.label);
+        if (opts.role) svg.setAttribute('role', opts.role);
+        wrap.appendChild(svg);
+        return { wrap, svg };
+      }
+
+      function axes(svg) {
+        const gx = el(
+          'g',
+          { class: 'axis x-axis', fill: 'none', transform: `translate(0,${PLOT.y1})` },
+          svg,
+        );
+        el('path', { class: 'domain', stroke: '#666', d: `M${PLOT.x0} 0 H${PLOT.x1}` }, gx);
+        for (let i = 0; i <= 5; i += 1) {
+          const x = PLOT.x0 + (i * (PLOT.x1 - PLOT.x0)) / 5;
+          const g = el('g', { class: 'tick', transform: `translate(${x},0)` }, gx);
+          el('line', { stroke: '#666', y2: 6 }, g);
+          txt(g, { fill: '#222', y: 18, 'text-anchor': 'middle', 'font-size': 10 }, String(i * 10));
+        }
+        const gy = el(
+          'g',
+          { class: 'axis y-axis', fill: 'none', transform: `translate(${PLOT.x0},0)` },
+          svg,
+        );
+        el('path', { class: 'domain', stroke: '#666', d: `M0 ${PLOT.y0} V${PLOT.y1}` }, gy);
+        for (let i = 0; i <= 4; i += 1) {
+          const y = PLOT.y1 - (i * (PLOT.y1 - PLOT.y0)) / 4;
+          const g = el('g', { class: 'tick', transform: `translate(0,${y})` }, gy);
+          el('line', { stroke: '#666', x2: -6 }, g);
+          txt(
+            g,
+            { fill: '#222', x: -9, dy: '0.32em', 'text-anchor': 'end', 'font-size': 10 },
+            String(i * 25),
+          );
+        }
+      }
+
+      /** D3-style legend: g.legend > g.legend-item > (swatch, text). `kind`: line | box | dot. */
+      function legend(svg, opts, items, kind) {
+        if (opts.legend === 'none' || opts.legend === 'html' || !opts.legend) return;
+        const g = el('g', { class: 'legend', transform: 'translate(330,8)' }, svg);
+        items.forEach((item, i) => {
+          const it = el('g', { class: 'legend-item', transform: `translate(0,${i * 16})` }, g);
+          if (opts.interactive) {
+            it.setAttribute('tabindex', '0');
+            it.setAttribute('role', 'button');
+            it.setAttribute('aria-pressed', 'true');
+            it.setAttribute('aria-label', 'Toggle ' + item.name);
+            const toggle = () => {
+              const target = svg.querySelectorAll(`[data-s="${item.name}"]`);
+              const off = it.getAttribute('aria-pressed') === 'true';
+              it.setAttribute('aria-pressed', off ? 'false' : 'true');
+              target.forEach((n) => n.setAttribute('visibility', off ? 'hidden' : 'visible'));
+              window.__log.toggled.push(item.name + ':' + (off ? 'off' : 'on'));
+            };
+            it.addEventListener('click', toggle);
+            it.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggle();
+              }
+            });
+          }
+          const common = { class: 'swatch', 'data-series': opts.keys ? item.name : null };
+          if (kind === 'line') {
+            el(
+              'line',
+              {
+                ...common,
+                x1: 0,
+                x2: 20,
+                y1: 5,
+                y2: 5,
+                stroke: item.color,
+                'stroke-width': 2,
+                'stroke-dasharray': item.dash || null,
+              },
+              it,
+            );
+          } else if (kind === 'dot') {
+            el('circle', { ...common, cx: 5, cy: 5, r: 5, fill: item.color }, it);
+          } else {
+            el('rect', { ...common, width: 10, height: 10, fill: item.fill || item.color }, it);
+          }
+          txt(
+            it,
+            { x: kind === 'line' ? 26 : 16, y: 10, fill: '#222', 'font-size': 11 },
+            item.name,
+          );
+        });
+      }
+
+      function htmlLegend(wrap, items) {
+        const ul = document.createElement('ul');
+        ul.className = 'legend-html';
+        for (const item of items) {
+          const li = document.createElement('li');
+          const sw = document.createElement('span');
+          sw.className = 'sw';
+          sw.style.backgroundColor = item.color;
+          li.appendChild(sw);
+          li.appendChild(document.createTextNode(item.name));
+          ul.appendChild(li);
+        }
+        wrap.appendChild(ul);
+      }
+
+      function attach(opts, wrap) {
+        (opts.into
+          ? document.getElementById(opts.into)
+          : document.getElementById('host')
+        ).appendChild(wrap);
+        return wrap.querySelector('svg');
+      }
+
+      function interactive(node, name) {
+        node.setAttribute('data-s', name);
+        node.addEventListener('mouseover', () => {
+          tip.hidden = false;
+          tip.textContent = name;
+          window.__log.hovered.push(name);
+        });
+        node.addEventListener('mouseout', () => (tip.hidden = true));
+        node.addEventListener('click', () => window.__log.clicked.push(name));
+      }
+
+      function defsFor(svg) {
+        return svg.querySelector('defs.page-defs') || el('defs', { class: 'page-defs' }, svg);
+      }
+
+      window.chartKit = {
+        /**
+         * opts: { id, series: [{ name, color, dash?, marker?, values? }], points?, legend?: 'svg'|'html'|'none',
+         *         legendKind?: 'line'|'box', keys?, direct?, interactive?, label?, role?, into? }
+         */
+        line(opts) {
+          const { wrap, svg } = root(opts, 'chart line-chart');
+          axes(svg);
+          const n = opts.points || 8;
+          const plot = el('g', { class: 'plot' }, svg);
+          const rand = rng(7);
+          opts.series.forEach((s, i) => {
+            const values =
+              s.values ||
+              Array.from(
+                { length: n },
+                (_, k) => 30 + i * 6 + 40 * Math.sin(k / 1.3 + i) + rand() * 10,
+              );
+            const d = values
+              .map(
+                (v, k) =>
+                  `${k === 0 ? 'M' : 'L'}${(PLOT.x0 + (k * (PLOT.x1 - PLOT.x0 - 60)) / (n - 1)).toFixed(1)} ${(PLOT.y1 - v * 2).toFixed(1)}`,
+              )
+              .join(' ');
+            let markerRef = null;
+            if (s.marker) {
+              const id = `${opts.id}-mk-${i}`;
+              const m = el(
+                'marker',
+                {
+                  id,
+                  markerWidth: 8,
+                  markerHeight: 8,
+                  refX: 4,
+                  refY: 4,
+                  markerUnits: 'userSpaceOnUse',
+                },
+                defsFor(svg),
+              );
+              if (s.marker === 'square')
+                el('rect', { x: 1, y: 1, width: 6, height: 6, fill: s.color }, m);
+              else el('circle', { cx: 4, cy: 4, r: 3, fill: s.color }, m);
+              markerRef = `url(#${id})`;
+            }
+            const path = el(
+              'path',
+              {
+                class: `series series-${i}`,
+                'data-series': opts.keys ? s.name : null,
+                fill: 'none',
+                stroke: s.color,
+                'stroke-width': s.width || 2,
+                'stroke-dasharray': s.dash || null,
+                'marker-mid': markerRef,
+                d,
+              },
+              plot,
+            );
+            if (opts.interactive) interactive(path, s.name);
+            if (opts.direct) {
+              const lastX = PLOT.x0 + PLOT.x1 - PLOT.x0 - 60;
+              const lastY = PLOT.y1 - values[values.length - 1] * 2;
+              txt(
+                plot,
+                { class: 'direct', x: lastX + 6, y: lastY + 4, fill: s.color, 'font-size': 11 },
+                s.name,
+              );
+            }
+          });
+          legend(svg, opts, opts.series, opts.legendKind || 'line');
+          const out = attach(opts, wrap);
+          if (opts.legend === 'html') htmlLegend(wrap, opts.series);
+          return out.id;
+        },
+
+        /** Grouped bars: opts.series[{name,color,pattern?}], opts.categories (default 4). */
+        bar(opts) {
+          const { wrap, svg } = root(opts, 'chart bar-chart');
+          axes(svg);
+          const cats = opts.categories || 4;
+          const k = opts.series.length;
+          const rand = rng(11);
+          const plot = el('g', { class: 'plot' }, svg);
+          const groupW = (PLOT.x1 - PLOT.x0 - 40) / cats;
+          const barW = Math.min(30, (groupW - 12) / k);
+          for (let c = 0; c < cats; c += 1) {
+            opts.series.forEach((s, i) => {
+              const h = 40 + rand() * 150;
+              const x = PLOT.x0 + 20 + c * groupW + i * barW;
+              const rect = el(
+                'rect',
+                {
+                  class: `bar bar-${i}`,
+                  'data-series': opts.keys ? s.name : null,
+                  fill: s.fill || s.color,
+                  x,
+                  y: PLOT.y1 - h,
+                  width: barW - 2,
+                  height: h,
+                },
+                plot,
+              );
+              if (opts.interactive) interactive(rect, s.name);
+            });
+          }
+          legend(svg, opts, opts.series, 'box');
+          const out = attach(opts, wrap);
+          if (opts.legend === 'html') htmlLegend(wrap, opts.series);
+          return out.id;
+        },
+
+        /** Stacked bars (classified, not adapted). */
+        stacked(opts) {
+          const { wrap, svg } = root(opts, 'chart bar-chart stacked');
+          axes(svg);
+          const cats = 4;
+          const plot = el('g', { class: 'plot' }, svg);
+          const groupW = (PLOT.x1 - PLOT.x0 - 40) / cats;
+          for (let c = 0; c < cats; c += 1) {
+            let top = PLOT.y1;
+            opts.series.forEach((s, i) => {
+              const h = 30 + ((c * 17 + i * 29) % 50);
+              top -= h;
+              el(
+                'rect',
+                {
+                  class: `bar bar-${i}`,
+                  fill: s.color,
+                  x: PLOT.x0 + 20 + c * groupW,
+                  y: top,
+                  width: groupW - 16,
+                  height: h,
+                },
+                plot,
+              );
+            });
+          }
+          legend(svg, opts, opts.series, 'box');
+          return attach(opts, wrap).id;
+        },
+
+        scatter(opts) {
+          const { wrap, svg } = root(opts, 'chart scatter-chart');
+          axes(svg);
+          const rand = rng(23);
+          const plot = el('g', { class: 'plot' }, svg);
+          opts.series.forEach((s, i) => {
+            for (let n = 0; n < (opts.points || 12); n += 1) {
+              const c = el(
+                'circle',
+                {
+                  class: `dot dot-${i}`,
+                  'data-series': opts.keys ? s.name : null,
+                  cx: (PLOT.x0 + 20 + rand() * 360).toFixed(1),
+                  cy: (PLOT.y0 + 10 + rand() * 230).toFixed(1),
+                  r: 4,
+                  fill: s.color,
+                },
+                plot,
+              );
+              if (opts.interactive) interactive(c, s.name);
+            }
+          });
+          legend(svg, opts, opts.series, 'dot');
+          const out = attach(opts, wrap);
+          if (opts.legend === 'html') htmlLegend(wrap, opts.series);
+          return out.id;
+        },
+
+        pie(opts) {
+          const { wrap, svg } = root(opts, 'chart pie-chart');
+          const cx = 160;
+          const cy = 160;
+          const r = 110;
+          const ri = opts.donut ? 60 : 0;
+          const total = opts.series.reduce((sum, s) => sum + (s.value || 1), 0);
+          let angle = -Math.PI / 2;
+          const plot = el('g', { class: 'plot', transform: '' }, svg);
+          opts.series.forEach((s, i) => {
+            const a2 = angle + ((s.value || 1) / total) * Math.PI * 2;
+            const large = a2 - angle > Math.PI ? 1 : 0;
+            const p = (a, rad) =>
+              `${(cx + rad * Math.cos(a)).toFixed(2)} ${(cy + rad * Math.sin(a)).toFixed(2)}`;
+            const d = opts.donut
+              ? `M${p(angle, r)} A${r} ${r} 0 ${large} 1 ${p(a2, r)} L${p(a2, ri)} A${ri} ${ri} 0 ${large} 0 ${p(angle, ri)} Z`
+              : `M${cx} ${cy} L${p(angle, r)} A${r} ${r} 0 ${large} 1 ${p(a2, r)} Z`;
+            const path = el(
+              'path',
+              {
+                class: `slice slice-${i}`,
+                'data-series': opts.keys ? s.name : null,
+                fill: s.color,
+                stroke: '#ffffff',
+                'stroke-width': 1,
+                d,
+              },
+              plot,
+            );
+            if (opts.interactive) interactive(path, s.name);
+            angle = a2;
+          });
+          legend(svg, opts, opts.series, 'box');
+          const out = attach(opts, wrap);
+          if (opts.legend === 'html') htmlLegend(wrap, opts.series);
+          return out.id;
+        },
+
+        /** Sequential heatmap: a 6x6 grid of one hue (never adapted). */
+        heatmap(opts) {
+          const { wrap, svg } = root(opts, 'chart heatmap');
+          axes(svg);
+          const plot = el('g', { class: 'plot' }, svg);
+          for (let r = 0; r < 6; r += 1) {
+            for (let c = 0; c < 6; c += 1) {
+              const t = (r * 6 + c) / 35;
+              const shade = Math.round(235 - t * 170);
+              el(
+                'rect',
+                {
+                  class: 'cell',
+                  x: PLOT.x0 + 10 + c * 40,
+                  y: PLOT.y0 + 6 + r * 38,
+                  width: 38,
+                  height: 36,
+                  fill: `rgb(${shade}, ${shade + 10}, 255)`,
+                },
+                plot,
+              );
+            }
+          }
+          return attach(opts, wrap).id;
+        },
+
+        /** Filled areas (classified, not adapted). */
+        area(opts) {
+          const { wrap, svg } = root(opts, 'chart area-chart');
+          axes(svg);
+          const plot = el('g', { class: 'plot' }, svg);
+          opts.series.forEach((s, i) => {
+            const pts = Array.from(
+              { length: 8 },
+              (_, k) => `${PLOT.x0 + k * 55},${PLOT.y1 - 30 - i * 25 - ((k * 31 + i * 17) % 60)}`,
+            );
+            el(
+              'path',
+              {
+                class: `area area-${i}`,
+                fill: s.color,
+                'fill-opacity': 0.6,
+                d: `M${PLOT.x0},${PLOT.y1} L${pts.join(' L')} L${PLOT.x0 + 7 * 55},${PLOT.y1} Z`,
+              },
+              plot,
+            );
+          });
+          legend(svg, opts, opts.series, 'box');
+          return attach(opts, wrap).id;
+        },
+
+        /** A complex colorful SVG with labels but no axes or legend: a map-like illustration. */
+        ambiguous(opts) {
+          const { wrap, svg } = root(opts, 'map');
+          const palette = [
+            '#e63946',
+            '#f1faee',
+            '#a8dadc',
+            '#457b9d',
+            '#1d3557',
+            '#ffb703',
+            '#fb8500',
+          ];
+          const rand = rng(5);
+          for (let i = 0; i < 36; i += 1) {
+            const x = (i % 6) * 70 + 20;
+            const y = Math.floor(i / 6) * 48 + 14;
+            el(
+              'path',
+              {
+                fill: palette[i % palette.length],
+                stroke: '#ffffff',
+                d: `M${x} ${y} l${40 + rand() * 20} ${rand() * 10} l${rand() * 10} ${30 + rand() * 12} l-${40 + rand() * 20} ${rand() * 8} z`,
+              },
+              svg,
+            );
+          }
+          txt(svg, { x: 30, y: 30, fill: '#000' }, 'North');
+          txt(svg, { x: 300, y: 250, fill: '#000' }, 'South');
+          txt(svg, { x: 200, y: 140, fill: '#000' }, 'Central');
+          return attach(opts, wrap).id;
+        },
+
+        logo(opts) {
+          const { wrap, svg } = root({ ...opts }, 'logo');
+          svg.setAttribute('viewBox', '0 0 100 100');
+          svg.setAttribute('width', 96);
+          svg.setAttribute('height', 96);
+          const arcs = [
+            ['#e63946', 'M50 50 L90 50 A40 40 0 0 1 50 90 Z'],
+            ['#457b9d', 'M50 50 L50 90 A40 40 0 0 1 10 50 Z'],
+            ['#1d3557', 'M50 50 L10 50 A40 40 0 0 1 50 10 Z'],
+            ['#ffb703', 'M50 50 L50 10 A40 40 0 0 1 90 50 Z'],
+          ];
+          for (const [fill, d] of arcs) el('path', { fill, d }, svg);
+          return attach(opts, wrap).id;
+        },
+
+        diagram(opts) {
+          const { wrap, svg } = root(opts, 'diagram');
+          const colors = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#264653'];
+          colors.forEach((c, i) => {
+            const x = 20 + i * 75;
+            const y = 30 + (i % 3) * 80;
+            el(
+              'rect',
+              { x, y, width: 60 + (i % 2) * 8, height: 36 + (i % 3) * 6, fill: c, rx: 4 },
+              svg,
+            );
+            txt(svg, { x: x + 6, y: y + 22, fill: '#fff', 'font-size': 11 }, 'Step ' + i);
+          });
+          for (let i = 0; i < 5; i += 1)
+            el(
+              'path',
+              {
+                fill: 'none',
+                stroke: '#555',
+                d: `M${80 + i * 75} 50 H${95 + i * 75} V${110 + (i % 2) * 20}`,
+              },
+              svg,
+            );
+          return attach(opts, wrap).id;
+        },
+
+        icon(opts) {
+          const { wrap, svg } = root(opts, 'icon');
+          svg.setAttribute('viewBox', '0 0 24 24');
+          svg.setAttribute('width', 24);
+          svg.setAttribute('height', 24);
+          for (let i = 0; i < 6; i += 1)
+            el('path', { fill: '#333', d: `M${i} ${i} h8 v8 h-8 z` }, svg);
+          return attach(opts, wrap).id;
+        },
+
+        canvas(opts) {
+          const wrap = document.createElement('div');
+          wrap.className = 'wrap ' + (opts.wrapClass || '');
+          const canvas = document.createElement('canvas');
+          canvas.id = opts.id;
+          canvas.width = 240;
+          canvas.height = 120;
+          if (opts.class) canvas.className = opts.class;
+          if (opts.label) canvas.setAttribute('aria-label', opts.label);
+          wrap.appendChild(canvas);
+          document.getElementById('host').appendChild(wrap);
+          const ctx = canvas.getContext('2d');
+          const colors = opts.colors || ['#d62728', '#2ca02c', '#1f77b4'];
+          colors.forEach((c, i) => {
+            ctx.fillStyle = c;
+            ctx.fillRect(10 + i * 70, 120 - (30 + i * 20), 50, 30 + i * 20);
+          });
+          return canvas.id;
+        },
+
+        /** Appends one series (path + legend entry) to an existing line chart, as a framework would. */
+        addSeries(id, s) {
+          const svg = document.getElementById(id);
+          const plot = svg.querySelector('g.plot');
+          const index = svg.querySelectorAll('path.series').length;
+          const n = 8;
+          const values =
+            s.values ||
+            Array.from({ length: n }, (_, k) => 40 + index * 6 + 30 * Math.sin(k / 1.3 + index));
+          const d = values
+            .map(
+              (v, k) =>
+                `${k === 0 ? 'M' : 'L'}${(PLOT.x0 + (k * (PLOT.x1 - PLOT.x0 - 60)) / (n - 1)).toFixed(1)} ${(PLOT.y1 - v * 2).toFixed(1)}`,
+            )
+            .join(' ');
+          const path = el(
+            'path',
+            {
+              class: `series series-${index}`,
+              fill: 'none',
+              stroke: s.color,
+              'stroke-width': 2,
+              'stroke-dasharray': s.dash || null,
+              d,
+            },
+            plot,
+          );
+          interactive(path, s.name);
+          const g = svg.querySelector('g.legend');
+          if (g) {
+            const it = el(
+              'g',
+              { class: 'legend-item', transform: `translate(0,${index * 16})` },
+              g,
+            );
+            el(
+              'line',
+              {
+                class: 'swatch',
+                x1: 0,
+                x2: 20,
+                y1: 5,
+                y2: 5,
+                stroke: s.color,
+                'stroke-width': 2,
+                'stroke-dasharray': s.dash || null,
+              },
+              it,
+            );
+            txt(it, { x: 26, y: 10, fill: '#222', 'font-size': 11 }, s.name);
+          }
+        },
+        /** Removes a series (path and legend entry) by its name. */
+        removeSeries(id, name) {
+          const svg = document.getElementById(id);
+          const paths = [...svg.querySelectorAll('path.series')];
+          const items = [...svg.querySelectorAll('g.legend-item')];
+          const index = items.findIndex((it) => it.querySelector('text').textContent === name);
+          paths[index].remove();
+          items[index].remove();
+        },
+        /** Recolors a series in the chart and in its legend (a theme or palette change). */
+        recolor(id, index, color) {
+          const svg = document.getElementById(id);
+          svg.querySelectorAll('path.series')[index].setAttribute('stroke', color);
+          const swatch = svg.querySelectorAll('g.legend-item .swatch')[index];
+          if (swatch) swatch.setAttribute('stroke', color);
+        },
+        /** Changes a series' data: only the `d` attribute moves, as a chart library animating or refreshing does. */
+        updateData(id, index, values) {
+          const svg = document.getElementById(id);
+          const n = values.length;
+          svg
+            .querySelectorAll('path.series')
+            [index].setAttribute(
+              'd',
+              values
+                .map(
+                  (v, k) =>
+                    `${k === 0 ? 'M' : 'L'}${(PLOT.x0 + (k * (PLOT.x1 - PLOT.x0 - 60)) / (n - 1)).toFixed(1)} ${(PLOT.y1 - v * 2).toFixed(1)}`,
+                )
+                .join(' '),
+            );
+        },
+        remove(id) {
+          const wrap =
+            document.getElementById(id + '-wrap') || document.getElementById(id).closest('.wrap');
+          wrap.remove();
+        },
+        clear() {
+          document.getElementById('host').replaceChildren();
+        },
+        /** Re-renders in place (a framework replacing the subtree): same container, new nodes. */
+        replace(kind, opts) {
+          const old = document.getElementById(opts.id + '-wrap');
+          const holder = document.createElement('div');
+          holder.id = 'replace-holder';
+          document.getElementById('host').appendChild(holder);
+          if (old) old.remove();
+          window.chartKit[kind]({ ...opts, into: 'replace-holder' });
+        },
+      };
+    </script>
+  </body>
+</html>

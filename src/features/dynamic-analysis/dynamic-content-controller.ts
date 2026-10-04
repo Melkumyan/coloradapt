@@ -1,6 +1,7 @@
 import type { AnalyzeDocumentOptions } from '@core/analysis';
 import type { UserSettings } from '@domain/models';
 import { createContentController, type ContentController } from '../page-analysis';
+import type { ChartEnvironment } from '../charts';
 import { createNativeValidityBridge, type FactsEnvironment } from '../semantics';
 import {
   createDynamicPipeline,
@@ -33,7 +34,7 @@ export function createDynamicContentController(
   pipelineOptions: Partial<
     Pick<DynamicPipelineOptions, 'scheduler' | 'now' | 'budget' | 'createObserver'>
   > = {},
-  semanticOptions: { readonly env?: FactsEnvironment } = {},
+  semanticOptions: { readonly env?: FactsEnvironment; readonly chartEnv?: ChartEnvironment } = {},
 ): DynamicContentController {
   const base = createContentController(doc, analyzerOptions, semanticOptions);
   let lastRequest: { url: string; settings: UserSettings } | null = null;
@@ -49,6 +50,7 @@ export function createDynamicContentController(
     },
     ...pipelineOptions,
   });
+  base.bindChartInvalidation((svg) => dynamic.invalidate(svg, 'chart'));
 
   return {
     ...base,

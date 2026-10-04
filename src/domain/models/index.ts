@@ -10,3 +10,4 @@ export * from './site-profile';
 export * from './settings';
 export * from './dynamic';
 export * from './semantic';
+export * from './chart';

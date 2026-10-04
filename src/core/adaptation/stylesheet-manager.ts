@@ -107,6 +107,11 @@ export class StylesheetManager {
    * keyed on an attribute, so it never needs per-element rules. `null`: no cue on the page.
    */
   #cueCss: string | null = null;
+  /**
+   * Static CSS of the chart layer (M7): attribute-keyed rules for the series it adapts
+   * (`stroke-dasharray`, markers, pattern fills). `null`: no chart is adapted.
+   */
+  #chartCss: string | null = null;
 
   constructor(doc: Document = document) {
     this.#doc = doc;
@@ -254,22 +259,41 @@ export class StylesheetManager {
     if (!unchanged || !wasAttached) this.#commit(styleElement, this.#css());
   }
 
+  /** The chart CSS currently in the sheet. */
+  get chartCss(): string | null {
+    return this.#chartCss;
+  }
+
+  /**
+   * Replaces the chart CSS (`null` removes it); same contract as {@link setCueCss}. The chart
+   * layer writes its nodes first and the CSS second, then checks the browser's computed result.
+   */
+  setChartCss(css: string | null): void {
+    const next = css === '' ? null : css;
+    const unchanged = next === this.#chartCss;
+    this.#chartCss = next;
+    if (this.#isEmpty()) {
+      if (this.#styleElement) this.restore();
+      return;
+    }
+    const wasAttached = this.#styleElement?.isConnected === true;
+    const styleElement = this.#ensureStyleElement();
+    if (!unchanged || !wasAttached) this.#commit(styleElement, this.#css());
+  }
+
   /** The `<style>` element, if one is currently injected — for mutation-ownership checks. */
   get styleElement(): HTMLStyleElement | null {
     return this.#styleElement;
   }
 
   #css(): string {
-    const rules = buildCss([...this.#rules.values()]);
-    return this.#cueCss === null
-      ? rules
-      : rules === ''
-        ? this.#cueCss
-        : `${rules}\n${this.#cueCss}`;
+    return [buildCss([...this.#rules.values()]), this.#cueCss, this.#chartCss]
+      .filter((part): part is string => part !== null && part !== '')
+      .join('\n');
   }
 
   #isEmpty(): boolean {
-    return this.#rules.size === 0 && this.#cueCss === null;
+    return this.#rules.size === 0 && this.#cueCss === null && this.#chartCss === null;
   }
 
   #verify(
@@ -367,6 +391,7 @@ export class StylesheetManager {
   restore(): void {
     this.#clearRules();
     this.#cueCss = null;
+    this.#chartCss = null;
     const styleElement = this.#styleElement;
     if (styleElement?.isConnected) {
       // Original colors return with transitions suppressed, then the sheet goes.

@@ -172,6 +172,44 @@ created, cued and removed five times leave no cue attribute, no queued or deferr
 cue rule behind. Wall time stays informational. In jsdom the numbers mean nothing for time (see below); the E2E suite
 asserts the counters.
 
+## Chart bridge and legend guard (M7.R1)
+
+Structural, never wall-clock. The resize / geometry bridge is one `ResizeObserver` and one
+`MutationObserver` for at most `maxWatched` (128) charts, nothing else; a `d`/`points` change that keeps the
+path's structure costs the structure comparison of that one attribute and no pass; a size change costs one
+M4 pass over one chart (`chartPassesSkipped` when nothing in the scale changed). The HTML legend guard runs
+only for an SVG that could be adapted (at least two distinct colored paints, something laid out), reads at
+most `maxLegendScan` (300) elements per scope (the parent and the grandparent, or the siblings of a chart
+directly in `<body>`) and is part of the chart's one read per pass. The benchmark of 150 scenarios reads
+7657 marks, evaluates 511 series and 389 legend items in 184 chart passes.
+
+## Chart budgets (M7)
+
+Defined in `CHART_LIMITS` (`src/shared/constants/charts.ts`; full table in `docs/CHARTS.md`).
+Structural, never wall-clock; the chart layer has no observer and no scan of its own: it reuses the
+regions M4 resolved and hands back what its budget could not cover.
+
+| Budget               | Default | Why this number                                                                                                                 |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `maxMarks`           | 2000    | a chart with more marks is a scatter of data, not a chart a legend can describe; each costs one computed-style read and one box |
+| `maxDescendants`     | 6000    | bounds the walk (defs, groups, ticks) of one `<svg>`                                                                            |
+| `maxSeries`          | 12      | beyond ~10 categorical encodings no set of dash/marker/pattern stays distinguishable (also the pattern budget)                  |
+| `maxLegendItems`     | 12      | a larger swatch + text cluster is data labels                                                                                   |
+| `maxMarkerVertices`  | 60      | `marker-mid` draws one marker per vertex: above it the line gets dashes only                                                    |
+| `maxMarkerInstances` | 500     | per chart: `vertices x paths` of the lines that wear a marker                                                                   |
+| `maxOverlayNodes`    | 500     | the only DOM nodes M7 inserts besides one `<defs>`: legend sample lines (scatter shapes are CSS)                                |
+| `maxMarksPerPass`    | 20 000  | summed over regions; later regions return to M4 whole, the first is always finished                                             |
+
+Cost model: an `<svg>` with fewer than 3 shapes is never read (icons, logos pay one selector). A
+chart is read once per pass with the page's own styles in effect (one suspended-sheet flush, shared
+with M3/M5), classified and planned in pure code, and written only when something changed: the plan,
+the targets and everything M7 wrote are compared, so a settled chart costs a read and no write
+(`chartPassesSkipped`). One chart's write is one `<defs>` insert, one attribute per adapted mark and
+one CSS commit; verification reads the first mark of each adapted series. Real-Chromium evidence is
+structural: 10 series x 100 points reads under 200 marks and is stable over refreshes; 100 charts
+created, adapted and removed leave no owner, def, rule or pending work; 30 charts on one page are
+adapted in two flushes; a 2200-point scatter is refused after a bounded read.
+
 ## What to measure before optimizing further
 
 - Time spent in `analyzeDocument` on a real, large page (e.g. a dense

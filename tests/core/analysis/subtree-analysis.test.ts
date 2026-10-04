@@ -9,6 +9,7 @@ import {
 import { createDetailedAdaptationPlan, createAdaptationPlan } from '@core/adaptation';
 import { toAnalysisResult } from '@core/analysis';
 import { DEFAULT_USER_SETTINGS } from '@domain/models';
+import { analyzerOptionsForMode } from '@features/page-analysis';
 
 const STYLE = 'color: #c0392b; background-color: #27ae60;';
 const opts = { now: () => 0 };
@@ -104,6 +105,34 @@ describe('analyzeSubtrees', () => {
     expect(result.elements).toHaveLength(5); // the first root is complete however slow it was
     expect(result.truncated).toBe(false);
     expect(result.rootsCompleted).toBe(1); // r2 is left, whole, for the next pass
+  });
+
+  it('R1-5 root cause: on a slow machine the same 100 roots are split by the clock, on the logical clock they are not', () => {
+    document.body.innerHTML = Array.from(
+      { length: 100 },
+      (_, i) => `<p id="p${i}" style="${STYLE}">x</p>`,
+    ).join('');
+    const roots = Array.from({ length: 100 }, (_, i) => ({
+      element: byId(`p${i}`),
+      scope: 'self' as const,
+    }));
+    let t = 0;
+    const slow = analyzeSubtrees(roots, { now: () => (t += 60), maxDurationMs: 50 });
+    expect(slow.rootsCompleted).toBe(1); // machine-dependent: the budget ran out after the first root
+    // The E2E build's analyzer options (src/features/page-analysis/build-mode.ts): structural budgets only.
+    const deterministic = analyzeSubtrees(roots, {
+      ...analyzerOptionsForMode('e2e'),
+      maxDurationMs: 50,
+    });
+    expect(deterministic.rootsCompleted).toBe(100);
+    expect(deterministic.elements).toHaveLength(100);
+  });
+
+  it('the shipped build keeps the real clock: only the e2e mode swaps it', () => {
+    expect(analyzerOptionsForMode('production')).toEqual({});
+    expect(analyzerOptionsForMode(undefined)).toEqual({});
+    expect(analyzerOptionsForMode('development')).toEqual({});
+    expect(analyzerOptionsForMode('e2e').now?.()).toBe(0);
   });
 
   it('a root that does not fit next to the others is left whole, never started and cut', () => {

@@ -72,6 +72,23 @@ describe('SettingsStore semanticCuesEnabled (M6.R1 migration policy)', () => {
     expect(loaded.visionProfile).toBe('protanopia');
   });
 
+  it('adaptCharts: absent reads as the default, an explicit false survives reads and updates', async () => {
+    const backend = createMemoryStorageBackend();
+    const { adaptCharts: _omitted, ...beforeM7 } = DEFAULT_USER_SETTINGS;
+    await backend.set(SETTINGS_KEY, { ...beforeM7, visionProfile: 'protanopia' });
+    const store = new SettingsStore(backend);
+    expect((await store.get()).adaptCharts).toBe(true);
+    await store.update({ adaptCharts: false });
+    for (const patch of [
+      { enabled: false },
+      { adaptSVG: false },
+      { visionProfile: 'tritanopia' as const },
+    ]) {
+      expect((await store.update(patch)).adaptCharts).toBe(false);
+    }
+    expect((await new SettingsStore(backend).get()).adaptCharts).toBe(false);
+  });
+
   it('an explicit false survives reads and unrelated updates', async () => {
     const backend = createMemoryStorageBackend();
     const store = new SettingsStore(backend);

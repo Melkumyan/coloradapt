@@ -45,6 +45,11 @@ export interface ResolvedBatch {
   readonly removed: readonly Element[];
   /** Where elements left: their former peers may have lost what they were compared with (M6). */
   readonly peerSeeds: readonly PeerSeed[];
+  /**
+   * Parents that lost a child, whether it was deleted or moved elsewhere: a chart whose legend neighbourhood
+   * that is must be read again (M7, docs/CHARTS.md). Bounded; not a region to analyze.
+   */
+  readonly departures: readonly Element[];
   /** Set when the batch cannot be handled region by region. */
   readonly fullRescan: FullRescanReason | null;
 }

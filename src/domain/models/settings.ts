@@ -16,7 +16,10 @@ export interface UserSettings {
    * for that state is strong (M6, docs/SEMANTIC_ACCESSIBILITY.md).
    */
   readonly semanticCuesEnabled: boolean;
-  /** Planned for M7. */
+  /**
+   * Add non-color redundancy (line style, marker, pattern) to charts whose series color alone cannot
+   * tell apart, and keep their legends in step (M7, docs/CHARTS.md).
+   */
   readonly adaptCharts: boolean;
   /** Planned for M8. */
   readonly adaptImages: boolean;
@@ -33,7 +36,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   improveStatusIndicators: true,
   adaptSVG: true,
   semanticCuesEnabled: true,
-  adaptCharts: false,
+  adaptCharts: true,
   adaptImages: false,
   showWarnings: true,
   siteOverrides: {},

@@ -30,6 +30,8 @@ export interface AnalyzeDocumentOptions {
    * explicit, so SVGs are analyzed but never adapted.
    */
   readonly probeStyles?: SvgStyleProbe;
+  /** Whether the chart layer (M7) owns an SVG: such an SVG is analyzed but never adapted here. */
+  readonly isChartOwned?: (svg: Element) => boolean;
 }
 
 let idCounter = 0;
@@ -172,6 +174,7 @@ function describeSvgBatch(
   getStyle: (element: Element) => CSSStyleDeclaration,
   backgroundCache: BackgroundResolutionCache,
   probe: SvgStyleProbe | undefined,
+  isChartOwned?: (svg: Element) => boolean,
 ): { descriptors: ElementDescriptor[]; nodes: Map<string, Element> } {
   const descriptors: ElementDescriptor[] = [];
   const nodes = new Map<string, Element>();
@@ -183,6 +186,7 @@ function describeSvgBatch(
     ensureId: ensureElementId,
     probe,
     animatedTargets: collectAnimatedPaintTargets(first.ownerDocument),
+    ...(isChartOwned ? { isChartOwned } : {}),
   });
   for (const result of results) {
     if (!result.descriptor) continue;
@@ -239,7 +243,8 @@ export function analyzeDocument(options: AnalyzeDocumentOptions = {}): {
   }
 
   elements.push(
-    ...describeSvgBatch(svgs, getStyle, backgroundCache, options.probeStyles).descriptors,
+    ...describeSvgBatch(svgs, getStyle, backgroundCache, options.probeStyles, options.isChartOwned)
+      .descriptors,
   );
   return { elements, truncated };
 }
@@ -343,7 +348,13 @@ export function analyzeSubtrees(
     rootsCompleted += 1;
   }
 
-  const svg = describeSvgBatch(svgs, getStyle, backgroundCache, options.probeStyles);
+  const svg = describeSvgBatch(
+    svgs,
+    getStyle,
+    backgroundCache,
+    options.probeStyles,
+    options.isChartOwned,
+  );
   elements.push(...svg.descriptors);
   for (const [id, node] of svg.nodes) nodes.set(id, node);
 

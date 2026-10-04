@@ -85,6 +85,37 @@ describe('parseUserSettings', () => {
     });
   });
 
+  describe('adaptCharts (M7 migration)', () => {
+    it('is true on a fresh install: only HIGH-confidence, mappable charts are ever written to', () => {
+      expect(DEFAULT_USER_SETTINGS.adaptCharts).toBe(true);
+      expect(parseUserSettings(undefined).adaptCharts).toBe(true);
+    });
+
+    it('field absent: the product default, and nothing else about the stored settings changes', () => {
+      const { adaptCharts: _omitted, ...beforeM7 } = DEFAULT_USER_SETTINGS;
+      const result = parseUserSettings({
+        ...beforeM7,
+        visionProfile: 'tritanopia',
+        semanticCuesEnabled: false,
+      });
+      expect(result.adaptCharts).toBe(true);
+      expect(result).toMatchObject({ visionProfile: 'tritanopia', semanticCuesEnabled: false });
+    });
+
+    it('explicit true and explicit false are never overridden (settings saved by M1-M6 hold false)', () => {
+      expect(parseUserSettings({ adaptCharts: true }).adaptCharts).toBe(true);
+      expect(parseUserSettings({ adaptCharts: false }).adaptCharts).toBe(false);
+    });
+
+    it('an invalid value falls back to the default instead of rejecting the object', () => {
+      for (const invalid of ['no', 0, 1, null, {}, []]) {
+        const result = parseUserSettings({ adaptCharts: invalid, enabled: false });
+        expect(result.adaptCharts).toBe(true);
+        expect(result.enabled).toBe(false);
+      }
+    });
+  });
+
   it('drops malformed site overrides but keeps valid ones', () => {
     const result = parseUserSettings({
       siteOverrides: {

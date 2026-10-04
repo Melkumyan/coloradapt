@@ -114,7 +114,9 @@ describe('SVG attributes are style-affecting only on SVG elements', () => {
     expect(isStyleChangeRelevant(null, 'mask-image: url(#m)')).toBe(true);
     expect(isStyleChangeRelevant(null, 'marker-start: url(#m)')).toBe(true);
     expect(isStyleChangeRelevant(null, 'transform: rotate(1deg)')).toBe(false);
-    expect(isStyleChangeRelevant(null, 'stroke-dasharray: 2')).toBe(false);
+    // M7: a dash is one of the non-color channels that tell chart series apart.
+    expect(isStyleChangeRelevant(null, 'stroke-dasharray: 2')).toBe(true);
+    expect(isStyleChangeRelevant(null, 'stroke-linecap: round')).toBe(false);
   });
 });
 

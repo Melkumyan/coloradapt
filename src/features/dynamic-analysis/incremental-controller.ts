@@ -1,5 +1,6 @@
 import { DYNAMIC_BUDGET, type DynamicBudget } from '@shared/constants';
 import {
+  EMPTY_CHART_DIAGNOSTICS,
   EMPTY_SEMANTIC_DIAGNOSTICS,
   EMPTY_SVG_DIAGNOSTICS,
   type DynamicDiagnostics,
@@ -38,7 +39,7 @@ export interface DynamicPipeline {
    * Asks for `element` (and the semantic unit around it) to be re-examined, through the normal
    * batched path. For state that changes without a DOM mutation: native form validity.
    */
-  invalidate(element: Element): void;
+  invalidate(element: Element, source?: 'semantic' | 'chart'): void;
   /** `stop()`, and `start()` becomes a no-op. */
   dispose(): void;
   /** Drops queued mutations and any pending flush (a full adaptation is about to supersede them). */
@@ -93,6 +94,7 @@ function emptyCounters(): Counters {
     throttleTimerActive: false,
     svg: EMPTY_SVG_DIAGNOSTICS,
     semantic: EMPTY_SEMANTIC_DIAGNOSTICS,
+    charts: EMPTY_CHART_DIAGNOSTICS,
     semanticInvalidations: 0,
   };
 }
@@ -269,6 +271,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     let resolvedRemoved: readonly Element[] = [];
     let resolvedRoots: readonly AnalysisRoot[] = [];
     let resolvedSeeds: readonly PeerSeed[] = [];
+    let resolvedDepartures: readonly Element[] = [];
     if (records.length > 0) {
       const { mutations, counts } = classifyMutations(records, { doc });
       counters.selfMutationsIgnored += counts.COLORADAPT_INTERNAL;
@@ -294,6 +297,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       resolvedRemoved = resolved.removed;
       resolvedRoots = resolved.roots;
       resolvedSeeds = resolved.peerSeeds;
+      resolvedDepartures = resolved.departures;
     }
 
     if (!adaptation.active) {
@@ -320,14 +324,19 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     const removedIds = collectRemovedIds(resolvedRemoved);
     if (roots.length === 0 && removedIds.length === 0) {
       // Nodes left and none held a color rule: only the semantic layer has anything to do (their peers).
-      if (resolvedSeeds.length > 0) {
-        adaptation.updatePeers(resolvedSeeds);
+      if (resolvedSeeds.length > 0 || resolvedDepartures.length > 0) {
+        adaptation.updatePeers(resolvedSeeds, resolvedDepartures);
         drainOwnMutations();
       }
       return;
     }
 
-    const result = adaptation.update({ roots, removedIds, peerSeeds: resolvedSeeds });
+    const result = adaptation.update({
+      roots,
+      removedIds,
+      peerSeeds: resolvedSeeds,
+      departures: resolvedDepartures,
+    });
     counters.incrementalPasses += 1;
     counters.affectedRoots += result.rootsConsumed;
     counters.elementsProcessed += result.elementsProcessed;
@@ -393,6 +402,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       throttleTimerActive: cancelThrottle !== null || cancelRepairTimer !== null,
       svg: adaptation.svgDiagnostics(),
       semantic: adaptation.semanticDiagnostics(),
+      charts: adaptation.chartDiagnostics(),
     };
   }
 
@@ -415,10 +425,10 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
       batcher.request();
     },
 
-    invalidate(element) {
+    invalidate(element, source = 'semantic') {
       if (!observer.connected || !adaptation.active) return;
       invalidated.add(element);
-      counters.semanticInvalidations += 1;
+      if (source === 'semantic') counters.semanticInvalidations += 1;
       batcher.request();
     },
 

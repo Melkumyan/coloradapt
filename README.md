@@ -50,6 +50,15 @@ classified and left alone (`adaptSVG` is on by default; stored settings without 
 default). Rules go through the same stylesheet, are verified against
 the real computed paint, and are reversible. See `docs/SVG_ANALYSIS.md`.
 
+M7 makes the series of a chart distinguishable **without color**: for confusable pairs under the
+selected vision profile (M2 simulation, series against series) it adds a line style, a marker, a
+pattern or a point shape, keeps the original colors, and mirrors the same encoding in the chart's
+SVG legend. Only high-confidence inline-SVG line, bar, scatter and pie/donut charts with an
+unambiguous series-to-legend mapping are touched; heatmaps, area/stacked charts, HTML legends and
+Canvas charts are detected and left alone (a chart with, or with possible, an HTML legend is refused whole rather than adapted next to a legend that cannot show the same encoding), and non-charts (logos, illustrations, diagrams) are never
+claimed. Everything is reversible, verified against the browser and flows through the M4 pipeline
+(`adaptCharts`, on by default). See `docs/CHARTS.md`.
+
 M6 adds a second, non-color channel where color alone carries a state. Deterministic evidence
 (ARIA, native form state, exact class/data tokens, a small English/Russian status vocabulary) is
 classified with an explicit confidence; only when the evidence is HIGH, the original page
@@ -114,7 +123,8 @@ pnpm build:firefox   # dist/firefox-mv2
 pnpm test
 pnpm lint
 pnpm typecheck
-pnpm verify          # lint + typecheck + test + build
+pnpm verify          # lint + typecheck + format:check + test + build
+pnpm test:e2e        # build the E2E variant (build:e2e) + real-Chromium tests
 ```
 
 See `docs/DEVELOPMENT.md` for more (adding a vision profile, a conflict

@@ -16,9 +16,10 @@ import {
   type PlanningMemo,
   type StylesheetManager,
 } from '@core/adaptation';
-import { EMPTY_SEMANTIC_DIAGNOSTICS } from '@domain/models';
+import { EMPTY_CHART_DIAGNOSTICS, EMPTY_SEMANTIC_DIAGNOSTICS } from '@domain/models';
 import type {
   AdaptationChange,
+  ChartDiagnostics,
   AdaptationDelta,
   AdaptationSummary,
   ElementDescriptor,
@@ -27,6 +28,7 @@ import type {
   SvgUnitInfo,
   UserSettings,
 } from '@domain/models';
+import type { ChartController } from '../charts';
 import type { PeerSeed, SemanticCueController } from '../semantics';
 import { findNotAdaptable } from './adaptability';
 
@@ -43,6 +45,8 @@ export interface IncrementalPassInput {
   readonly removedIds: readonly string[];
   /** Where elements left the page: their former peers are re-examined by the semantic layer (M6). */
   readonly peerSeeds?: readonly PeerSeed[];
+  /** Parents that lost a child (deleted or moved): the chart layer re-reads charts next to them. */
+  readonly departures?: readonly Element[];
 }
 
 export interface IncrementalPassResult {
@@ -69,6 +73,8 @@ export interface IncrementalAdaptation {
   readonly hasInjectedContent: boolean;
   /** Counters of the semantic-cue layer (docs/SEMANTIC_ACCESSIBILITY.md). */
   semanticDiagnostics(): SemanticDiagnostics;
+  /** Counters and gauges of the chart layer (docs/CHARTS.md). */
+  chartDiagnostics(): ChartDiagnostics;
   /** Elements the bookkeeping currently tracks (ids only; for leak tests and diagnostics). */
   trackedCount(): number;
   /** Gauges of the inline-SVG units currently tracked. */
@@ -79,7 +85,7 @@ export interface IncrementalAdaptation {
    * Only elements left the page and none of them held a color rule: nothing for the color layer to
    * do, but the semantic layer re-examines their former peers (M6.R1). Not an incremental pass.
    */
-  updatePeers(seeds: readonly PeerSeed[]): void;
+  updatePeers(seeds: readonly PeerSeed[], departures?: readonly Element[]): void;
   /** Re-attaches the sheet if the page removed it. */
   repairStylesheet(): boolean;
   /** The injected `<style>` element, if any (for mutation-ownership checks). */
@@ -111,6 +117,7 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
   readonly #stylesheet: StylesheetManager;
   readonly #analyzerOptions: Partial<AnalyzeDocumentOptions>;
   readonly #semantic: SemanticCueController | null;
+  readonly #charts: ChartController | null;
   #context: PlanningContext | null = null;
   #memo: PlanningMemo = new Map();
   #kinds = new Map<string, TrackedKind>();
@@ -123,11 +130,13 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     stylesheet: StylesheetManager,
     analyzerOptions: Partial<AnalyzeDocumentOptions>,
     semantic: SemanticCueController | null = null,
+    charts: ChartController | null = null,
   ) {
     this.#doc = doc;
     this.#stylesheet = stylesheet;
     this.#analyzerOptions = analyzerOptions;
     this.#semantic = semantic;
+    this.#charts = charts;
   }
 
   get active(): boolean {
@@ -148,6 +157,10 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
   semanticDiagnostics(): SemanticDiagnostics {
     return this.#semantic?.diagnostics() ?? EMPTY_SEMANTIC_DIAGNOSTICS;
+  }
+
+  chartDiagnostics(): ChartDiagnostics {
+    return this.#charts?.diagnostics() ?? EMPTY_CHART_DIAGNOSTICS;
   }
 
   /** Starts (or restarts) tracking from a full adaptation's per-element outcomes. */
@@ -171,11 +184,18 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
       this.#semantic.begin(settings);
       this.#semantic.scanDocument();
     }
+    // Charts follow the same settled page; what `owns` classified during the analysis is reused.
+    if (this.#charts) {
+      this.#charts.begin(settings);
+      this.#charts.scanDocument();
+      this.#charts.endPass();
+    }
   }
 
   /** Stops tracking and forgets everything (adaptation switched off). */
   end(): void {
     this.#semantic?.end();
+    this.#charts?.end();
     this.#context = null;
     this.#memo = new Map();
     this.#kinds = new Map();
@@ -218,8 +238,11 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     return true;
   }
 
-  updatePeers(seeds: readonly PeerSeed[]): void {
-    if (this.#context) this.#semantic?.update([], seeds);
+  updatePeers(seeds: readonly PeerSeed[], departures: readonly Element[] = []): void {
+    if (!this.#context) return;
+    this.#semantic?.update([], seeds);
+    // A removed chart still has artifacts (rules) to drop; a legend that left changes its chart's neighbourhood.
+    this.#charts?.update([], [...seeds.map((seed) => seed.anchor), ...departures]);
   }
 
   update(input: IncrementalPassInput): IncrementalPassResult {
@@ -314,9 +337,15 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
     // Semantics follow the same regions M4 chose; the cue layer has no observer and no scan of its own.
     this.#semantic?.update(input.roots.slice(0, rootsConsumed), input.peerSeeds ?? []);
+    // The chart layer has its own structural budget: regions it leaves are handed back, whole.
+    const chartsConsumed =
+      this.#charts?.update(input.roots.slice(0, rootsConsumed), [
+        ...(input.peerSeeds ?? []).map((seed) => seed.anchor),
+        ...(input.departures ?? []),
+      ]) ?? rootsConsumed;
 
     return {
-      rootsConsumed,
+      rootsConsumed: Math.min(rootsConsumed, chartsConsumed),
       elementsProcessed: sub.candidatesInspected,
       truncated: sub.truncated,
       delta: {

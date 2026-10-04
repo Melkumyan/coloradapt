@@ -536,7 +536,7 @@ state word in a short title is only LOW evidence and is never applied.
   other attributes or through JS-only state is invisible.
 - Pseudo-elements cannot be attached to inputs, images, `select`, tables rows; those get an outline
   pattern for error/invalid/warning/success/valid, nothing for other states.
-- Shadow DOM, iframes, canvas, charts, background images: not examined.
+- Shadow DOM, iframes, canvas, charts, background images: not examined. (M7: the semantic layer skips every inline SVG, so a chart legend is never given a state cue from its colors; chart marks are the chart layer's, `docs/CHARTS.md`.)
 - Firefox: built and packaged; **runtime not verified** in M6 (as in M5).
 - Screen-reader behavior was checked through the browser's accessibility tree only, with no
   assistive technology.

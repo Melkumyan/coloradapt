@@ -15,7 +15,20 @@ export default defineConfig({
     permissions: ['storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
   },
-  vite: () => ({
+  vite: ({ mode }) => ({
+    // `wxt build --mode e2e` (docs/DEVELOPMENT.md) is the shipped build plus one thing: the analyzer
+    // runs on a logical clock (features/page-analysis/build-mode.ts). Vite would otherwise treat any
+    // mode but `production` as development (React dev build, `import.meta.env.DEV`), which E2E must
+    // not test instead of what ships.
+    ...(mode === 'e2e'
+      ? {
+          define: {
+            'import.meta.env.DEV': 'false',
+            'import.meta.env.PROD': 'true',
+            'process.env.NODE_ENV': '"production"',
+          },
+        }
+      : {}),
     resolve: {
       alias: {
         '@domain': path.resolve(root, 'src/domain'),

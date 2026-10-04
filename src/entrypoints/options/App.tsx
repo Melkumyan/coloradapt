@@ -111,9 +111,13 @@ export function App(): JSX.Element {
           />
           Add a second cue where color alone carries a state (✓ × ! underline)
         </label>
-        <label className="options__checkbox options__checkbox--planned">
-          <input type="checkbox" checked={settings.adaptCharts} disabled />
-          Adapt charts <span className="options__badge">planned</span>
+        <label className="options__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.adaptCharts}
+            onChange={(event) => void update({ adaptCharts: event.target.checked })}
+          />
+          Make chart series distinguishable without color (line styles, markers, patterns)
         </label>
         <label className="options__checkbox options__checkbox--planned">
           <input type="checkbox" checked={settings.adaptImages} disabled />

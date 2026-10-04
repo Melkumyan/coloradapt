@@ -30,6 +30,8 @@ export type SvgUnsupportedReason =
   | 'complex-svg'
   /** Text labels next to several shapes: looks like data visualization (M7). */
   | 'chart-like'
+  /** The chart layer (M7) owns this SVG: its marks are never recolored here (docs/CHARTS.md). */
+  | 'chart-owned'
   /** `<use href="file.svg#id">` / `data:` — not resolvable without new permissions. */
   | 'use-external'
   /** `<use>` whose target is missing, nested, or part of a reference cycle. */

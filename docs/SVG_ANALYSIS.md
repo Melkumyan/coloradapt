@@ -10,7 +10,7 @@ icons, and SVG text — and it classifies everything else instead of guessing.
 > Safe SVG adaptation > coverage > aggressive recoloring. If an SVG is too
 > complex to adapt safely, `unsupported` is the correct answer.
 
-Not in M5: semantic interpretation (M6), charts and data visualization (M7),
+Not in M5: semantic interpretation (M6), charts and data visualization (M7; M5 asks the chart layer `isChartOwned(svg)` before it plans and reports an owned SVG `chart-owned`, see `docs/CHARTS.md`),
 Canvas, raster images (M8), AI, developer audit, Shadow DOM, iframes. M5 is an
 engineering milestone; M2 stays PARTIAL, M3 and M4 stay PASS.
 
@@ -211,25 +211,26 @@ Automatic adaptation requires **exactly one distinct effective paint**
 (`paintCount === 1`), counted over fills, strokes, text and `<use>` instances
 after compositing. Everything else is `unsupported`, with a reason:
 
-| Reason             | When                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| `multi-paint`      | 2 … `maxDistinctPaints` distinct paints                                                          |
-| `complex-svg`      | > `maxDistinctPaints` paints, > `maxPaintedElements`, > `maxDescendants`, deeper than `maxDepth` |
-| `chart-like`       | ≥ 2 paints with ≥ 3 text elements and ≥ 3 shapes (label only; M7 owns charts)                    |
-| `paint-gradient`   | `fill`/`stroke` is a linear/radial gradient                                                      |
-| `paint-pattern`    | `fill`/`stroke` is a `<pattern>`                                                                 |
-| `paint-server`     | any other `url(...)` (missing, external, mesh gradient) or unparseable paint                     |
-| `paint-context`    | `context-fill` / `context-stroke`                                                                |
-| `filter`           | `filter` on the `<svg>` or any rendered element in it                                            |
-| `mask`             | `mask` / `mask-image`                                                                            |
-| `blend-mode`       | `mix-blend-mode` ≠ `normal`                                                                      |
-| `marker`           | `marker-start/mid/end`                                                                           |
-| `foreign-object`   | `<foreignObject>` (its HTML is analyzed as HTML)                                                 |
-| `embedded-image`   | `<image>`                                                                                        |
-| `animated`         | SMIL (`animate`, `set`, `animateColor`) or a CSS/Web animation of a paint property               |
-| `use-external`     | `<use href="file.svg#id">`, `data:` …                                                            |
-| `use-unresolved`   | missing target, reference cycle, nested `<use>`                                                  |
-| `use-shared-paint` | the referenced content declares its own paint                                                    |
+| Reason             | When                                                                                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `multi-paint`      | 2 … `maxDistinctPaints` distinct paints                                                                                                           |
+| `complex-svg`      | > `maxDistinctPaints` paints, > `maxPaintedElements`, > `maxDescendants`, deeper than `maxDepth`                                                  |
+| `chart-owned`      | the chart layer (M7) owns this SVG (a HIGH-confidence chart, adapted or not, or refused for an HTML legend): never recolored here; reported first |
+| `chart-like`       | ≥ 2 paints with ≥ 3 text elements and ≥ 3 shapes (label only; charts the chart layer does not own end up here or as `multi-paint`)                |
+| `paint-gradient`   | `fill`/`stroke` is a linear/radial gradient                                                                                                       |
+| `paint-pattern`    | `fill`/`stroke` is a `<pattern>`                                                                                                                  |
+| `paint-server`     | any other `url(...)` (missing, external, mesh gradient) or unparseable paint                                                                      |
+| `paint-context`    | `context-fill` / `context-stroke`                                                                                                                 |
+| `filter`           | `filter` on the `<svg>` or any rendered element in it                                                                                             |
+| `mask`             | `mask` / `mask-image`                                                                                                                             |
+| `blend-mode`       | `mix-blend-mode` ≠ `normal`                                                                                                                       |
+| `marker`           | `marker-start/mid/end`                                                                                                                            |
+| `foreign-object`   | `<foreignObject>` (its HTML is analyzed as HTML)                                                                                                  |
+| `embedded-image`   | `<image>`                                                                                                                                         |
+| `animated`         | SMIL (`animate`, `set`, `animateColor`) or a CSS/Web animation of a paint property                                                                |
+| `use-external`     | `<use href="file.svg#id">`, `data:` …                                                                                                             |
+| `use-unresolved`   | missing target, reference cycle, nested `<use>`                                                                                                   |
+| `use-shared-paint` | the referenced content declares its own paint                                                                                                     |
 
 When several apply, the first of this list (top to bottom, with the blockers
 before the paint-server reasons, `use-*`, then complexity, then `multi-paint`)

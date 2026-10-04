@@ -5,6 +5,8 @@ import type { ClassifiedMutation, FullRescanReason, ResolvedBatch } from './type
 
 /** One seed per (parent, kind of element) that lost a child; more than this in one batch are not followed. */
 const MAX_PEER_SEEDS = 200;
+/** Parents that lost a child (deleted or moved) that the chart layer is told about, per batch. */
+const MAX_DEPARTURES = 64;
 
 export interface ResolveOptions {
   readonly doc: Document;
@@ -95,6 +97,7 @@ export function resolveAffectedRoots(
   const candidates: AnalysisRoot[] = [];
   const removed: Element[] = [];
   const peerSeeds: PeerSeed[] = [];
+  const departures = new Set<Element>();
   const seededKinds = new Map<Element, Set<string>>();
   let fullRescan: FullRescanReason | null = null;
 
@@ -132,6 +135,15 @@ export function resolveAffectedRoots(
         if (isPageContent(mutation.element, doc)) addRegion(mutation.element, 'self');
         break;
       case 'NODE_REMOVED':
+        // A child that left (even to be moved elsewhere) changes its former neighbourhood.
+        if (
+          mutation.parent &&
+          departures.size < MAX_DEPARTURES &&
+          isPageContent(mutation.parent, doc) &&
+          !outermostSvg(mutation.parent)
+        ) {
+          departures.add(mutation.parent);
+        }
         if (!mutation.element.isConnected) {
           removed.push(mutation.element);
           // A child that left an inline SVG changes what the SVG paints.
@@ -156,13 +168,13 @@ export function resolveAffectedRoots(
     }
   }
 
-  if (fullRescan) return { roots: [], removed: [], peerSeeds: [], fullRescan };
+  if (fullRescan) return { roots: [], removed: [], peerSeeds: [], departures: [], fullRescan };
 
   const roots = normalizeRoots(candidates);
   if (roots.length > options.maxRoots) {
-    return { roots: [], removed: [], peerSeeds: [], fullRescan: 'too-many-roots' };
+    return { roots: [], removed: [], peerSeeds: [], departures: [], fullRescan: 'too-many-roots' };
   }
-  return { roots, removed, peerSeeds, fullRescan: null };
+  return { roots, removed, peerSeeds, departures: [...departures], fullRescan: null };
 }
 
 /** Owned ids inside detached subtrees, each once. */
