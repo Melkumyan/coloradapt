@@ -4,3 +4,6 @@ node_modules
 dist
 coverage
 pnpm-lock.yaml
+realworld/.tools
+realworld/.artifacts
+dist-profile

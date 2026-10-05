@@ -60,11 +60,32 @@ describe('build configuration', () => {
   });
 
   it('the audit adds no permission and no host: storage and web hosts only', async () => {
+    type Manifest = { permissions?: string[]; host_permissions?: string[] };
     const config = (await import('../../../wxt.config')).default as unknown as {
-      manifest: { permissions?: string[]; host_permissions?: string[] };
+      manifest: (env: { browser: string }) => Manifest;
     };
-    expect(config.manifest.permissions).toEqual(['storage']);
-    expect(config.manifest.host_permissions).toEqual(['http://*/*', 'https://*/*']);
+    // The manifest is per browser (Firefox adds its add-on id); the permissions must be the same in both.
+    for (const browser of ['chrome', 'firefox']) {
+      const manifest = config.manifest({ browser });
+      expect(manifest.permissions).toEqual(['storage']);
+      expect(manifest.host_permissions).toEqual(['http://*/*', 'https://*/*']);
+    }
+  });
+
+  it('only the Firefox manifest carries the add-on id, and it declares no data collection', async () => {
+    type Manifest = {
+      browser_specific_settings?: {
+        gecko?: { id?: string; data_collection_permissions?: unknown };
+      };
+    };
+    const config = (await import('../../../wxt.config')).default as unknown as {
+      manifest: (env: { browser: string }) => Manifest;
+    };
+    expect(config.manifest({ browser: 'chrome' }).browser_specific_settings).toBeUndefined();
+    expect(config.manifest({ browser: 'firefox' }).browser_specific_settings?.gecko).toEqual({
+      id: 'coloradapt@coloradapt.invalid',
+      data_collection_permissions: { required: ['none'] },
+    });
   });
 });
 

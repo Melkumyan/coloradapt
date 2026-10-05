@@ -22,6 +22,8 @@
     "src",
     "tests",
     "e2e",
+    "realworld",
+    "playwright.realworld.config.ts",
     "vitest.config.ts",
     "playwright.config.ts",
     "wxt.config.ts",

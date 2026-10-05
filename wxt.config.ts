@@ -8,13 +8,26 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   srcDir: 'src',
   outDir: 'dist',
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'ColorAdapt',
     description:
       'Adapts web pages for people with color vision deficiencies by detecting and fixing hard-to-distinguish color combinations.',
     permissions: ['storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
-  },
+    // Firefox only (Chromium ignores the key and WXT leaves it out): a stable add-on id gives the
+    // extension a stable moz-extension:// origin and is required for MV3 and for signing. The id
+    // is a placeholder until the extension is published (M11). The extension collects nothing.
+    ...(browser === 'firefox'
+      ? {
+          browser_specific_settings: {
+            gecko: {
+              id: 'coloradapt@coloradapt.invalid',
+              data_collection_permissions: { required: ['none'] },
+            },
+          },
+        }
+      : {}),
+  }),
   vite: ({ mode }) => ({
     // `wxt build --mode e2e` (docs/DEVELOPMENT.md) is the shipped build plus one thing: the analyzer
     // runs on a logical clock (features/page-analysis/build-mode.ts). Vite would otherwise treat any

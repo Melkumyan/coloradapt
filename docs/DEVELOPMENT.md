@@ -305,6 +305,19 @@ Add a pair in `adaptation-pairs.ts`; a hard-safety violation fails the suite.
 `dynamic-benchmark.test.ts` likewise writes `dynamic-benchmark.json` (mutation counters;
 wall-clock informational only).
 
+### Real-world validation (M10)
+
+A harness drives the installed Chrome and Firefox against 193 live pages and hostile local fixtures:
+
+```sh
+pnpm build && pnpm build:firefox
+pnpm test:realworld                         # everything, about two hours
+RW_BROWSER=firefox RW_ONLY=gov-uk pnpm test:realworld corpus-run   # one page, one browser
+```
+
+It is not part of `pnpm verify`. Layout, environment, results and the known open findings are in
+`docs/REAL_WORLD_VALIDATION.md`.
+
 ## Debugging the analyzer on a real page
 
 Set `data-coloradapt-debug` on `<html>` (e.g. via devtools:

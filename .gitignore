@@ -41,3 +41,8 @@ Desktop.ini
 benchmark-report/
 playwright-report/
 test-results/
+
+# M10 real-world harness
+realworld/.tools/
+realworld/.artifacts/
+dist-profile/

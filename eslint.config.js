@@ -15,6 +15,10 @@ export default tseslint.config(
       'benchmark-report/**',
       'playwright-report/**',
       'test-results/**',
+      'dist-profile/**',
+      'realworld/tools/**',
+      'realworld/.tools/**',
+      'realworld/.artifacts/**',
     ],
   },
   js.configs.recommended,
@@ -47,8 +51,9 @@ export default tseslint.config(
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    files: ['tests/**/*.{ts,tsx}', 'e2e/**/*.ts'],
+    files: ['tests/**/*.{ts,tsx}', 'e2e/**/*.ts', 'realworld/**/*.ts'],
     rules: {
+      'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
