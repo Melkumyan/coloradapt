@@ -1,16 +1,37 @@
-import { analyzeDocument, toAnalysisResult, type AnalyzeDocumentOptions } from '@core/analysis';
+import {
+  analyzeDocument,
+  analyzeSubtrees,
+  toAnalysisResult,
+  type AnalyzeDocumentOptions,
+} from '@core/analysis';
 import { createDetailedAdaptationPlan, StylesheetManager } from '@core/adaptation';
 import { detectColorConflict } from '@core/conflicts';
-import type { AdaptationPlan, AnalysisResult, ColorConflict, UserSettings } from '@domain/models';
-import { ChartController, type ChartEnvironment } from '../charts';
-import { ImageController, type ImageEnvironment, type ImageInfo } from '../images';
+import type {
+  AdaptationPlan,
+  AnalysisResult,
+  ColorConflict,
+  ElementDescriptor,
+  UserSettings,
+} from '@domain/models';
+import { ChartController, type ChartAuditScan, type ChartEnvironment } from '../charts';
+import {
+  ImageController,
+  type ImageAuditScan,
+  type ImageEnvironment,
+  type ImageInfo,
+} from '../images';
 import { findNotAdaptable } from './adaptability';
 import {
   SemanticCueController,
   type FactsEnvironment,
+  type SemanticAuditScan,
   type SemanticInspection,
 } from '../semantics';
-import { IncrementalAdaptationSession, type IncrementalAdaptation } from './incremental-adaptation';
+import {
+  IncrementalAdaptationSession,
+  type IncrementalAdaptation,
+  type TrackedKind,
+} from './incremental-adaptation';
 
 /**
  * Development-only, opt-in diagnostics: logs a one-line analysis summary
@@ -31,6 +52,31 @@ function logDebugSummary(doc: Document, result: AnalysisResult): void {
     unresolved: result.unresolvedCount,
     truncated: result.truncated,
   });
+}
+
+/** Elements one developer-audit pass analyzes (more than the live pipeline's budget, still bounded). */
+export const AUDIT_MAX_ELEMENTS = 5000;
+
+/**
+ * Everything the developer audit (docs/DEVELOPER_AUDIT.md) reads from the page layers in one pass,
+ * all of it measured with ColorAdapt's own rules suspended: the page as authored, never the page as
+ * adapted. Data and elements only; turning it into findings is `features/audit`'s job.
+ */
+export interface AuditSources {
+  /** The CSS/SVG analysis (M1, M5) of the document body, with the element behind every descriptor. */
+  readonly elements: readonly ElementDescriptor[];
+  readonly nodes: ReadonlyMap<string, Element>;
+  readonly truncated: boolean;
+  /** Elements whose foreground a plain `color` rule cannot reproduce (M3 leaves them alone). */
+  readonly notAdaptable: ReadonlySet<string>;
+  /** What the color layer decided for an element right now; `null` while adaptation is off. */
+  readonly trackedKind: (id: string) => TrackedKind | null;
+  /** Adaptation is running (a full adaptation began and was not ended). */
+  readonly adaptationActive: boolean;
+  readonly semantic: SemanticAuditScan;
+  readonly charts: ChartAuditScan;
+  readonly images: ImageAuditScan;
+  readonly getStyle: (element: Element) => CSSStyleDeclaration;
 }
 
 export interface ContentController {
@@ -57,6 +103,11 @@ export interface ContentController {
   settleImages(): Promise<void>;
   /** What the image layer made of one image (read-only; for tests and debugging). */
   inspectImage(element: Element): ImageInfo | null;
+  /**
+   * One read-only pass over the page for the developer audit. Writes nothing the page can see
+   * (the analyzer's own `data-coloradapt-id` attribute aside) and works whether or not adaptation is on.
+   */
+  auditSources(options?: { readonly maxElements?: number }): AuditSources;
 }
 
 /**
@@ -197,6 +248,60 @@ export function createContentController(
     return { analysis, adaptation };
   }
 
+  function auditSources(options: { readonly maxElements?: number } = {}): AuditSources {
+    const root = doc.body;
+    const emptyScan = {
+      semantic: { records: [], enabled: false, candidates: 0 },
+      charts: { charts: [], canvases: [], active: false, truncated: false },
+      images: { records: [], images: 0, truncated: false },
+    } as const;
+    if (!root) {
+      return {
+        elements: [],
+        nodes: new Map(),
+        truncated: false,
+        notAdaptable: new Set(),
+        trackedKind: () => null,
+        adaptationActive: session.active,
+        ...emptyScan,
+        getStyle,
+      };
+    }
+    try {
+      const { pass, unsafe } = stylesheetManager.withOriginalStyles(() => {
+        const analysis = analyzeSubtrees([{ element: root, scope: 'subtree' }], {
+          ...analyzerOptions,
+          maxElements:
+            options.maxElements ?? Math.max(analyzerOptions.maxElements ?? 0, AUDIT_MAX_ELEMENTS),
+        });
+        return {
+          pass: analysis,
+          unsafe: findNotAdaptable(
+            doc,
+            analysis.elements.filter((element) => element.analysisStatus === 'resolved'),
+            getStyle,
+            analysis.nodes,
+          ),
+        };
+      });
+      return {
+        elements: pass.elements,
+        nodes: pass.nodes,
+        truncated: pass.truncated,
+        notAdaptable: unsafe,
+        trackedKind: (id) => (session.active ? session.trackedKind(id) : null),
+        adaptationActive: session.active,
+        semantic: semantic.auditScan(root),
+        charts: charts.auditScan(root),
+        images: images.auditScan(root),
+        getStyle,
+      };
+    } finally {
+      // The analysis above asked the chart layer who owns which SVG; that is only valid for this pass.
+      charts.endPass();
+    }
+  }
+
   function disableAdaptation(): void {
     session.end();
     stylesheetManager.restore();
@@ -218,5 +323,6 @@ export function createContentController(
     bindChartInvalidation: (invalidate) => charts.bindInvalidation(invalidate),
     settleImages: () => images.settle(),
     inspectImage: (element) => images.inspect(element),
+    auditSources,
   };
 }

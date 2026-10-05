@@ -23,6 +23,26 @@ alone — there is no backend for it to send data to.
   and are revoked when no longer shown. See `docs/IMAGE_ADAPTATION.md`. M8.R1 re-checked it: the manifest permissions are unchanged since
   `m7-charts` (`storage`, `http(s)` host access), the image layer adds no host, no upload and no
   analytics, and with it on the set of hosts the page contacts is the same as with it off (E2E).
+- **Developer audit (M9) is local and on demand.** The audit page asks the content script of one tab for a
+  report; nothing is sent to a server, it makes no network request, and there is no telemetry (counters such
+  as `auditExports` stay in memory). With no audit page open it does nothing. It reads the same page data as
+  the rest of the extension (computed styles, structure) plus a few attributes it needs (`aria-*`, `role`,
+  `alt`, class and id names, the `type` of an `input`). It never reads or exports values of `input`,
+  `textarea`, `select`, `contenteditable` or password fields, cookies, storage, headers, `href`/`src` or
+  `data-*` attributes, and no full HTML. Visible text appears only as a snippet of at most 40 characters of an
+  element's own text with emails, long numbers and opaque tokens replaced, and never for form controls or
+  editable regions. A report keeps the page's origin and pathname (opaque path segments redacted) and never the
+  query, fragment or credentials. Exports (JSON; standalone HTML with no script or remote resource) are made in
+  the audit page and saved through the browser's download; ColorAdapt does not store or upload them. The
+  highlight is a temporary overlay box that reads and sends nothing. Page text also loses every control,
+  bidirectional, zero-width and line-separator character and unpaired surrogate (they cannot reorder or
+  hide text in a report); only a bounded window of an element's text is ever read (a 100 KB element adds one
+  40-character snippet). **Nothing of an audit is persisted**: findings, locators, page text and exports live
+  in memory (page and audit tab) and are gone when either closes; no `chrome.storage` key, `localStorage`,
+  IndexedDB or cache holds any of it (checked in a real browser). The audit page learns the tab's address
+  from the browser only to compare its sanitized origin and path with the snapshot's; the raw address is
+  neither stored nor exported. A report is always the whole snapshot, whatever the audit page's filters
+  show. See `docs/DEVELOPER_AUDIT.md` and `docs/AUDIT_EXPORT_SCHEMA.md`.
 - **No telemetry.** There is no analytics or crash-reporting SDK in this
   project, and none is planned as a default-on feature.
 - **No account, no registration, no login.** The extension works

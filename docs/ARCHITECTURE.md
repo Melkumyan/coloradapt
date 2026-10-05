@@ -48,6 +48,9 @@ algorithm needs to change, only `core/color` changes.
 | Image core (`core/images`)                | DOM-free raster-image logic (M8): bounded sampling, deterministic OKLab color clusters, pairwise M2 analysis, classification (kind + confidence + evidence), policy (default: leave it alone), and the cluster-aware monochrome-icon plan on top of the M3 optimizer. Pixels in, pixels out. See `docs/IMAGE_ADAPTATION.md`.                                                                                                                                                                                        |
 | Image layer (`features/images`)           | The only code that reads an image into pixels (offscreen canvas, never the page's canvases), shows a generated bitmap in place of a source and puts it back. A memory-only cache owns and revokes every object URL; generations guard every async result; no document observer (M4 hands it regions, one capture-phase `load`/`error` listener covers loads). Off unless `adaptImages`.                                                                                                                             |
 | Chart layer (`features/charts`)           | The only code that reads an `<svg>` into chart facts and applies a plan: owned `<defs>`, decorative overlays, `data-coloradapt-chart-*` attributes and one static CSS portion inside the managed `<style>`; verifies against the browser, rolls back, reverses. No document observer (M4 delivers regions); a bounded `ResizeObserver` + scoped `MutationObserver` bridge (`chart-watch.ts`) only signals M4. The HTML legend guard (`html-legend.ts`) refuses charts that may have a legend M7 cannot synchronize. |
+| Audit core (`core/audit`)                 | DOM-free developer audit (M9): rule registry, evaluators over plain data from M1–M8, severity model, dedup, grouping, snapshot, filters, JSON/HTML export, privacy helpers. See `docs/DEVELOPER_AUDIT.md`.                                                                                                                                                                                                                                                                                                          |
+| Audit layer (`features/audit`)            | Collector (audit sources → candidates), element locator, one-box highlighter, snapshot store with generations, `AuditController` (on-demand pass, debounced live session, SPA re-audit). Reads only; no analysis of its own.                                                                                                                                                                                                                                                                                        |
+| Audit page (`entrypoints/audit`)          | React extension page opened from the popup with `?tabId=N`: summary, filters, finding cards, highlight controls, export. Holds a port to the audited tab.                                                                                                                                                                                                                                                                                                                                                           |
 | Conflict Detection (`core/conflicts`)     | Decide whether a foreground/background pair is a likely problem for a vision profile.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Adaptation Engine (`core/adaptation`)     | Constrained candidate search (OKLCH) -> `AdaptationResult` -> DOM-free `AdaptationPlan`; the stylesheet manager applies/restores a plan. See `docs/ADAPTATION_ENGINE.md`.                                                                                                                                                                                                                                                                                                                                           |
 | Settings Store (`infrastructure/storage`) | The only code that knows the storage schema/keys; validates data read back from `browser.storage`.                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -86,6 +89,11 @@ actually support:
   `REFRESH_ADAPTATION`. Only a content script can see/modify the page DOM.
   Two debug-only messages, `GET_DYNAMIC_DIAGNOSTICS` and `FLUSH_DYNAMIC`, expose the
   dynamic pipeline's local counters to the E2E suite (nothing leaves the device).
+  The developer audit (M9) adds `AUDIT_RUN`, `AUDIT_GET`, `AUDIT_HIGHLIGHT`, `AUDIT_CLEAR_HIGHLIGHT`,
+  `AUDIT_CLOSE`, `AUDIT_NOTE_EXPORT` and the debug-only `AUDIT_DIAGNOSTICS`; payload types live in
+  `core/audit/session.ts`. An open audit page also holds a `runtime` port named `coloradapt-audit`
+  (`AUDIT_PORT_NAME`) to the content script: while it is open the audit re-runs on page changes (batched),
+  and when it drops (tab closed or navigated) the session ends and the highlight is removed.
 
 Every message is validated at the receiving end with `isColorAdaptMessage`
 before being dispatched, since both `runtime.onMessage` and
@@ -144,10 +152,17 @@ before being dispatched, since both `runtime.onMessage` and
    generated bitmap through an object URL that a memory-only cache owns and revokes. Photographs,
    logos, screenshots, charts, status graphics and anything uncertain are untouched. M4 supplies the
    regions; one capture-phase `load`/`error` listener covers loads. See `docs/IMAGE_ADAPTATION.md`.
-9. Disabling adaptation removes that one stylesheet. The page's original
-   styles were never touched, so this is an exact restore. Every analysis
-   (including re-scans while adapted) runs with the stylesheet suspended, so
-   the original styles stay the source of truth and adaptation never compounds.
+9. The developer audit (M9) is a separate, on-demand consumer: `ContentController.auditSources()` re-reads the
+   page once under `withOriginalStyles` (M1/M5 descriptors, M3 outcomes, and read-only `auditScan` hooks of the
+   M6/M7/M8 layers), `features/audit` turns that into candidates and `core/audit` into a snapshot. It works
+   whether or not adaptation is on, never adapts, and writes only the analyzer's `data-coloradapt-id` and its own
+   highlight box. The highlight (`data-coloradapt-audit-overlay`, `position: fixed`, `pointer-events: none`, on
+   `<html>`) is a ColorAdapt-owned node: `features/dynamic-analysis/ownership.ts` treats its insertion and
+   `style` changes as self-mutations, and the audit skips it. See `docs/DEVELOPER_AUDIT.md`.
+10. Disabling adaptation removes that one stylesheet. The page's original
+    styles were never touched, so this is an exact restore. Every analysis
+    (including re-scans while adapted) runs with the stylesheet suspended, so
+    the original styles stay the source of truth and adaptation never compounds.
 
 ## Why no `<all_urls>`
 

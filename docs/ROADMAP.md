@@ -343,12 +343,56 @@ verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5
 - Validation: 1748 unit tests; image-focused tests x50 **50/50**; full suite x5 **5/5**; the 300-chart test
   x20 isolated **20/20**; `pnpm verify` x3 **3/3**; Chromium E2E **526 passed / 1 skipped / 0 failed**, x5
   **5/5** (M8: 509 / 1 / 0; R1 added 17). Firefox: build passes, runtime NOT_VERIFIED. M2 stays PARTIAL.
-- Next: M9 — Developer Audit (not started).
+- Next: M9 — Developer Audit (done: see M9 and M9.R1 below).
 
-## M9 — Developer Audit ⬜
+## M9 — Developer Audit ✅ (M9 + M9.R1 PASS; upstream M2 scientific status stays PARTIAL)
 
-- Full-page accessibility report: conflicts found, recommendations,
-  exportable output.
+- `core/audit`: a pure, DOM-free pipeline — rule registry (stable ids `CA-COLOR-001/002/003`, `CA-GEN-001`,
+  `CA-SEM-001/002`, `CA-SVG-001/002`, `CA-CHART-001..004`, `CA-IMG-001..003`), candidate → instance →
+  dedupe → group → snapshot, one centralized severity model, separate finding confidence and M2
+  scientific (model) confidence, evidence with an explicit basis, deterministic recommendations (M3
+  suggestions labeled ColorAdapt-generated), no score, "related to" WCAG mapping only.
+- `features/audit`: collector over read-only `auditScan` hooks of M6/M7/M8 and `auditSources()` of the
+  content controller (everything read under `withOriginalStyles`, ColorAdapt-owned nodes ignored), element
+  locator (structural identity, bounded redacted text, no form values), one-box highlighter, snapshot store
+  with generations, controller with a debounced live session and SPA-aware re-audit.
+- Audit page (`audit.html?tabId=N`, from the popup): summary, filters (severity, category, confidence,
+  ColorAdapt status, kind, search), expandable cards, element highlight and next/previous, JSON and
+  standalone HTML export (CSP, escaped, offline). Typed `AUDIT_*` messages and a `coloradapt-audit` port.
+- Works with adaptation off (audit-only); source findings are the same with adaptation on or off.
+- **M9.R1 — Developer Audit Validation & Freeze: PASS.** Validated, not extended; what it changed:
+  - claims: a WCAG wording invariant over rule metadata, recommendations, UI source, JSON, HTML and the audit
+    docs (only "related to", never conformance or non-conformance); no score; registry ↔ docs consistency
+    (`AUDIT_RULES.md` summary table and per-rule sections); critical also needs "no non-color redundancy";
+  - privacy and export: invisible/bidi/zero-width/line-separator characters and unpaired surrogates removed from
+    page text (and refused by the parser); text read through a bounded window (no quadratic scan); strict
+    parser (origin without credentials, path without `@`/query, locator bounds, `related-to` only); hostile
+    markup and Unicode checked through a real export opened in Chromium (no script, dialog, request or
+    navigation); nothing persisted in extension storage or the audit origin; no network beyond the page's;
+  - coverage: `coverage.subsystems` (complete / partial / disabled / unsupported) in the snapshot, the audit
+    page and both reports; M8 pixel analysis disclosed as disabled unless adaptation and image adaptation
+    are on; truncation says "Audit truncated: coverage limited"; shadow DOM, frames, borders and focus rings
+    stay explicitly unsupported; confirmed issues, manual reviews and limitations are counted apart;
+  - identity: finding id = rule + component + region scope + context (so two landmarks with the same
+    component are two findings), stable across refresh x20, open/close, adaptation on/off, reorder, same-tag
+    insertion, node replacement and reparenting within a region; instance ids stay structural best effort
+    (class- or text-based ids rejected: they change exactly when a problem is fixed); contract in
+    `DEVELOPER_AUDIT.md`;
+  - fixes found by the validation: a highlight on a hidden element drew a box in the page corner; a
+    highlight stayed on an element that was no longer part of any finding; keyboard focus fell to `<body>`
+    when the focused card disappeared; a route change without DOM changes left the report address stale (now
+    updated from `tabs.onUpdated`, with export paused while pending; the History API is still never hooked);
+  - benchmark: 342 scenarios (144 before), 193 expected = 193 actual confirmed findings, 32 manual reviews,
+    2 analysis limitations, 0 false confirmed, 0 false negatives, 0 source differences with adaptation on
+    (the color-vision pairs are regression-locked against the M2 simulation, not independently validated);
+  - stability: audit-focused tests x50 **50/50**, privacy/export/id tests x100 **100/100**, full suite x5
+    **5/5** (2489 tests), `pnpm verify` x3 **3/3**, Chromium E2E x5 **5/5** (582 passed / 1 skipped / 0
+    failed). Firefox: build passes, runtime NOT_VERIFIED. The 90 s hang guard on one M4 benchmark is
+    test-local: the same structural work and the same isolated time as at M8 (~11 s), so it never hid a regression.
+- Known technical debt, carried to **M11 Production Hardening**: the per-site `adaptCharts` setting is stored
+  but the chart runtime does not consult it (frozen M7 behavior; not changed in M9, not exposed in the audit UI).
+  M2 stays PARTIAL and is propagated into every simulation-based finding.
+- See `docs/DEVELOPER_AUDIT.md`.
 
 ## M10 — AI Semantic Engine ⬜
 

@@ -81,6 +81,40 @@ export interface ImageInfo {
   readonly originalSource: string | null;
 }
 
+/** One image as the developer audit sees it (docs/DEVELOPER_AUDIT.md). Decorative images are not listed. */
+export interface ImageAuditRecord {
+  readonly element: Element;
+  readonly kind: ImageKind;
+  readonly confidence: ImageConfidence;
+  /** What the layer decided (pixels read, `adaptImages` on); `null` when it never looked at this image. */
+  readonly layer: ImageInfo | null;
+  readonly interactive: boolean;
+  /** Rendered no larger than a control icon. */
+  readonly small: boolean;
+  /** From another origin without a `crossorigin` request: the browser will not let anyone read its pixels. */
+  readonly crossOrigin: boolean;
+}
+
+export interface ImageAuditScan {
+  readonly records: readonly ImageAuditRecord[];
+  readonly images: number;
+  readonly truncated: boolean;
+}
+
+/** Longest rendered side of an image that counts as a control icon for the audit. */
+const AUDIT_SMALL_IMAGE = 64;
+
+/** The size an image is shown at (its own size while nothing is laid out yet). */
+function sideOf(facts: {
+  renderedWidth: number;
+  renderedHeight: number;
+  naturalWidth: number;
+  naturalHeight: number;
+}): number {
+  const rendered = Math.max(facts.renderedWidth, facts.renderedHeight);
+  return rendered > 0 ? rendered : Math.max(facts.naturalWidth, facts.naturalHeight);
+}
+
 interface Applied {
   readonly entry: GeneratedImage;
   readonly original: OriginalSource;
@@ -263,6 +297,63 @@ export class ImageController {
       readability: state.readability,
       originalSource: state.applied?.source ?? null,
     };
+  }
+
+  /**
+   * The developer audit's read-only look at the images under `root`. No pixel is read here: what
+   * is known without pixels comes from the DOM (a chart word in the name, the page's own source
+   * even while a generated bitmap is shown), and what the layer learned with the user's opt-in
+   * (`adaptImages`) is passed along as it is.
+   */
+  auditScan(root: Element): ImageAuditScan {
+    const records: ImageAuditRecord[] = [];
+    const found = findImages({ element: root, scope: 'subtree' }, IMAGE_LIMITS.maxImagesPerPass);
+    this.#sheet.withOriginalStyles(() => {
+      for (const element of found) {
+        if (!element.isConnected) continue;
+        try {
+          const layer = this.inspect(element);
+          const state = this.#states.get(element);
+          const source = state?.applied?.source ?? currentSource(element);
+          const facts = readImageFacts(element, {
+            doc: this.#doc,
+            getStyle: this.#getStyle,
+            source,
+          });
+          if (isDecorative(facts)) continue;
+          const classification =
+            layer && layer.kind !== 'unknown'
+              ? { kind: layer.kind, confidence: layer.confidence }
+              : classifyImage(facts, null);
+          records.push({
+            element,
+            kind: classification.kind,
+            confidence: classification.confidence,
+            layer,
+            interactive: facts.interactive,
+            small: sideOf(facts) > 0 && sideOf(facts) <= AUDIT_SMALL_IMAGE,
+            crossOrigin: this.#isCrossOrigin(element, source),
+          });
+        } catch {
+          // An image that cannot be read is not audited.
+        }
+      }
+    });
+    return {
+      records,
+      images: found.length,
+      truncated: found.length >= IMAGE_LIMITS.maxImagesPerPass,
+    };
+  }
+
+  #isCrossOrigin(element: Element, source: string): boolean {
+    if (!/^https?:/i.test(source)) return false;
+    if (element.hasAttribute('crossorigin')) return false;
+    try {
+      return new URL(source).origin !== new URL(this.#doc.baseURI).origin;
+    } catch {
+      return false;
+    }
   }
 
   /** Resolves once no read, build or queued evaluation is outstanding. For tests and flushes. */

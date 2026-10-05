@@ -27,6 +27,9 @@ export default defineConfig({
             'import.meta.env.PROD': 'true',
             'process.env.NODE_ENV': '"production"',
           },
+          // The React runtime above is the production one, which has no `jsxDEV`: compile JSX for it too
+          // (Vite would otherwise emit the development transform for any mode but `production`).
+          oxc: { jsx: { development: false } },
         }
       : {}),
     resolve: {

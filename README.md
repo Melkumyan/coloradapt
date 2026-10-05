@@ -83,6 +83,21 @@ focus order, clicks, typing and form behavior are identical with and without cue
 verdicts follow their peers (a removed or changed neighbor takes a stale cue away). No screen reader
 was run. See `docs/SEMANTIC_ACCESSIBILITY.md`.
 
+M9 adds a **developer audit**: a read-only report that turns what M1–M8 know into findings with a
+severity, a separate confidence, the evidence, the affected elements, a deterministic recommendation and
+whether ColorAdapt already compensated for it. It is opened from the popup ("Developer audit") in its own
+tab, works with adaptation off, always describes the **original** page (ColorAdapt's own recoloring, cues,
+chart encodings and generated images never hide a source problem), keeps "needs manual review" and "could not
+analyze" apart from real issues, highlights the affected element on the page (a temporary outline, no layout
+change) and exports a versioned JSON report and a standalone HTML report with no form values, query strings
+or fragments. There is no accessibility score and no WCAG conformance claim. Local only, on demand. See
+`docs/DEVELOPER_AUDIT.md`, `docs/AUDIT_RULES.md` and `docs/AUDIT_EXPORT_SCHEMA.md`. M9 status: **engineering PASS**
+(validated by M9.R1: benchmark of 342 scenarios with no false confirmed finding, privacy and hostile-content
+checks in a real browser, explicit coverage disclosure, stability repeats); upstream scientific confidence
+stays PARTIAL (M2). The audit's image pixel analysis needs image adaptation (otherwise it is reported as
+disabled, not as "no image issues"); shadow DOM, frames, borders and focus rings are not audited; Firefox
+runtime is NOT_VERIFIED.
+
 Status: **M3 engineering PASS** (validated in real Chromium); **upstream
 scientific confidence PARTIAL** (M2 model assumption). Known limitations:
 a page's own `:hover`/`:focus` colors are

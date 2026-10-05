@@ -83,6 +83,35 @@ The content script reads values out of an arbitrary, untrusted web page
   allocation ceiling for transformed bitmaps, bounded queue, concurrency and cache
   (`docs/IMAGE_ADAPTATION.md`).
 
+## Developer audit (M9)
+
+- **Typed messages only.** The audit uses `AUDIT_*` entries of `MessageMap`; the content script validates every
+  message with `isColorAdaptMessage` as before. The audit port is accepted only under the name
+  `coloradapt-audit` (`AUDIT_PORT_NAME`); any other port is ignored. Port messages carry only a generation
+  number; the snapshot travels over the typed channel.
+- **No page text as markup.** The audit page is React (text nodes, never `innerHTML`/`dangerouslySetInnerHTML`).
+  The standalone HTML report escapes every page-derived string (`escapeHtml`: `& < > " '`), inserts nothing as
+  markup, contains no script and no external resource, and sets `Content-Security-Policy: default-src 'none';
+style-src 'unsafe-inline'`, so `<script>`, `<img onerror>` and `javascript:` text from a page stay inert.
+- **Untrusted page, bounded reads.** Names, text and URLs from the page pass through `core/audit/privacy.ts`
+  (length caps, safe characters, redaction) before they can enter a report; text is read through a bounded tree
+  walk and a bounded window (no quadratic scan of 100 KB of text); no `JSON.parse` of page strings.
+- **Hostile and invisible text.** Control, bidirectional (RTL override, isolates), zero-width, format and
+  line/paragraph-separator characters and unpaired surrogates are removed from page-derived strings, in
+  the snapshot builder, in `escapeHtml` and again in `createAuditReport`; `parseAuditReport` rejects a
+  report that still holds one, an origin with credentials, and a path with `@`, whitespace or a query.
+  Verified in a real browser: a hostile page (`<script>`, `<img onerror>`, `</style><script>`, `"><svg onload>`,
+  RTL override, 120 000 characters of text) produces a JSON that parses and an HTML report that executes
+  nothing, opens no dialog, requests nothing but itself, and holds no `<script>`, `<img>` or `<svg>`.
+- **No History API hooks.** Neither the content script nor the audit patches `history.pushState` /
+  `replaceState`; the audit page uses the browser's `tabs.onUpdated` (a test scans the source and the built
+  bundle for hooks).
+- **The highlight is inert.** One `position: fixed`, `pointer-events: none`, `aria-hidden` box on `<html>`; it
+  intercepts no click, takes no focus, is never given page content, and is removed when the session ends.
+- **No new permission, no network.** The audit adds no permission or host; export is a local Blob download.
+- **Read-only.** The audit never writes to the page except the analyzer's own `data-coloradapt-id` and its
+  highlight box; both are filtered as ColorAdapt's own mutations.
+
 ## Prototype pollution / unsafe parsing
 
 - `infrastructure/storage/schema.ts` parses values read back from

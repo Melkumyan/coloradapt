@@ -42,7 +42,7 @@ import { findNotAdaptable } from './adaptability';
 const MAX_MEMO_ENTRIES = 2048;
 
 /** What the page-level bookkeeping remembers per element: a string, never a node. */
-type TrackedKind = ElementOutcome['kind'] | 'notApplied';
+export type TrackedKind = ElementOutcome['kind'] | 'notApplied';
 
 export interface IncrementalPassInput {
   /** Regions to re-analyze (already de-duplicated by the caller). */
@@ -85,6 +85,8 @@ export interface IncrementalAdaptation {
   imageDiagnostics(): ImageDiagnostics;
   /** Elements the bookkeeping currently tracks (ids only; for leak tests and diagnostics). */
   trackedCount(): number;
+  /** What the color layer decided for one analyzed element, `null` when it is not tracked (developer audit). */
+  trackedKind(id: string): TrackedKind | null;
   /** Gauges of the inline-SVG units currently tracked. */
   svgDiagnostics(): SvgDiagnostics;
   /** Re-analyzes `input.roots` and applies only the difference. */
@@ -230,6 +232,10 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
 
   trackedCount(): number {
     return this.#kinds.size;
+  }
+
+  trackedKind(id: string): TrackedKind | null {
+    return this.#kinds.get(id) ?? null;
   }
 
   svgDiagnostics(): SvgDiagnostics {

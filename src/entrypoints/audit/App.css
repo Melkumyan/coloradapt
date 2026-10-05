@@ -1,0 +1,272 @@
+:root {
+  color-scheme: light dark;
+  --ca-bg: #ffffff;
+  --ca-fg: #1a1a1a;
+  --ca-muted: #505050;
+  --ca-border: #8a8a8a;
+  --ca-soft: #d6d6d6;
+  --ca-card: #f6f6f6;
+  --ca-focus: #0b57d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ca-bg: #1b1c1f;
+    --ca-fg: #f1f1f1;
+    --ca-muted: #bdbdbd;
+    --ca-border: #8f9196;
+    --ca-soft: #3a3c40;
+    --ca-card: #25272b;
+    --ca-focus: #8ab4f8;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--ca-bg);
+  color: var(--ca-fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.audit {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+  margin: 0 0 0.3rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 1.4rem 0 0.4rem;
+}
+
+h4 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.2rem;
+}
+
+.muted {
+  color: var(--ca-muted);
+}
+
+code {
+  font-family: ui-monospace, 'Cascadia Mono', monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+select,
+input[type='search'] {
+  max-width: 100%;
+}
+
+button,
+select,
+input[type='search'] {
+  font: inherit;
+  color: inherit;
+  background: var(--ca-bg);
+  border: 1px solid var(--ca-border);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  min-height: 2rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ca-focus);
+  outline-offset: 2px;
+}
+
+.audit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.notice {
+  border: 2px dashed var(--ca-border);
+  border-radius: 6px;
+  padding: 0.5rem 0.8rem;
+}
+
+/* Severity is a word and a shape; the outline style changes with it, hue adds nothing the text lacks. */
+.badge {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  min-width: 6.2rem;
+  padding: 0.05rem 0.5rem;
+  border: 2px solid var(--ca-border);
+  border-radius: 4px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badge--critical {
+  border-style: double;
+  border-width: 4px;
+}
+
+.badge--high {
+  border-style: solid;
+  border-width: 3px;
+}
+
+.badge--medium {
+  border-style: solid;
+}
+
+.badge--low {
+  border-style: dashed;
+}
+
+.badge--info {
+  border-style: dotted;
+}
+
+.summary__severity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  list-style: none;
+  padding: 0;
+}
+
+.filters__groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.8rem;
+  margin: 0.6rem 0;
+}
+
+.filters__group {
+  border: 1px solid var(--ca-soft);
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+}
+
+.filters__option {
+  display: block;
+}
+
+.filters__search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-width: 28rem;
+}
+
+.card {
+  border: 1px solid var(--ca-border);
+  border-radius: 6px;
+  background: var(--ca-card);
+  margin: 0.6rem 0;
+  padding: 0.5rem 0.8rem;
+}
+
+.card__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.card__toggle {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  font-weight: 600;
+}
+
+.card__toggle[aria-expanded='true']::after {
+  content: '▾';
+  margin-left: auto;
+}
+
+.card__toggle[aria-expanded='false']::after {
+  content: '▸';
+  margin-left: auto;
+}
+
+.card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 1rem;
+  margin: 0.2rem 0 0;
+  color: var(--ca-muted);
+  font-size: 0.9rem;
+}
+
+.card__panel {
+  margin-top: 0.4rem;
+  border-top: 1px solid var(--ca-soft);
+}
+
+.card__panel[hidden] {
+  display: none;
+}
+
+.card__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.card__targets {
+  padding-left: 1.4rem;
+}
+
+.card__targets li[aria-current='true'] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.evidence {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.evidence th,
+.evidence td {
+  border: 1px solid var(--ca-soft);
+  padding: 0.2rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+@media (max-width: 640px) {
+  .audit {
+    padding: 0.6rem;
+  }
+
+  .badge {
+    min-width: 0;
+  }
+}

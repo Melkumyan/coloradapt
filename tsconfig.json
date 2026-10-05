@@ -18,6 +18,7 @@
     }
   },
   "include": [
+    ".wxt/wxt.d.ts",
     "src",
     "tests",
     "e2e",

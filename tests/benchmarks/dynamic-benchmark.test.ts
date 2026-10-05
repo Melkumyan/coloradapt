@@ -149,13 +149,19 @@ describe('dynamic benchmark: synchronous inserts', () => {
     expect(r.elementsProcessed).toBeLessThan(r.naiveElementsInspected / 500);
   });
 
-  it('1000 inserts: exceeds the root budget, so exactly one controlled full rescan', () => {
-    const { row: r } = run(insertScenario(1000));
-    expect(r.analysisPasses).toBe(1);
-    expect(r.fullRescans).toBe(1);
-    expect(r.incrementalPasses).toBe(0);
-    expect(r.mutationRecords).toBe(1000);
-  });
+  // ~7 s alone, ~30 s when the whole suite shares the CPU: the timeout is a hang guard only (no assertion
+  // here depends on time), so it is generous for this one test.
+  it(
+    '1000 inserts: exceeds the root budget, so exactly one controlled full rescan',
+    { timeout: 90_000 },
+    () => {
+      const { row: r } = run(insertScenario(1000));
+      expect(r.analysisPasses).toBe(1);
+      expect(r.fullRescans).toBe(1);
+      expect(r.incrementalPasses).toBe(0);
+      expect(r.mutationRecords).toBe(1000);
+    },
+  );
 });
 
 describe('dynamic benchmark: attribute storms', () => {

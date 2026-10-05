@@ -283,3 +283,32 @@ Structural bounds, no wall-clock gates (`docs/IMAGE_ADAPTATION.md`, "Sampling an
   ~12.4 s alone on both M7 (`3a3e8d4`) and M8 (the same structural work), and ~30 s only when all
   workers are busy: contention, not a regression. The global Vitest `testTimeout` stays 30 s; only
   that test has its own 90 s hang guard.
+
+## Developer audit (M9)
+
+- **Closed audit = zero cost.** No observer, timer or work exists until an audit page asks. A pass runs on
+  `AUDIT_RUN`; a live session (audit page open) adds one `MutationObserver` that ignores ColorAdapt's own
+  mutations.
+- **Live session spacing**: a pass starts 400 ms after the first mutation of a burst and at least 1200 ms
+  after the previous one started (`AUDIT_WATCH`; the timer is not pushed back, the pass reads the page when it
+  fires, so the last mutation is always in it); a burst is one pass. A route change reported by the browser
+  (`tabs.onUpdated`, sanitized origin/path differ) schedules one pass 600 ms later from the audit page; a
+  query/fragment-only change schedules none.
+- **Budget boundaries are exact and deterministic** (`tests/core/audit/review-coverage.test.ts`,
+  `tests/features/audit/budgets.test.ts`): 999 / 1000 / 1001 groups keep 999 / 1000 / 1000 and count 0 / 0 /
+  1 as truncated; an affected count stays exact at 49 / 50 / 51 / 500 / 5000 while 50 are sampled; reaching
+  a budget is stated in `coverage` ("Audit truncated: coverage limited"), never silent.
+- **Recorded per pass, structurally** (no wall-clock threshold): `elementsAnalyzed`, instances, groups
+  (`summary.findings`), `affectedElements`, `budgetsReached`, passes and live passes (`AUDIT_DIAGNOSTICS`).
+- **Budgets (structural, no wall clock)**: `AUDIT_MAX_ELEMENTS` = 5000 elements per pass (the single `<body>`
+  root is cut only by this count), 1500 semantic candidates, chart marks 20 000 per pass and 500 canvases,
+  500 images. When one ends a pass, CA-GEN-001 says which. A pass reads each layer's facts once with the layers'
+  own read code; it does not run adaptation.
+- **Linear work**: element locators are memoized per pass (a path is built from its parent's, a sibling index is
+  computed once per parent); dedup and grouping are single passes over the candidates; M3 plan outcomes are
+  memoized per color pair.
+- **Bounded output**: 50 affected elements kept per finding (the count is exact; a weak element registry holds
+  the rest for highlighting), at most 1000 finding groups per snapshot (the rest counted in
+  `coverage.truncatedFindings`), 200 findings drawn at a time in the audit page; exports are made from the
+  snapshot already in the page.
+- **Highlight**: one fixed box; position updates are batched to one per frame and run only while it is shown.

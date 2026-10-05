@@ -94,6 +94,26 @@ export interface SemanticInspection {
   readonly kind: ElementKind;
 }
 
+/** One element as the developer audit sees it (docs/DEVELOPER_AUDIT.md): what it means and whether color is all that says so. */
+export interface SemanticAuditRecord {
+  readonly element: Element;
+  readonly result: SemanticResult;
+  readonly decision: CueDecision;
+  /** The color-only verdict, when the decision got far enough to ask for one. */
+  readonly verdict: ColorOnlyVerdict | null;
+  readonly kind: ElementKind;
+  /** The element carries one of this layer's cues right now. */
+  readonly hasCue: boolean;
+}
+
+export interface SemanticAuditScan {
+  readonly records: readonly SemanticAuditRecord[];
+  /** The layer is adding cues right now (so a missing cue means something). */
+  readonly enabled: boolean;
+  /** Candidates examined (a structural cap ends the scan, never the clock). */
+  readonly candidates: number;
+}
+
 /** Layout facts read before a cue exists, to compare with the layout after it. */
 interface Metrics {
   readonly rect: DOMRect;
@@ -441,13 +461,19 @@ export class SemanticCueController {
     element: Element,
     examine: (element: Element) => Examined,
     count: boolean,
-  ): { result: SemanticResult; decision: CueDecision } {
+  ): { result: SemanticResult; decision: CueDecision; verdict: ColorOnlyVerdict | null } {
     const { facts, result } = examine(element);
     if (result.status !== 'classified') {
-      return { result, decision: decideCue({ ...this.#inputFor(facts, result), enabled: true }) };
+      return {
+        result,
+        decision: decideCue({ ...this.#inputFor(facts, result), enabled: true }),
+        verdict: null,
+      };
     }
     const existing = detectExistingCues(facts, result);
     let counted = false;
+    // The color-only verdict, when the decision got far enough to ask for one (the developer audit reports it).
+    let seen: ColorOnlyVerdict | null = null;
     const note = (colorOnly: boolean | undefined) => {
       if (count && colorOnly && !counted) {
         counted = true;
@@ -462,6 +488,7 @@ export class SemanticCueController {
       enabled: true,
       assessColorOnly: () => {
         const verdict = this.#assess(element, examine, facts, result, existing);
+        seen = verdict;
         note(verdict.colorOnly);
         return verdict;
       },
@@ -476,6 +503,7 @@ export class SemanticCueController {
       return {
         result,
         decision: { action: 'none', reason: 'no-safe-placement', detail: 'already-underlined' },
+        verdict: seen,
       };
     }
     // A grid container turns `::after` into a grid item of its own: the glyph would land in a
@@ -488,9 +516,10 @@ export class SemanticCueController {
       return {
         result,
         decision: { action: 'none', reason: 'no-safe-placement', detail: 'grid-host' },
+        verdict: seen,
       };
     }
-    return { result, decision };
+    return { result, decision, verdict: seen };
   }
 
   #inputFor(facts: ElementFacts, result: SemanticResult) {
@@ -519,6 +548,45 @@ export class SemanticCueController {
       const { result, decision } = this.#decide(element, examine, false);
       return { result, decision, kind: examine(element).facts.kind };
     });
+  }
+
+  /**
+   * The developer audit's read-only look at every candidate under `root`: the same decision the
+   * layer makes, with the page's own styles in effect, whether or not the layer is adding cues.
+   * Nothing is written and no counter moves. Peers are found exactly as for a normal pass.
+   */
+  auditScan(root: Element): SemanticAuditScan {
+    const candidates = this.#collectCandidates([{ element: root, scope: 'subtree' }]);
+    const records: SemanticAuditRecord[] = [];
+    if (candidates.size === 0) return { records, enabled: this.#enabled, candidates: 0 };
+    this.#sheet.withOriginalStyles(() => {
+      const cache = new Map<Element, Examined>();
+      const examine = (target: Element): Examined => {
+        let examined = cache.get(target);
+        if (!examined) {
+          const facts = readElementFacts(target, this.#env);
+          examined = { facts, result: classifyElement(facts) };
+          cache.set(target, examined);
+        }
+        return examined;
+      };
+      for (const element of candidates) {
+        try {
+          const { result, decision, verdict } = this.#decide(element, examine, false);
+          records.push({
+            element,
+            result,
+            decision,
+            verdict,
+            kind: examine(element).facts.kind,
+            hasCue: element.hasAttribute(CUE_ATTRIBUTE),
+          });
+        } catch {
+          // An element that cannot be read is not audited.
+        }
+      }
+    });
+    return { records, enabled: this.#enabled, candidates: candidates.size };
   }
 
   #assess(

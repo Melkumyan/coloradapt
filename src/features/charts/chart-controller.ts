@@ -12,6 +12,7 @@ import {
   normalizeDashArray,
   ownsChart,
   planChart,
+  type CanvasVerdict,
   type ChartAnalysis,
   type ChartAdaptationPlan,
   type ChartFacts,
@@ -68,6 +69,28 @@ export interface ChartInfo {
   readonly series: number;
   readonly adapted: number;
   readonly legendMapped: boolean;
+}
+
+/** One chart as the developer audit sees it: the page's own structure, read with ColorAdapt's rules suspended. */
+export interface ChartAuditRecord {
+  readonly svg: Element;
+  readonly analysis: ChartAnalysis;
+  /** What the layer did with it (`unknown` while the layer is inactive). */
+  readonly info: ChartInfo;
+}
+
+export interface CanvasAuditRecord {
+  readonly canvas: Element;
+  readonly verdict: CanvasVerdict;
+}
+
+export interface ChartAuditScan {
+  readonly charts: readonly ChartAuditRecord[];
+  readonly canvases: readonly CanvasAuditRecord[];
+  /** The layer is adapting charts right now (so `info` is meaningful). */
+  readonly active: boolean;
+  /** A structural budget ended the scan before every chart was read. */
+  readonly truncated: boolean;
 }
 
 const UNKNOWN_INFO: ChartInfo = {
@@ -311,6 +334,51 @@ export class ChartController {
   /** What is known about `svg` (read-only; for tests and debugging). */
   inspect(svg: Element): ChartInfo {
     return this.#states.get(svg)?.info ?? UNKNOWN_INFO;
+  }
+
+  /**
+   * The developer audit's read-only look at every chart and canvas under `root` (docs/DEVELOPER_AUDIT.md):
+   * the page's own structure, read with this layer's rules suspended, whether or not the layer is
+   * active. It neither remembers anything nor touches the page; charts are read the same way
+   * {@link update} reads them, so what the audit sees is what the layer would act on.
+   */
+  auditScan(root: Element): ChartAuditScan {
+    const canvases = new Set<Element>();
+    const svgs = this.#svgsIn({ element: root, scope: 'subtree' }, canvases);
+    const charts: ChartAuditRecord[] = [];
+    let budget = CHART_LIMITS.maxMarksPerPass;
+    let truncated = false;
+    this.#sheet.withOriginalStyles(() => {
+      for (const svg of svgs) {
+        if (!svg.isConnected) continue;
+        if (budget <= 0) {
+          truncated = true;
+          break;
+        }
+        // Icons and logos are the common case: a handful of shapes never makes a chart.
+        if (svg.querySelectorAll(SHAPE_SELECTOR).length < MIN_SHAPES) continue;
+        try {
+          const { facts } = this.#read(svg);
+          budget -= facts.marks.length + facts.texts.length;
+          const analysis = analyzeChart(facts);
+          if (analysis.status !== 'unknown')
+            charts.push({ svg, analysis, info: this.inspect(svg) });
+        } catch {
+          // A chart that cannot be read is not audited; the audit never throws into the page.
+        }
+      }
+    });
+    const records: CanvasAuditRecord[] = [];
+    let canvasBudget = CHART_LIMITS.maxCanvasPerPass * 10;
+    for (const canvas of canvases) {
+      if (canvasBudget <= 0) {
+        truncated = true;
+        break;
+      }
+      canvasBudget -= 1;
+      records.push({ canvas, verdict: classifyCanvas(readCanvasFacts(canvas)) });
+    }
+    return { charts, canvases: records, active: this.#active, truncated };
   }
 
   /**

@@ -1,4 +1,11 @@
 import type {
+  AuditDiagnostics,
+  AuditRequest,
+  AuditSnapshot,
+  HighlightRequest,
+  HighlightResult,
+} from '@core/audit';
+import type {
   AdaptationPlan,
   AnalysisResult,
   DynamicDiagnostics,
@@ -23,6 +30,19 @@ export interface MessageMap {
   GET_DYNAMIC_DIAGNOSTICS: { request: undefined; response: DynamicDiagnostics };
   /** Debug/test channel: process every pending mutation now, then report the counters. */
   FLUSH_DYNAMIC: { request: undefined; response: DynamicDiagnostics };
+  /** Developer audit (M9, docs/DEVELOPER_AUDIT.md): one read-only pass over the page, as authored. Works with adaptation off. */
+  AUDIT_RUN: { request: AuditRequest; response: AuditSnapshot };
+  /** The current audit snapshot, or `null` before the first pass. */
+  AUDIT_GET: { request: undefined; response: AuditSnapshot | null };
+  /** Outline one element of one finding (no focus change, no page change). */
+  AUDIT_HIGHLIGHT: { request: HighlightRequest; response: HighlightResult };
+  AUDIT_CLEAR_HIGHLIGHT: { request: undefined; response: null };
+  /** Ends the audit session of the page: live watching stops and the highlight goes. */
+  AUDIT_CLOSE: { request: undefined; response: null };
+  /** The audit page exported a report (a local counter, `auditExports`). */
+  AUDIT_NOTE_EXPORT: { request: undefined; response: null };
+  /** Debug/test channel: audit counters. Local only, never sent anywhere. */
+  AUDIT_DIAGNOSTICS: { request: undefined; response: AuditDiagnostics };
 }
 
 export type MessageType = keyof MessageMap;
@@ -37,6 +57,13 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
   'REFRESH_ADAPTATION',
   'GET_DYNAMIC_DIAGNOSTICS',
   'FLUSH_DYNAMIC',
+  'AUDIT_RUN',
+  'AUDIT_GET',
+  'AUDIT_HIGHLIGHT',
+  'AUDIT_CLEAR_HIGHLIGHT',
+  'AUDIT_CLOSE',
+  'AUDIT_NOTE_EXPORT',
+  'AUDIT_DIAGNOSTICS',
 ];
 
 export interface ColorAdaptMessage<T extends MessageType = MessageType> {

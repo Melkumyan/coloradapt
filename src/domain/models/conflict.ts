@@ -12,8 +12,9 @@ export const CONFLICT_SEVERITIES: readonly ConflictSeverity[] = [
 
 /**
  * A detected color combination that is estimated to be poorly
- * distinguishable for a given vision profile and/or fails WCAG contrast
- * guidelines. This is a heuristic estimate, not a diagnostic result.
+ * distinguishable for a given vision profile and/or below ColorAdapt's
+ * contrast targets (related to WCAG 1.4.3, not a conformance finding). This is
+ * a heuristic estimate, not a diagnostic result.
  */
 export interface ColorConflict {
   readonly elementId: string;

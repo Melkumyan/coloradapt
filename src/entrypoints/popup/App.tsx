@@ -46,6 +46,13 @@ export function App(): JSX.Element {
     void browser.runtime.openOptionsPage();
   }, []);
 
+  // The audit runs in its own tab so it can stay open next to the page it audits; the tab id says which page.
+  const openAudit = useCallback(async () => {
+    const tabId = await getActiveTabId();
+    if (tabId === undefined) return;
+    await browser.tabs.create({ url: `${browser.runtime.getURL('/audit.html')}?tabId=${tabId}` });
+  }, []);
+
   if (loading || !settings) {
     return (
       <main className="popup" aria-busy="true">
@@ -155,6 +162,9 @@ export function App(): JSX.Element {
       <footer className="popup__footer">
         <button type="button" className="popup__link-button" onClick={openSettings}>
           Settings
+        </button>{' '}
+        <button type="button" className="popup__link-button" onClick={() => void openAudit()}>
+          Developer audit
         </button>
       </footer>
     </main>
