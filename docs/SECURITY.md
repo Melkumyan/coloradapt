@@ -112,6 +112,52 @@ style-src 'unsafe-inline'`, so `<script>`, `<img onerror>` and `javascript:` tex
 - **Read-only.** The audit never writes to the page except the analyzer's own `data-coloradapt-id` and its
   highlight box; both are filtered as ColorAdapt's own mutations.
 
+## AI-assisted review (M11)
+
+The only code that can contact something other than the audited page's own resources is the local model client, and
+it can contact only this computer's loopback (`docs/AI_PRIVACY.md`, `docs/AI_PROVIDER_PROTOCOL.md`).
+
+- **One place, one rule.** `core/semantic-ai/local-provider.ts` is the only AI code that calls `fetch` (a static test
+  pins it, and `realworld/dist.spec.ts` pins it in the built bundles: the content script and the background contain
+  no model path or client). It runs in the audit page only.
+- **The endpoint is hostile input.** It is matched, as typed, against `^http://(127.0.0.1|localhost|[::1]):<1024-65535>/?$`
+  in lower case, in settings (anything else is replaced by the default when read) and again before every request.
+  `localhost.evil.com`, `127.0.0.1.evil.com`, `127.0.0.1@evil.com`, `evil.com@127.0.0.1`, `2130706433`, `0x7f000001`,
+  `0177.0.0.1`, `127.1`, `127.0.1`, `[::ffff:127.0.0.1]`, `[::1].evil.com`, percent-encoded and full-width spellings,
+  mixed case, a trailing dot, userinfo, a path, a query, a fragment, other 127.x addresses, `0.0.0.0`, private and
+  public addresses, IPv6 variants and `https` are refused with no request (a corpus of about 70 spellings, plus 4000
+  random hosts, in `tests/core/semantic-ai/m11r1-network.test.ts`). Only three literal hosts exist, so there is no
+  name to resolve and DNS rebinding has nothing to rebind.
+- **No redirect escape.** `redirect: 'error'`: a 3xx is a failure, so a loopback server that answers
+  `302 → https://example.com` (or another loopback port) never makes the extension contact the target (tested against
+  real servers, for 301/302/303/307/308 to a public URL, a LAN address, `127.0.0.2`, the `localhost` alias, `[::1]`,
+  another port and a protocol-relative URL; and in Chromium and Firefox). A response that claims it was redirected, or whose final address is not the
+  configured origin, is refused; a response is bounded to 64 KiB while it is read.
+- **No credentials, referrer or cache** on the request; no API key, no authentication in M11.
+- **The model's output is data, never behavior.** It is parsed into one fixed shape; a field outside it, a label outside
+  the task, an unknown evidence id or more than 1024 characters is an error. No output can name a URL, a command,
+  CSS, a DOM change, navigation, a download, a storage write or a tool, because the schema has no field for one and
+  nothing in the product executes a model string (static tests forbid `eval`, `Function`, `innerHTML` and DOM writes
+  in the AI code).
+- **Page text is not instructions.** Fixed per-task instructions, the packet as a separate JSON payload, and a validator
+  that decides from deterministic evidence whatever the model says (109 hostile strings, English and Russian, in five places, in the benchmark; wording that would claim an authority
+  (`AI confirmed`, `WCAG_FAIL`, `AUTO_FIX`) is pinned absent by a static test).
+- **No second sink.** One static test covers every file of the review: a single `fetch`, no `XMLHttpRequest`,
+  `WebSocket`, `EventSource`, `sendBeacon`, dynamic `import()` or `importScripts`; no `eval`, `new Function` or string
+  timers; the page-side reader has no DOM write; the UI has no `dangerouslySetInnerHTML`; the deterministic cores
+  never import the AI layer, and no adaptation, semantics, chart or image pipeline reads an AI setting or result.
+- **Turning it off is immediate.** An open audit page follows the setting (M11.R1 fixed a gap where it read it once):
+  requests in flight are aborted, answers dropped and the cache cleared.
+- **No new permission, no new host, no web-accessible resource, no CSP change.** The existing `http(s)` host access
+  already covers loopback for the audit page. A `connect-src` limited to loopback would be a defense in depth; it is an
+  M12 candidate because M10 pins that the manifest declares no CSP.
+- **Local runtime trust.** ColorAdapt cannot see what the runtime on your computer does with a request. A runtime that
+  forwards requests elsewhere defeats "local"; use one you trust. Ollama only accepts requests from the extension when
+  `OLLAMA_ORIGINS` includes its origin; ColorAdapt never edits that setting.
+- **Known gap (M12):** the loopback restriction is enforced in code, not by the extension's CSP (`connect-src` is not
+  pinned; M10 pins that the manifest declares no CSP). Static tests prove there is one network call and that every
+  endpoint passes the validator.
+
 ## Prototype pollution / unsafe parsing
 
 - `infrastructure/storage/schema.ts` parses values read back from

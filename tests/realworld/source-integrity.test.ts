@@ -50,12 +50,17 @@ describe('M10 static source integrity', () => {
     expect(find(/document\s*\.\s*write(ln)?\s*\(/)).toEqual([]);
   });
 
-  it('uses the network only to read the page’s own images (M8 raster reader)', () => {
+  it('uses the network only to read the page’s own images (M8) and to reach the loopback model (M11)', () => {
     expect(find(/\bXMLHttpRequest\b/)).toEqual([]);
     expect(find(/\bWebSocket\b/)).toEqual([]);
     expect(find(/\bEventSource\b/)).toEqual([]);
     expect(find(/sendBeacon/)).toEqual([]);
-    expect(find(/\bfetch\s*\(/)).toEqual(['features/images/raster-reader.ts']);
+    // M11: the local provider's transport is the only other place a request is made (loopback only,
+    // enforced there and pinned by tests/core/semantic-ai/*.test.ts and m11-integrity.test.ts).
+    expect(find(/\bfetch\s*\(/)).toEqual([
+      'core/semantic-ai/local-provider.ts',
+      'features/images/raster-reader.ts',
+    ]);
   });
 
   it('keeps nothing in page-visible storage and never touches cookies', () => {

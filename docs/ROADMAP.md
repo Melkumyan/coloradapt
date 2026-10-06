@@ -417,12 +417,64 @@ verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5
 - Exception carried to M12: the Chrome SPA heap-growth budget (1.1021 against 1.1; the M10 build 1.0969).
 - M2 stays PARTIAL.
 
-## M11 — AI Semantic Engine ⬜
+## M11 — AI Semantic Engine ✅ (implemented; validated and frozen by M11.R1)
 
-- Optional, isolated module for richer semantic understanding
-  (e.g. classifying a badge as "success" vs. "error" when CSS alone is
-  ambiguous). Explicitly **not** a dependency of the core engine — the
-  extension must keep working fully offline without it.
+- An optional, local, advisory layer that suggests what a `manual-review` finding of the developer audit may mean
+  (`CA-SEM-002`, `CA-SVG-002`, `CA-CHART-002/003/004`, `CA-IMG-002/003`), on request, in the audit page. Deterministic
+  M1–M10 stays the source of truth: the model cannot override evidence, suppress, downgrade or create a finding,
+  change a page or reach anything but the loopback. Off by default. See `docs/AI_SEMANTIC_ENGINE.md`,
+  `docs/AI_PRIVACY.md`, `docs/AI_PROVIDER_PROTOCOL.md`.
+- Pieces: closed taxonomy (6 tasks, fixed label sets), bounded and redacted packets (6144 bytes, no form values, no
+  URLs), a strict answer schema, a deterministic validator (`ACCEPTED_ADVISORY` / `REJECTED` / `UNRESOLVED`; model
+  confidence is only a floor), a loopback-only provider (`local-ollama`, `local-http`; no cloud, no fallback), a
+  bounded engine (dedupe, 64 requests per run, 2 in flight, timeout, cancellation, stale answers dropped, memory-only
+  cache), audit UI and a separate `semanticAssist` export section.
+- Provider decision: loopback runtime (no weights or inference library in the package; +49.9 kB of code in the
+  extension, +16.6 kB zipped). In-browser inference and browser-native AI APIs were rejected for M11 (package size,
+  `wasm-unsafe-eval`, portability, testability).
+- Not in M11: AI-authorized page changes (the layer is advisory), OCR or image bytes to a model, a cloud model, tool
+  use, per-site AI settings, authentication, Firefox AI runtime verification (done in M11.R1), a `connect-src`
+  restricted to loopback (an M12 candidate: M10 pins that the manifest declares no CSP).
+- Evidence: 253 curated scenarios (English and Russian) with an adversarial sweep of 8637 claims, 0 incorrect
+  accepted; 57 hostile strings in 4 places and 2 fact sets (456 packets); a frozen real-world sample of 159 packets
+  from 68 pages of the M10 corpus (26 ground-truthed, 1074 adversarial claims, 0 incorrect accepted); two real local
+  models (llama3.2:3b, qwen2.5:7b-instruct) through the real transport, with 0 incorrect accepted.
+- M2 stays PARTIAL; AI cannot change scientific evidence. The SPA heap-growth exception carried to M12 is not worse
+  (1.1015 against 1.1; 1.1021 at M10.R1).
+
+## M11.R1 — AI Semantic Validation & Freeze ✅ (tag `m11-ai-semantic-engine`; M11.R1 is not a feature milestone)
+
+- Invariant: AI may fail, abstain or stay unresolved; it must not become confidently wrong in a way ColorAdapt
+  accepts. AI stays advisory, off by default, loopback-only, with no cloud fallback and **0 AI-authorized page
+  transformations**. M11 is AI-assisted review of existing `manual-review` findings; it does not analyze every `unknown`
+  element (documented, not broadened).
+- Defects found and fixed: (1) a finding groups elements by rule, component and context, so one icon's answer
+  (Close) could label the others (Delete, Search): the first four elements are now compared by evidence signature, a
+  group that differs is left to a human, and an accepted answer says "representative element" (`instances`,
+  `sampled`; live sample: 24 of 243 findings left manual review); (2) an open audit page did not follow the AI setting,
+  so turning it off elsewhere did not stop a running review: it now follows storage live; (3) class, `data-*` and id
+  (and text and name) counted as independent evidence, unlike M6: they are now one group each, and two firm
+  conflicting readings are `UNRESOLVED`; (4) the cache key lacked the instruction version; (5) queued requests for
+  vanished elements were still sent: they are skipped.
+- Validation: 424 synthetic scenarios (146 511 adversarial claims, 0 incorrect accepted); 109 hostile strings x 5
+  places (0 unsafe accepted); 114 ground-truthed real-world packets (0 incorrect accepted; 45 more reported as
+  unresolved, not ground truth); ~70 endpoint spellings and 4000 random hosts refused, 35 redirect variants not
+  followed, 64 KiB / 1024-character boundaries exact; canary privacy tests (typed values, PII, invisible characters)
+  over packets, request bodies, cache and exports; static gates for network, execution and DOM-write sinks and
+  authority wording; inert HTML export; deterministic report byte-identical without the AI section.
+- Models: `qwen2.5:7b-instruct` and `llama3.2:3b` through Ollama 0.31, 428 synthetic cases and 159 real packets
+  each: **0 incorrect accepted**, both `QUALIFIED_FOR_ADVISORY` for that sample (qwen 215 + 11 accepted; llama 64 + 6,
+  with 65 model errors that cite ids not in the packet: capability, the parser was not loosened). Other models:
+  `NOT_TESTED`. `pnpm qualify:ai` writes a machine-readable result.
+- Firefox AI runtime: **PASS** for the provider path (Firefox 151 and Chrome 154, `realworld/ai-provider.spec.ts`, packet
+  identical in both). Live Ollama in Firefox was not run; full Firefox extension E2E parity is not claimed.
+- SPA heap (M12 debt): 1.1015 against 1.1, not worse than M11 (1.1014–1.1015) or M10.R1 (1.1021); budget unchanged.
+  Package +54.5 kB unpacked / +18.0 kB zipped over M10.R1.
+- Carried to M12: SPA heap budget; extension `connect-src` pinned to loopback (the restriction is code-enforced and
+  statically gated, not CSP-enforced); per-site `adaptCharts` runtime debt; Firefox full E2E parity; an in-flight AI
+  request is not aborted when only its element leaves the page (queued ones are skipped; the wasted ones are bounded
+  by the concurrency of 2); ground truth is small and written by one person.
+- M2 stays PARTIAL; AI cannot change scientific evidence.
 
 ## M12 — Production Hardening ⬜
 

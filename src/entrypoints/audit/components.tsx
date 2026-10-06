@@ -24,6 +24,9 @@ import {
   type AuditSummary,
 } from '@core/audit';
 import { VISION_PROFILES, VISION_PROFILE_INFO } from '@domain/models';
+import { AssistBadge, AssistBlock } from './assist-components';
+import type { AuditSemanticAssistEntry } from '@core/audit';
+import type { SemanticAssistState } from './use-semantic-assist';
 
 /** Severity as a shape *and* a word: never a color alone (the audit follows the rule it audits). */
 export function SeverityBadge({ severity }: { severity: AuditSeverity }): JSX.Element {
@@ -274,6 +277,9 @@ export interface FindingCardProps {
   readonly highlighted: number | null;
   readonly onToggle: () => void;
   readonly onHighlight: (index: number, scroll: boolean) => void;
+  /** The AI-assisted interpretation of this finding, when there is one (kept apart from its evidence). */
+  readonly assist?: AuditSemanticAssistEntry;
+  readonly provider?: SemanticAssistState['provider'];
 }
 
 export function FindingCard({
@@ -282,6 +288,8 @@ export function FindingCard({
   highlighted,
   onToggle,
   onHighlight,
+  assist,
+  provider,
 }: FindingCardProps): JSX.Element {
   const panelId = useId();
   const profiles = finding.visionProfiles.map((p) => VISION_PROFILE_INFO[p].label).join(', ');
@@ -318,6 +326,7 @@ export function FindingCard({
         <span>
           <code>{finding.ruleId}</code>
         </span>
+        {assist && <AssistBadge entry={assist} />}
       </p>
       <div id={panelId} hidden={!expanded} className="card__panel">
         {expanded && (
@@ -343,6 +352,7 @@ export function FindingCard({
                 {recommendation.suggestedColor.note}
               </p>
             )}
+            {assist && provider && <AssistBlock entry={assist} provider={provider} />}
             <h4>How sure, and why</h4>
             <ul>
               <li>

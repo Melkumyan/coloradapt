@@ -280,6 +280,44 @@ pnpm build:e2e && npx playwright test e2e/audit-*.spec.ts
   from other software, so "ColorAdapt never hooks History" is checked statically (source and built bundle).
 - Never leave scratch specs behind; wait on state (a snapshot generation), never on sleeps.
 
+### AI semantic engine (M11)
+
+```bash
+npx vitest run tests/core/semantic-ai tests/features/audit/semantic-*.test.ts tests/benchmarks/semantic-ai-*.test.ts
+pnpm build:e2e && npx playwright test e2e/semantic-assist.spec.ts
+# real browsers, Chrome and Firefox (after pnpm build and pnpm build:firefox; not part of verify):
+RW_BROWSERS=firefox,chrome npx playwright test -c playwright.realworld.config.ts realworld/ai-provider.spec.ts
+# optional, manual, needs a local model runtime (never part of verify or E2E); writes
+# benchmark-report/semantic-ai-qualification-<model>.json (machine-readable, with QUALIFIED_FOR_ADVISORY / NOT_QUALIFIED):
+OLLAMA_ORIGINS="chrome-extension://*,moz-extension://*" ollama serve
+QUALIFY_ENDPOINT=http://127.0.0.1:11434 QUALIFY_PROTOCOL=ollama QUALIFY_MODEL=llama3.2:3b QUALIFY_FULL=1 QUALIFY_REALWORLD=1 pnpm qualify:ai
+```
+
+- No test needs a model, Ollama, WebGPU, a browser AI API or the Internet. Answers come from scripted replay
+  (`MockSemanticProvider`) or from a real **loopback HTTP server the test starts** (`tests/core/semantic-ai/local-provider.test.ts`,
+  `e2e/semantic-assist.spec.ts`), so the transport, redirect refusal and size bounds are exercised for real.
+- `tests/core/semantic-ai`: packet privacy and budgets (`build`), the strict parser (`output`), the validator
+  (`validator`), the endpoint parser against a hostile list (`endpoint`), the engine (`engine`: dedupe, caps,
+  concurrency, timeouts, cancellation, staleness, 100 open/close cycles), and static boundaries
+  (`m11-integrity`: one `fetch`, no storage, no permission, no import from the audit core, defaults off).
+- `tests/features/audit/semantic-*.test.ts`: the content-side packets on real DOM (no form value or URL in any
+  packet, eligible rules only, deterministic fingerprints) and the report section (parse, escape, byte-identical
+  findings).
+- M11.R1 adds `m11r1-network` (endpoint corpus, redirects, size limits, no ambient authority), `m11r1-validator`
+  (confidence floor, high-risk labels, independence, rivals, strict parser, EN/RU vocabulary boundaries, cache),
+  `m11r1-engine` (churn, removal, cancellation, lifecycle, coverage), `m11r1-static` (network, execution and DOM-write
+  sinks, authority wording), and in `tests/features/audit` `m11r1-privacy` (canaries) and `m11r1-report` (provenance,
+  inert HTML, parity); `tests/entrypoints/audit-assist-ui.test.tsx` covers the panel's accessibility.
+- `tests/benchmarks/semantic-ai-benchmark.test.ts` (424 scenarios from `semantic-ai-scenarios.ts` and
+  `semantic-ai-scenarios-r1.ts`, English and Russian, with an adversarial sweep of every label at nine confidences and five
+  ways of citing) and `semantic-ai-injection.test.ts` (109 hostile strings in five places) write
+  `benchmark-report/semantic-ai-*.json`. The hard gate in both: no accepted label outside the scenario's ground truth.
+- `tests/realworld/semantic-sample.test.ts` replays the frozen real-world packets (`tests/fixtures/semantic-ai/`);
+  `realworld/semantic-sample.spec.ts` records them from the live corpus (`pnpm test:realworld`-style, not in verify).
+- To add a task: a label set in `taxonomy.ts`, its evidence rules in `evidence-rules.ts`, its fixed question in
+  `prompt.ts`, its choice in `eligibility.ts`, scenarios in `tests/benchmarks/semantic-ai-scenarios.ts`. To add a
+  provider: see `docs/AI_PROVIDER_PROTOCOL.md`; the static integrity tests will (rightly) fail until they are updated.
+
 ### Stability runs and the hostile-cycle test
 
 Stress tests that are slow only under contention get their own `{ timeout }` (the 300-chart
@@ -349,6 +387,9 @@ resolved. In short:
   chart plans (no observer of its own).
 - `src/core/audit` and `src/features/audit` — the developer audit (M9): pure pipeline and the browser
   collector/controller/highlighter.
+- `src/core/semantic-ai` — the optional AI-assisted review (M11): packets, parser, validator, local provider,
+  engine; DOM-free and storage-free. Its only browser-facing pieces are `features/audit/semantic-facts.ts`
+  (reads the allowlisted facts) and the audit page's `use-semantic-assist.ts` (the only user of the provider).
 - `src/entrypoints` — thin WXT entrypoints (background, content script,
   popup, options, audit page).
 

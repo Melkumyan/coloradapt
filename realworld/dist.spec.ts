@@ -62,7 +62,7 @@ for (const [name, dir] of Object.entries(BUNDLES)) {
       }
     });
 
-    test('network use is the module preload helper and the page-image reader only', () => {
+    test('network use is the module preload helper, the page-image reader and the loopback model client only', () => {
       const where = js()
         .flatMap(({ file, text }) =>
           (text.match(/\bfetch\s*\(/g) ?? []).map(() =>
@@ -73,8 +73,28 @@ for (const [name, dir] of Object.entries(BUNDLES)) {
           ),
         )
         .sort();
-      // one preload helper in the shared chunk and the M8 raster reader (page images only) in the content script
-      expect(where).toEqual(['chunks/messaging.js', 'content-scripts/content.js']);
+      // one preload helper in the shared chunk (named after whichever module the bundler put it with), the M8
+      // raster reader (page images only) in the content script, and the M11 local-model client, which lives in
+      // the audit page's chunk and nowhere else.
+      expect(where.filter((w) => w !== 'chunks/audit.js')).toEqual([
+        where.find((w) => /^chunks\/(?!audit\.js)/.test(w)),
+        'content-scripts/content.js',
+      ]);
+      expect(where.filter((w) => w === 'chunks/audit.js')).toHaveLength(1);
+    });
+
+    test('the model client is in the audit page only, and refuses redirects and credentials', () => {
+      for (const { file, text } of js()) {
+        const isAudit = /^chunks\/audit-/.test(file.split(path.sep).join('/'));
+        if (isAudit) {
+          expect(text, file).toMatch(/redirect:\s*["'`]error["'`]/);
+          expect(text, file).toMatch(/credentials:\s*["'`]omit["'`]/);
+          expect(text, file).toMatch(/referrerPolicy:\s*["'`]no-referrer["'`]/);
+        } else {
+          // no page-facing script, and not the background, can reach a model runtime
+          expect(text, file).not.toMatch(/\/v1\/semantic|\/api\/chat|v1\/health|api\/tags/);
+        }
+      }
     });
   });
 }

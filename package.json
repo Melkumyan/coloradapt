@@ -20,6 +20,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "qualify:ai": "vitest run -c vitest.qualify.config.ts",
     "test:e2e": "pnpm build:e2e && playwright test",
     "test:realworld": "playwright test -c playwright.realworld.config.ts",
     "verify": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test && pnpm build"

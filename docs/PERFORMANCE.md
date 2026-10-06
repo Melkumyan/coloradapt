@@ -319,3 +319,49 @@ Structural bounds, no wall-clock gates (`docs/IMAGE_ADAPTATION.md`, "Sampling an
   `coverage.truncatedFindings`), 200 findings drawn at a time in the audit page; exports are made from the
   snapshot already in the page.
 - **Highlight**: one fixed box; position updates are batched to one per frame and run only while it is shown.
+
+## AI-assisted review (M11)
+
+With the setting off (the default) nothing of it runs: no packet is read from the page, no engine exists (a
+`DisabledProvider` stands in), and the audit page makes no request. The only standing cost is code size.
+
+| Item (Chrome MV3)       | M10.R1 (`a9e2bb9`) | M11       | M11.R1    | Delta M10.R1 → M11.R1 |
+| ----------------------- | ------------------ | --------- | --------- | --------------------- |
+| unpacked, whole package | 615.53 kB          | 665.42 kB | 670.06 kB | +54.53 kB (+8.9 %)    |
+| unpacked, Firefox (MV2) | 615.64 kB          | 665.54 kB | 670.18 kB | +54.54 kB             |
+| package zip (Chrome)    | 205.26 kB          | 221.89 kB | 223.22 kB | +17.96 kB             |
+| package zip (Firefox)   | 205.32 kB          | 221.95 kB | 223.28 kB | +17.96 kB             |
+| content script          | 294.34 kB          | 313.21 kB | 313.75 kB | +19.41 kB             |
+| audit page chunk        | 27.34 kB           | 53.83 kB  | 55.13 kB  | +27.79 kB             |
+| options page chunk      | 5.37 kB            | 8.19 kB   | 8.16 kB   | +2.79 kB              |
+
+M11.R1 added about 4.6 kB of code in total (group comparison, independence groups, live settings): no new
+dependency, no model or weights. The repository holds no `.gguf`, `.bin`, `.safetensors` or model cache.
+
+No model, weights or inference runtime is bundled. The content script contains no model client (checked on the
+built bundles).
+
+When the developer presses **Run AI-assisted review**: the content script reads one representative element per
+eligible finding (a few `getAttribute` calls, up to 12 siblings, short text snippets), at most 128 findings read and 64
+packets sent per run; the audit page runs at most 2 requests at a time, each limited to 20 s, identical packets
+once. Nothing is computed on a timer, and a pass of the audit itself does no AI work (the facts are read on request,
+holding the elements weakly like the audit store). Packets are at most 6144 bytes, answers 1024 characters, the cache
+256 entries / 256 KiB in the audit page's memory only. With 500 instances of 100 packets the engine makes 64 requests, never
+more than 2 in flight, and leaves 0 active and 0 queued (tested; there is no wall-clock assertion).
+
+Inference time is the local runtime's: on the development laptop (RTX 3060 6 GB, Ollama 0.31) 106 packets went
+through `llama3.2:3b` in 65 s (about 0.6 s each, one at a time). That is a measurement of that runtime, not a
+budget of ColorAdapt.
+
+SPA heap growth over 500 route changes (the M10 exception carried to M12): 1.1015 against a budget of 1.1 after
+M11.R1 (1.1014–1.1015 after M11, 1.1021 at M10.R1). The budget is unchanged and nothing got worse.
+
+M11.R1 structural measurements (counts, never latency; no wall-clock assertion except the 20 s timeout): a run reads
+at most 128 findings and 4 elements of each, asks at most 64 packets, 2 in flight, and skips queued requests for
+questions that stopped being current. Churn of 500 elements / 100 packets with a slow provider: at most 2 in flight,
+at most 64 requests, 0 active and 0 queued at the end, every finding accounted for (answered, discarded or manual
+review). 100 open / run / close cycles leave 0 active, 0 queued, an empty cache. A long-lived cache stays inside 256
+entries / 256 KiB over 100 runs of 64 fresh packets. On a live sample of 77 pages (Chrome, recorded again in
+M11.R1): 243 eligible findings, 218 asked about, 24 left manual review because their elements differ, 68 asked
+through a representative of several elements. Provider latency is diagnostic only (about 1.1 s per packet for
+`qwen2.5:7b-instruct` and about 0.6 s for `llama3.2:3b` on the development laptop).

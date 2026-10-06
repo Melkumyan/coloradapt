@@ -57,6 +57,7 @@ export default defineContentScript({
         return Promise.resolve(null);
       },
       AUDIT_DIAGNOSTICS: () => Promise.resolve(audit.diagnostics()),
+      AUDIT_SEMANTIC_CASES: (request) => Promise.resolve(audit.semanticCases(request)),
     });
 
     // An open audit page holds a port: while it is open the audit re-runs when the page changes, and

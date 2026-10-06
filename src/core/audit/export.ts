@@ -5,6 +5,11 @@ import { AUDIT_RULES } from './rules';
 import { escapeHtml, hasUnsafeCharacters, stripUnsafeCharacters } from './privacy';
 import { summarize } from './snapshot';
 import {
+  checkSemanticAssist,
+  semanticAssistHtml,
+  type AuditSemanticAssistReport,
+} from './semantic-assist';
+import {
   ADAPTATION_LABEL,
   ASSESSMENT_LABEL,
   assessmentCountsLine,
@@ -58,6 +63,11 @@ export interface AuditReport {
   readonly summary: AuditSummary;
   readonly coverage: AuditCoverage;
   readonly findings: readonly AuditFinding[];
+  /**
+   * AI-assisted interpretations (M11), a section of their own: present only when the audit page
+   * says what the AI-assisted review did. Findings never depend on it.
+   */
+  readonly semanticAssist?: AuditSemanticAssistReport;
 }
 
 /** Defense in depth: a string that reached the snapshot with an invisible character leaves it without one. */
@@ -72,11 +82,19 @@ function cleanStrings<T>(value: T): T {
   return value;
 }
 
-export function createAuditReport(snapshot: AuditSnapshot, generatedAt: number): AuditReport {
-  return cleanStrings(buildReport(snapshot, generatedAt));
+export function createAuditReport(
+  snapshot: AuditSnapshot,
+  generatedAt: number,
+  semanticAssist?: AuditSemanticAssistReport,
+): AuditReport {
+  return cleanStrings(buildReport(snapshot, generatedAt, semanticAssist));
 }
 
-function buildReport(snapshot: AuditSnapshot, generatedAt: number): AuditReport {
+function buildReport(
+  snapshot: AuditSnapshot,
+  generatedAt: number,
+  semanticAssist?: AuditSemanticAssistReport,
+): AuditReport {
   const findings = [...snapshot.findings].sort(compareFindings);
   return {
     schemaVersion: AUDIT_SCHEMA_VERSION,
@@ -92,6 +110,7 @@ function buildReport(snapshot: AuditSnapshot, generatedAt: number): AuditReport 
     summary: summarize(findings),
     coverage: snapshot.coverage,
     findings,
+    ...(semanticAssist ? { semanticAssist } : {}),
   };
 }
 
@@ -338,6 +357,9 @@ export function parseAuditReport(text: string): ParsedAuditReport {
   (data.findings as unknown[]).forEach((finding, index) =>
     checkFinding(finding, index, ids, errors),
   );
+  if (errors.length === 0 && data.semanticAssist !== undefined) {
+    errors.push(...checkSemanticAssist(data.semanticAssist, ids));
+  }
   if (errors.length === 0) {
     const expected = JSON.stringify(canonicalSorted(summarize(data.findings as AuditFinding[])));
     if (JSON.stringify(canonicalSorted(data.summary)) !== expected) {
@@ -562,6 +584,7 @@ export function renderAuditHtml(report: AuditReport): string {
 ${coverageHtml(report.coverage)}
 <h2>Findings</h2>
 ${report.findings.length === 0 ? '<p>No findings.</p>' : report.findings.map(findingHtml).join('\n')}
+${report.semanticAssist ? semanticAssistHtml(report.semanticAssist, new Map(report.findings.map((f) => [f.id, f.title]))) : ''}
 </body>
 </html>
 `;

@@ -7,6 +7,7 @@ import {
   evaluateSemantic,
   evaluateSvg,
   evaluateText,
+  findingIdFor,
   instanceIdFor,
   isLargeTextStyle,
   type AdaptationInfo,
@@ -16,7 +17,9 @@ import {
   type AuditScope,
   type AuditTargetInput,
 } from '@core/audit';
-import { ownsChart } from '@core/charts';
+import { ownsChart, type ChartAnalysis, type ChartFacts } from '@core/charts';
+import type { SemanticResult } from '@core/semantics';
+import { ELIGIBLE_RULES, chooseTask, type SemanticFacts } from '@core/semantic-ai';
 import {
   VISION_PROFILES,
   type AnalysisResult,
@@ -27,6 +30,7 @@ import {
 import type { AuditSources } from '../page-analysis';
 import { SEMANTIC_LIMITS } from '../semantics';
 import { isRendered } from './rendered';
+import { readChartFacts, readGraphicFacts, readStateFacts } from './semantic-facts';
 import {
   INTERACTIVE_SELECTOR as INTERACTIVE,
   LocatorContext,
@@ -67,8 +71,36 @@ export interface CollectInput {
   readonly scope: AuditProfileScope;
 }
 
+/**
+ * What the AI-assisted review needs of one finding, read while the page was audited: plain data of
+ * one representative element (no node), so a later pass of the page cannot change what was asked.
+ */
+export interface AssistCase {
+  readonly findingId: string;
+  readonly instanceId: string;
+  /**
+   * Reads the facts when the review asks (never during the pass, so an audit without the AI-assisted
+   * review pays nothing for it). `null` when the element is gone. Holds the element weakly, like the store.
+   */
+  readonly read: () => SemanticFacts | null;
+  /**
+   * The same for the first {@link ASSIST_SAMPLES} elements of the finding, the representative first. A
+   * finding groups elements by rule, component and context, not by what they mean: the review asks about
+   * the group only while every sampled element gives the same packet (docs/AI_SEMANTIC_ENGINE.md, "Groups").
+   */
+  readonly samples: readonly (() => SemanticFacts | null)[];
+}
+
+/** Elements of one finding whose packets are compared before a group is asked about. */
+export const ASSIST_SAMPLES = 4;
+
+/** Reads the facts of one element for one rule; takes the element so a closure never has to hold it. */
+type FactsReader = (ruleId: string, element: Element) => SemanticFacts | null;
+
 export interface Collected {
   readonly candidates: readonly AuditCandidate[];
+  /** One case per eligible manual-review finding, by finding id. */
+  readonly assist: ReadonlyMap<string, AssistCase>;
   /** The element behind every instance id, for navigation and highlighting. */
   readonly elements: ReadonlyMap<string, Element>;
   readonly profiles: readonly VisionProfile[];
@@ -185,12 +217,60 @@ export function collectAudit(input: CollectInput): Collected {
   const elements = new Map<string, Element>();
   const outcomes = planOutcomes(sources.elements, sources.notAdaptable, settings);
 
-  const add = (found: readonly AuditCandidate[], element: Element): void => {
+  const assist = new Map<string, AssistCase>();
+  // A manual-review case of an eligible rule keeps the facts of its first element (one per finding).
+  const add = (found: readonly AuditCandidate[], element: Element, facts?: FactsReader): void => {
     for (const candidate of found) {
       candidates.push(candidate);
       elements.set(instanceIdFor(candidate), element);
+      if (
+        facts &&
+        candidate.assessment === 'manual-review' &&
+        ELIGIBLE_RULES.includes(candidate.ruleId)
+      ) {
+        const findingId = findingIdFor(candidate);
+        const ref = new WeakRef(element);
+        const ruleId = candidate.ruleId;
+        const read = (): SemanticFacts | null => {
+          const live = ref.deref();
+          return live?.isConnected ? facts(ruleId, live) : null;
+        };
+        const known = assist.get(findingId);
+        if (!known) {
+          assist.set(findingId, {
+            findingId,
+            instanceId: instanceIdFor(candidate),
+            read,
+            samples: [read],
+          });
+        } else if (known.samples.length < ASSIST_SAMPLES) {
+          assist.set(findingId, { ...known, samples: [...known.samples, read] });
+        }
+      }
     }
   };
+  const stateReader =
+    (result: SemanticResult, colorOnly: boolean | null): FactsReader =>
+    (_ruleId, element) => {
+      const state = result.status === 'classified' ? result.state : undefined;
+      const task = chooseTask('CA-SEM-002', {
+        ...(state ? { state } : {}),
+        interactive: isInteractiveElement(element),
+      });
+      return task ? readStateFacts(element, task, result, colorOnly) : null;
+    };
+  const chartReader =
+    (analysis: ChartAnalysis, facts: ChartFacts): FactsReader =>
+    (ruleId, element) =>
+      ruleId === 'CA-CHART-002'
+        ? readChartFacts(element, analysis, facts)
+        : graphic(null)(ruleId, element);
+  const graphic =
+    (image: { classification: string; small: boolean } | null): FactsReader =>
+    (ruleId, element) => {
+      const task = chooseTask(ruleId, { interactive: isInteractiveElement(element) });
+      return task ? readGraphicFacts(element, task, ruleId, image) : null;
+    };
 
   const colorAdaptation = (id: string): AdaptationInfo => {
     const suggestionHex = suggestionOf(outcomes.get(id));
@@ -240,6 +320,7 @@ export function collectAudit(input: CollectInput): Collected {
           scope,
         ),
         node,
+        graphic(null),
       );
       continue;
     }
@@ -283,6 +364,7 @@ export function collectAudit(input: CollectInput): Collected {
         adaptation: { status },
       }),
       record.element,
+      stateReader(record.result, record.verdict?.colorOnly ?? null),
     );
   }
 
@@ -313,6 +395,7 @@ export function collectAudit(input: CollectInput): Collected {
         scope,
       ),
       chart.svg,
+      chartReader(chart.analysis, chart.facts),
     );
   }
   for (const canvas of sources.charts.canvases) {
@@ -320,6 +403,7 @@ export function collectAudit(input: CollectInput): Collected {
     add(
       evaluateCanvas({ target: new LazyTarget(locators, canvas.canvas), verdict: canvas.verdict }),
       canvas.canvas,
+      graphic(null),
     );
   }
 
@@ -344,6 +428,7 @@ export function collectAudit(input: CollectInput): Collected {
         adaptation: { status: 'not-applicable' },
       }),
       record.element,
+      graphic({ classification: record.kind, small: record.small }),
     );
   }
 
@@ -358,6 +443,7 @@ export function collectAudit(input: CollectInput): Collected {
 
   return {
     candidates,
+    assist,
     elements,
     profiles,
     coverage: {

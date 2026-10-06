@@ -7,6 +7,18 @@ import {
   type HighlightRequest,
   type HighlightResult,
 } from '@core/audit';
+import {
+  SEMANTIC_LIMITS,
+  buildSemanticQuery,
+  evidenceSignature,
+  isEligibleFinding,
+  priorityOf,
+  type BoundQuery,
+  type SemanticCase,
+  type SemanticCasesRequest,
+  type SemanticCasesResponse,
+  type SemanticFacts,
+} from '@core/semantic-ai';
 import type { UserSettings } from '@domain/models';
 import { isColorAdaptOwnedMutation } from '../dynamic-analysis/ownership';
 import type { AuditSources } from '../page-analysis';
@@ -135,7 +147,9 @@ export class AuditController {
         },
         coverage: collected.coverage,
       });
-      if (!this.#store.commit(built.snapshot, built.members, collected.elements)) {
+      if (
+        !this.#store.commit(built.snapshot, built.members, collected.elements, collected.assist)
+      ) {
         this.#counters.staleDiscarded += 1;
         return this.#store.snapshot ?? built.snapshot;
       }
@@ -256,6 +270,68 @@ export class AuditController {
 
   clearHighlight(): void {
     this.#highlighter.hide();
+  }
+
+  /**
+   * The packets of the current snapshot's manual-review findings (AI-assisted review). Read on
+   * demand, most valuable first, at most one run's budget plus the findings the caller already
+   * holds answers for. Nothing is read from the page for a finding that has no eligible case.
+   */
+  semanticCases(request: SemanticCasesRequest): SemanticCasesResponse {
+    const snapshot = this.#store.snapshot;
+    if (!snapshot) return { generation: 0, page: null, eligible: 0, cases: [], heterogeneous: [] };
+    const generation = snapshot.generation;
+    const eligible = snapshot.findings.filter(isEligibleFinding);
+    const wanted = new Set(request.includeIds.slice(0, SEMANTIC_LIMITS.queriesPerRun));
+    const cases: SemanticCase[] = [];
+    const heterogeneous: string[] = [];
+    // Findings come most severe first; only as many are read as a run could ask about.
+    let reads = 0;
+    for (const finding of eligible) {
+      if (reads >= SEMANTIC_LIMITS.queriesPerRun * 2 && !wanted.has(finding.id)) continue;
+      const assist = this.#store.assistCase(finding.id);
+      if (!assist) continue;
+      // The group is asked about through its representative only while its sampled elements agree.
+      const bounds: BoundQuery[] = [];
+      let first: SemanticFacts | null = null;
+      for (const read of assist.samples) {
+        const facts = read();
+        if (!facts) continue;
+        first ??= facts;
+        const bound = buildSemanticQuery(facts, {
+          findingId: finding.id,
+          generation: String(generation),
+        });
+        if (bound) bounds.push(bound);
+      }
+      reads += 1;
+      const representative = bounds[0];
+      if (!first || !representative) continue;
+      const signature = evidenceSignature(representative.query);
+      if (bounds.some((bound) => evidenceSignature(bound.query) !== signature)) {
+        heterogeneous.push(finding.id);
+        continue;
+      }
+      cases.push({
+        findingId: finding.id,
+        task: first.task,
+        priority: priorityOf(finding, first.interactive),
+        bound: representative,
+        instances: Math.max(this.#store.count(finding.id), bounds.length),
+        sampled: bounds.length,
+      });
+    }
+    cases.sort((a, b) => b.priority - a.priority);
+    const kept = cases.filter(
+      (c, index) => index < SEMANTIC_LIMITS.queriesPerRun || wanted.has(c.findingId),
+    );
+    return {
+      generation,
+      page: snapshot.page,
+      eligible: eligible.length,
+      cases: kept,
+      heterogeneous,
+    };
   }
 
   noteExport(): void {

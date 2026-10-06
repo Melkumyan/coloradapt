@@ -1,5 +1,11 @@
+import { parseLoopbackEndpoint } from '@core/semantic-ai/endpoint';
 import { DEFAULT_USER_SETTINGS, VISION_PROFILES } from '@domain/models';
-import type { SiteProfile, UserSettings, VisionProfile } from '@domain/models';
+import type {
+  SemanticAIProviderSetting,
+  SiteProfile,
+  UserSettings,
+  VisionProfile,
+} from '@domain/models';
 import { clamp01 } from '@shared/utils';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -16,6 +22,22 @@ function readBoolean(value: unknown, fallback: boolean): boolean {
 
 function readUnitInterval(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? clamp01(value) : fallback;
+}
+
+function readProvider(value: unknown): SemanticAIProviderSetting {
+  return value === 'local-http' || value === 'local-ollama'
+    ? value
+    : DEFAULT_USER_SETTINGS.semanticAIProvider;
+}
+
+/** The endpoint as stored, if it is a loopback address; otherwise the default. Never a remote host. */
+function readEndpoint(value: unknown): string {
+  const parsed = parseLoopbackEndpoint(value);
+  return parsed.ok ? parsed.origin : DEFAULT_USER_SETTINGS.semanticAIEndpoint;
+}
+
+function readModel(value: unknown): string {
+  return typeof value === 'string' && /^[A-Za-z0-9_.:/-]{1,60}$/.test(value) ? value : '';
 }
 
 export function parseSiteProfile(raw: unknown, hostname: string): SiteProfile | null {
@@ -71,6 +93,10 @@ export function parseUserSettings(raw: unknown): UserSettings {
     ),
     adaptCharts: readBoolean(raw.adaptCharts, DEFAULT_USER_SETTINGS.adaptCharts),
     adaptImages: readBoolean(raw.adaptImages, DEFAULT_USER_SETTINGS.adaptImages),
+    semanticAIEnabled: readBoolean(raw.semanticAIEnabled, DEFAULT_USER_SETTINGS.semanticAIEnabled),
+    semanticAIProvider: readProvider(raw.semanticAIProvider),
+    semanticAIEndpoint: readEndpoint(raw.semanticAIEndpoint),
+    semanticAIModel: readModel(raw.semanticAIModel),
     showWarnings: readBoolean(raw.showWarnings, DEFAULT_USER_SETTINGS.showWarnings),
     siteOverrides,
   };

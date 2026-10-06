@@ -77,6 +77,8 @@ export interface ChartAuditRecord {
   readonly analysis: ChartAnalysis;
   /** What the layer did with it (`unknown` while the layer is inactive). */
   readonly info: ChartInfo;
+  /** What was read from the SVG (plain data): the audit's AI-assisted review reads legend entries from it. */
+  readonly facts: ChartFacts;
 }
 
 export interface CanvasAuditRecord {
@@ -362,7 +364,7 @@ export class ChartController {
           budget -= facts.marks.length + facts.texts.length;
           const analysis = analyzeChart(facts);
           if (analysis.status !== 'unknown')
-            charts.push({ svg, analysis, info: this.inspect(svg) });
+            charts.push({ svg, analysis, info: this.inspect(svg), facts });
         } catch {
           // A chart that cannot be read is not audited; the audit never throws into the page.
         }

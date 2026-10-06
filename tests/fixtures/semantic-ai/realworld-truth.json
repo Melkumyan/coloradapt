@@ -1,0 +1,736 @@
+{
+  "note": "Ground truth for the real-world packets, written by a person who read each packet and its deterministic evidence (no model output was used): the labels that may be accepted for it. An empty list means none may be, either because the packet describes something outside the task's label set (kind \"not-in-label-set\") or because nothing in it settles the meaning (kind \"nothing-settles\"). Cases a person could not settle are listed under \"unresolved\" and are reported separately; they are not ground truth.",
+  "cases": {
+    "a11y-w3c-wai|CA-SVG-002|1f075a582743b286": {
+      "acceptable": ["search"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): icon button \"Submit Search\" with a search class",
+      "note": "icon button \"Submit Search\" with a search class"
+    },
+    "dash-owid-chart|CA-SVG-002|d9d2aa4f7901e05f": {
+      "acceptable": ["download"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"Download displayed data\" icon button",
+      "note": "\"Download displayed data\" icon button"
+    },
+    "doc-wikipedia-en|CA-IMG-003|3ac19dd7e2205c6c": {
+      "acceptable": ["edit"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"Edit this at Wikidata\" image link",
+      "note": "\"Edit this at Wikidata\" image link"
+    },
+    "forum-devto|CA-IMG-003|bdcef7f0e33f4efd": {
+      "acceptable": ["user"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"<name> profile\" avatar image link",
+      "note": "\"<name> profile\" avatar image link"
+    },
+    "forum-discourse-meta|CA-IMG-003|2434689a8f7cd47f": {
+      "acceptable": ["download"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"Download on the App Store\" badge image",
+      "note": "\"Download on the App Store\" badge image"
+    },
+    "gov-data|CA-SVG-002|af26eea2825183af": {
+      "acceptable": ["help"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"User Guide\" icon: a guide, not a user/account icon",
+      "note": "\"User Guide\" icon: a guide, not a user/account icon"
+    },
+    "gov-uk|CA-SVG-002|bcacf94dc399b44d": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "read from the packet by a person (M11 sample): GOV.UK logo svg beside a \"Navigation menu\" label: a logo, not a menu icon",
+      "note": "GOV.UK logo svg beside a \"Navigation menu\" label: a logo, not a menu icon"
+    },
+    "news-theverge|CA-SVG-002|1fc8ac753e1a06f0": {
+      "acceptable": ["back"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): \"Previous\" arrow",
+      "note": "\"Previous\" arrow"
+    },
+    "dash-chartjs-samples|CA-SEM-002|2287b05aa92b8967": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): tab-like button with an active class among peers",
+      "note": "tab-like button with an active class among peers"
+    },
+    "doc-k8s|CA-SEM-002|a7646b97078467b7": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): documentation nav item with an active class",
+      "note": "documentation nav item with an active class"
+    },
+    "doc-nextjs|CA-SEM-002|3626f7ec0e766de1": {
+      "acceptable": ["selected", "active"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): site nav item with a selected class among peers",
+      "note": "site nav item with a selected class among peers"
+    },
+    "doc-rust-book|CA-SEM-002|e52ef8915344034a": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): nav link with an active class",
+      "note": "nav link with an active class"
+    },
+    "fin-coinmarketcap|CA-SEM-002|848c1379caf9b9fe": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): current page of a pagination list",
+      "note": "current page of a pagination list"
+    },
+    "gov-australia|CA-SEM-002|2ae3e5dba71ef8b2": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): nav link with an active class",
+      "note": "nav link with an active class"
+    },
+    "news-lenta|CA-SEM-002|7693bde03a0c572f": {
+      "acceptable": ["active", "selected"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): tab with an active class among peers",
+      "note": "tab with an active class among peers"
+    },
+    "dash-metabase-demo|CA-CHART-003|5d08de93accf848e": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): stacked bar chart with a descriptive name",
+      "note": "stacked bar chart with a descriptive name"
+    },
+    "dash-metabase-demo|CA-CHART-003|2dc623639ff1ec48": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): stacked bar chart with a descriptive name",
+      "note": "stacked bar chart with a descriptive name"
+    },
+    "dash-owid|CA-IMG-002|d47c701576a3c5a0": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): line chart image, linked, with a descriptive alt",
+      "note": "line chart image, linked, with a descriptive alt"
+    },
+    "dash-worldometer|CA-CHART-003|d1f3d26724bdc22e": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): chart svg named \"A chart.\"",
+      "note": "chart svg named \"A chart.\""
+    },
+    "doc-wikipedia-en|CA-IMG-002|5f8ef54ac81d3072": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): chart image, linked, with a descriptive alt",
+      "note": "chart image, linked, with a descriptive alt"
+    },
+    "doc-wikipedia-en|CA-IMG-002|c7c8d0c551077af5": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): chart image, linked, with a descriptive alt",
+      "note": "chart image, linked, with a descriptive alt"
+    },
+    "doc-wikipedia-en|CA-IMG-002|c2cff67d0c88b258": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): table snippet image, linked, with a descriptive alt",
+      "note": "table snippet image, linked, with a descriptive alt"
+    },
+    "fin-tase|CA-CHART-003|d8b22aaa131055ed": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): Highcharts svg",
+      "note": "Highcharts svg"
+    },
+    "fin-tradingview|CA-CHART-003|81e6883ffb932b3d": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): chart svg with axis labels as its name",
+      "note": "chart svg with axis labels as its name"
+    },
+    "fin-yahoo|CA-CHART-004|c3b5c07f73521c89": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): price chart canvas in a control",
+      "note": "price chart canvas in a control"
+    },
+    "gov-data|CA-CHART-004|2cb4f79955ec792a": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "read from the packet by a person (M11 sample): chart canvas with a heading beside it",
+      "note": "chart canvas with a heading beside it"
+    },
+    "a11y-colorbrewer|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "a11y-deque|CA-SVG-002|e77e282e89f4d9a1": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "a11y-govuk-ds|CA-SVG-002|e17d8510b6722b6e": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"GOV.UK\""
+    },
+    "blog-csstricks|CA-IMG-003|fe676caf65e57da3": {
+      "acceptable": ["settings"],
+      "kind": "specific",
+      "basis": "a control whose visible neighbouring label says it opens cookie / consent preferences",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "blog-joshwcomeau|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "blog-qiita|CA-IMG-003|90ab0eae869f5e96": {
+      "acceptable": ["user"],
+      "kind": "specific",
+      "basis": "avatar image that links to a person's profile; the name is a username",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"kazuki_ogawa\""
+    },
+    "blog-qiita|CA-IMG-003|79e46d15c46de699": {
+      "acceptable": ["user"],
+      "kind": "specific",
+      "basis": "avatar image that links to a person's profile; the name is a username",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"inoyu-qiita\""
+    },
+    "blog-qiita|CA-SVG-002|c5d43ce13ebb4e35": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Qiita Conference\""
+    },
+    "dash-d3-gallery|CA-IMG-002|0c8ee8459f22a7e3": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "a raster chart (classified chart-raster, not small) that is operated or captioned; a chart carries information",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on img with no name"
+    },
+    "dash-echarts-examples|CA-IMG-002|0c8ee8459f22a7e3": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "a raster chart (classified chart-raster, not small) that is operated or captioned; a chart carries information",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on img with no name"
+    },
+    "dash-echarts-examples|CA-SVG-002|72a0c0fca47d6334": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"sankey\""
+    },
+    "dash-gapminder|CA-IMG-002|87406dea7e4c749f": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "a raster chart (classified chart-raster, not small) that is operated or captioned; a chart carries information",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on img with no name"
+    },
+    "dash-gapminder|CA-SVG-002|b43b0b6b7f841358": {
+      "acceptable": ["color-carries-meaning"],
+      "kind": "specific",
+      "basis": "the name lists the regions a chart legend maps to colors; the colors are the key",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg named \"Asia Africa The Americas Europe\""
+    },
+    "dash-grafana-play|CA-IMG-003|c4e6d97bc655d5a4": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Grafana\""
+    },
+    "dash-highcharts-demo|CA-SVG-002|3439681a92d877e3": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "dash-highcharts-demo|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "dash-metabase-demo|CA-IMG-003|aa61500fae341785": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Amazon Athena\""
+    },
+    "dash-owid-chart|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "doc-angular|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "doc-nextjs|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "doc-react|CA-SVG-002|3439681a92d877e3": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "doc-tailwind|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "doc-vue|CA-IMG-003|9c6c1f957fec0d09": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Vue Mastery Logo\""
+    },
+    "doc-vue|CA-IMG-003|95181bd697b67787": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Chrome Frameworks Fund\""
+    },
+    "doc-vue|CA-SVG-002|6c22c5f3a6767e1f": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Vue.js\""
+    },
+    "doc-wikipedia-ar|CA-IMG-003|eb7bb2cee5494d0a": {
+      "acceptable": ["edit"],
+      "kind": "specific",
+      "basis": "the accessible name says (in Arabic, Hebrew, Japanese) to edit the value on Wikidata",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"تعديل قيمة خاصية (P1995) في ويكي بيانات\""
+    },
+    "doc-wikipedia-ar|CA-IMG-003|c0ea4b93207e4f39": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "doc-wikipedia-ar|CA-IMG-003|9741635e881393d1": {
+      "acceptable": ["edit"],
+      "kind": "specific",
+      "basis": "the accessible name says (in Arabic, Hebrew, Japanese) to edit the value on Wikidata",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"عدلها في ويكي بيانات\""
+    },
+    "doc-wikipedia-en|CA-IMG-003|f6b403c8f2f072a6": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Wikimedia Commons logo\""
+    },
+    "doc-wikipedia-en|CA-IMG-003|b09beaade775ecd1": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"icon\""
+    },
+    "doc-wikipedia-he|CA-IMG-003|058c1747cdf51abf": {
+      "acceptable": ["edit"],
+      "kind": "specific",
+      "basis": "the accessible name says (in Arabic, Hebrew, Japanese) to edit the value on Wikidata",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"עריכת הנתון בוויקינתונים\""
+    },
+    "doc-wikipedia-ja|CA-IMG-003|c0ea4b93207e4f39": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "doc-wikipedia-ja|CA-IMG-003|4334b55681535009": {
+      "acceptable": ["edit"],
+      "kind": "specific",
+      "basis": "the accessible name says (in Arabic, Hebrew, Japanese) to edit the value on Wikidata",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"ウィキデータを編集\""
+    },
+    "doc-wikipedia-ja|CA-IMG-003|0e4527c897e1854f": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"ウィキペディア\""
+    },
+    "doc-wikipedia-ru|CA-IMG-003|09d9349098fdd315": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Логотип Викисклада\""
+    },
+    "edu-codecademy|CA-IMG-003|58b685c528e6ae49": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"ISC2\""
+    },
+    "edu-codecademy|CA-SVG-002|2012276c8840f609": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Google\""
+    },
+    "edu-coursera|CA-IMG-003|4445a7ef823fc651": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Coursera на Facebook\""
+    },
+    "edu-openstax|CA-IMG-003|c094463eb5a4c55d": {
+      "acceptable": ["settings"],
+      "kind": "specific",
+      "basis": "a control whose visible neighbouring label says it opens cookie / consent preferences",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Revisit consent button\""
+    },
+    "fin-coinmarketcap|CA-IMG-003|67d25d99e58c6055": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"CMC20 logo\""
+    },
+    "fin-coinmarketcap|CA-IMG-003|cc7aa70bfd75d195": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"AMC logo\""
+    },
+    "fin-coinmarketcap|CA-IMG-003|fa9d753924df44bb": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"ISO 27001 and ISO 27701 certified\""
+    },
+    "fin-coinmarketcap|CA-SVG-002|15288b263f47db29": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"New Try Agentic Charts\""
+    },
+    "fin-coinmarketcap|CA-IMG-003|81c7f47801ffe639": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"BTC\""
+    },
+    "fin-coinmarketcap|CA-IMG-002|dee7d0fbce00eed4": {
+      "acceptable": ["carries-information"],
+      "kind": "specific",
+      "basis": "a raster chart (classified chart-raster, not small) that is operated or captioned; a chart carries information",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on img named \"[token]\""
+    },
+    "fin-tradingview|CA-SVG-002|cea29a71e9bac096": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Today • S&P Global Construction PMI Actual 32:39 Forecast 45.2 Prior "
+    },
+    "fin-yahoo|CA-SVG-002|3439681a92d877e3": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "fin-yahoo|CA-CHART-003|59e495032ffd3373": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on svg with no name"
+    },
+    "forum-devto|CA-IMG-003|c0ea4b93207e4f39": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "forum-devto|CA-IMG-003|609e3a1a311a316b": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Subscriber\""
+    },
+    "forum-devto|CA-IMG-003|9fe1e7ef16e3a9ca": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"The DEV Team logo\""
+    },
+    "forum-devto|CA-IMG-003|727730cda6b35235": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Community Curator\""
+    },
+    "forum-devto|CA-SVG-002|145007be3f505ee0": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"DEV Challenges\""
+    },
+    "forum-discourse-meta|CA-IMG-003|6a1d49803d0b1b8b": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"megaphone\""
+    },
+    "forum-discourse-meta|CA-IMG-003|8a3594fc837b2ccb": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"blue_book\""
+    },
+    "forum-pikabu|CA-IMG-003|c0ea4b93207e4f39": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "forum-pikabu|CA-IMG-003|76c3051b54142611": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"NetSpy\""
+    },
+    "forum-pikabu|CA-SVG-002|e858d9d12f6a3f50": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Пикабу Игры +1000 бесплатных онлайн игр\""
+    },
+    "forum-pikabu|CA-SVG-002|bcab07cca258bba1": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Войти через VK ID\""
+    },
+    "forum-pikabu|CA-SVG-002|3439681a92d877e3": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "forum-pikabu|CA-SVG-002|ac18a3e0a19ac446": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Войти с Яндекс ID\""
+    },
+    "forum-slashdot|CA-IMG-003|93d43b902ee03286": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Medicine\""
+    },
+    "forum-slashdot|CA-SVG-002|a1614e9e45d7eed3": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Twitter\""
+    },
+    "gov-data|CA-CHART-004|cd3e75449c5167b5": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_MANUAL_REVIEW_CASE on canvas with no name"
+    },
+    "gov-digital-jp|CA-SVG-002|b42ee09c32b7729e": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "gov-nasa|CA-SVG-002|de20a1e7805fcf08": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"NASA’s SpaceX Crew-12\""
+    },
+    "gov-nasa|CA-SVG-002|d869aa4fd16cb18d": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Join Us\""
+    },
+    "land-linear|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "news-lemonde|CA-SVG-002|094050cbfa7d988d": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Météo du climat Consulter la carte et les données climatiques.\""
+    },
+    "news-lenta|CA-IMG-003|c0ea4b93207e4f39": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on img with no name"
+    },
+    "news-lenta|CA-SVG-002|2e84646b1f25df5a": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Раскрыто отношение Китая к формату «большой двойки» с США 10:48\""
+    },
+    "news-lenta|CA-SVG-002|75a00ca384dcd773": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"Спецназ по ошибке взял штурмом дом российской семьи и попал на видео "
+    },
+    "news-lenta|CA-SVG-002|3439681a92d877e3": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "news-lenta|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "news-meduza|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "port-awwwards|CA-SVG-002|99dc90a75c60ed3d": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on svg named \"View Nominees\""
+    },
+    "port-awwwards|CA-IMG-003|1df5312e879906fc": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Nectar\""
+    },
+    "port-awwwards|CA-SVG-002|1857321b6a9abb66": {
+      "acceptable": ["search"],
+      "kind": "specific",
+      "basis": "an operated svg whose adjacent text reads \"Search\" in the site header",
+      "note": "CLASSIFY_CONTROL_ICON on svg with no name"
+    },
+    "port-awwwards|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "port-dribbble|CA-IMG-003|a39dd64cd020e642": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"One Week Wonders\""
+    },
+    "port-robbowen|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "saas-diagrams|CA-SVG-002|396be01cb2de2b3c": {
+      "acceptable": [],
+      "kind": "nothing-settles",
+      "basis": "no accessible name, no usable neighbouring text and no deterministic evidence: nothing in the packet settles the meaning, so any accepted label would be a guess",
+      "note": "ASSESS_COLOR_DEPENDENCE on svg with no name"
+    },
+    "saas-github-repo|CA-IMG-003|717e01ae7a41269d": {
+      "acceptable": ["user"],
+      "kind": "specific",
+      "basis": "avatar image that links to a person's profile; the name is a username",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"@bpasero\""
+    },
+    "shop-aliexpress|CA-IMG-003|efd49daf630517cb": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Icon\""
+    },
+    "shop-aliexpress|CA-IMG-003|188cffb647bc9707": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Automotive\""
+    },
+    "shop-aliexpress|CA-IMG-003|21ecd413bc4dce84": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"增值电信业务经营许可证\""
+    },
+    "shop-newegg|CA-IMG-003|1ae6caafa6737ab8": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"Components & Storage\""
+    },
+    "shop-newegg|CA-IMG-003|6c7de4c7376fd3f6": {
+      "acceptable": [],
+      "kind": "not-in-label-set",
+      "basis": "a brand logo, badge, emoji, sponsor, thumbnail, banner or call-to-action: none of the 20 control-icon labels describes it, so any accepted label would be wrong",
+      "note": "CLASSIFY_CONTROL_ICON on img named \"AI Spark\""
+    }
+  },
+  "unresolvedRealWorld": {
+    "a11y-a11yproject|CA-SVG-002|22528b03819be8d9": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "a11y-apg|CA-SVG-002|dcbc78d5c65fbfd3": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "a11y-deque|CA-SVG-002|3b88718070bb4dde": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "a11y-w3c-wai|CA-SVG-002|dcbc78d5c65fbfd3": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "a11y-whocanuse|CA-SVG-002|b7c3ab6a19f0ad9c": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "blog-csstricks|CA-SVG-002|52e4a54e6783ef36": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "blog-zhihu-zhuanlan|CA-SVG-002|1c04dd64b2ff5cc0": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "dash-cloudflarestatus|CA-SVG-002|4da6650703b101d3": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "dash-gapminder|CA-SVG-002|200fd206c9b6746b": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "dash-gapminder|CA-SVG-002|be3900fd8ef85d91": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "dash-owid|CA-SVG-002|eaec98ec8fb5d533": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-angular|CA-SVG-002|a9662fc8c5cc4c28": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-angular|CA-SVG-002|d8c310088ffaca6a": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-k8s|CA-SVG-002|e8065e87736e9b65": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-mdn|CA-SVG-002|3c3673883f6c3951": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-nextjs|CA-SVG-002|5cc04f4f9ae596e1": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-tailwind|CA-SVG-002|32bf3d1ea6cddb24": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "doc-wikipedia-ru|CA-IMG-003|f44375a4ece18b4c": "a small image link whose purpose cannot be told from the sanitized packet",
+    "doc-wikipedia-ru|CA-IMG-003|1838ac75c088f657": "a small image link whose purpose cannot be told from the sanitized packet",
+    "fin-coinmarketcap|CA-SEM-002|c76f1019537164d9": "a color-coded status whose meaning rests on a class name alone",
+    "fin-coinmarketcap|CA-SEM-002|46083035531f5322": "a color-coded status whose meaning rests on a class name alone",
+    "fin-coinmarketcap|CA-SVG-002|d08c7750720040eb": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "fin-coinmarketcap|CA-SVG-002|aa1835b0799e752a": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-devto|CA-IMG-003|b6072291ab63d13f": "a small image link whose purpose cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|51c4b9279da0d624": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|f593688f4d8416d8": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|84a6c07be2f23800": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|9f4f163f82a0266d": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|30d2edb7e1d47ce6": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|5839ed57939eb32e": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|32d394fd6f04654c": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|62b4cdff7e8dd8f9": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|38f615a70bdecbe0": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|9df338bf50a486e3": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|18a5332bd6c0a23a": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "forum-pikabu|CA-SVG-002|396be01cb2de2b3c": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "gov-europa|CA-CHART-004|1619b372b11a8c43": "a canvas whose role depends on the page",
+    "land-linear|CA-SVG-002|0e8a969350c33eac": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "land-linear|CA-SVG-002|fcd6c310dd1be40f": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "land-notion|CA-SVG-002|170349dcd35486db": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "news-npr|CA-SVG-002|3463418f08472637": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "saas-netlify-app|CA-IMG-002|6bde0331429a02e4": "an illustration whose informativeness is a judgement call",
+    "saas-squoosh|CA-SVG-002|61b6b3005f992b6a": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet",
+    "shop-aliexpress|CA-IMG-003|ff706d7e15211d9d": "a small image link whose purpose cannot be told from the sanitized packet",
+    "shop-newegg|CA-SVG-002|ab6144e23929d98c": "an interactive or decorative svg whose purpose (logo link, count badge, promo, or icon) cannot be told from the sanitized packet"
+  }
+}

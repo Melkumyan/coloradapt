@@ -12,9 +12,12 @@ import {
   type AuditProfileScope,
 } from '@core/audit';
 import { VISION_PROFILE_INFO } from '@domain/models';
+import { useSettings } from '@features/settings';
+import { AssistPanel } from './assist-components';
 import { CoveragePanel, FilterPanel, FindingCard, SummaryBar } from './components';
 import { downloadText } from './download';
 import { useAuditSession } from './use-audit-session';
+import { useSemanticAssist } from './use-semantic-assist';
 
 /** Findings drawn at first and per "Show more": a big page must not freeze the page that audits it. */
 const PAGE_SIZE = 200;
@@ -36,18 +39,26 @@ export function App(): JSX.Element {
   const [scope, setScope] = useState<AuditProfileScope>('auto');
   const session = useAuditSession(tabId, 'auto');
   const { snapshot, status, error } = session;
+  const { settings } = useSettings({ live: true });
+  const assist = useSemanticAssist(tabId, snapshot, settings);
+  const [assistView, setAssistView] = useState<
+    'all' | 'ACCEPTED_ADVISORY' | 'UNRESOLVED' | 'REJECTED'
+  >('all');
   const [filters, setFilters] = useState<AuditFilters>(NO_FILTERS);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<number | null>(null);
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [notice, setNotice] = useState('');
 
-  const filtered = useMemo(
-    () => (snapshot ? filterFindings(snapshot.findings, filters) : []),
-    [snapshot, filters],
-  );
+  const filtered = useMemo(() => {
+    const found = snapshot ? filterFindings(snapshot.findings, filters) : [];
+    // A view over the findings, not a filter of the audit: it never changes what is exported.
+    return assistView === 'all'
+      ? found
+      : found.filter((f) => assist.entries.get(f.id)?.validatorStatus === assistView);
+  }, [snapshot, filters, assistView, assist.entries]);
   const filteredSummary = useMemo(() => summarize(filtered), [filtered]);
-  const filtering = isFiltering(filters);
+  const filtering = isFiltering(filters) || assistView !== 'all';
 
   // A new snapshot may have lost the selected finding: nothing may point at it (derived, not stored).
   const ids = useMemo(
@@ -119,14 +130,14 @@ export function App(): JSX.Element {
   const exportAs = useCallback(
     (kind: 'json' | 'html') => {
       if (!snapshot || session.routePending) return;
-      const report = createAuditReport(snapshot, Date.now());
+      const report = createAuditReport(snapshot, Date.now(), assist.report());
       const name = auditFileName(report.page, report.generatedAt, kind);
       if (kind === 'json') downloadText(name, serializeAuditReport(report), 'application/json');
       else downloadText(name, renderAuditHtml(report), 'text/html');
       void session.noteExport();
       setNotice(`Saved ${name}`);
     },
-    [snapshot, session],
+    [snapshot, session, assist],
   );
 
   if (tabId === null) {
@@ -226,6 +237,22 @@ export function App(): JSX.Element {
         <>
           <SummaryBar summary={snapshot.summary} />
           <CoveragePanel coverage={snapshot.coverage} />
+          <AssistPanel assist={assist} />
+          {assist.entries.size > 0 && (
+            <p>
+              <label htmlFor="assist-view">AI-assisted interpretation: </label>
+              <select
+                id="assist-view"
+                value={assistView}
+                onChange={(event) => setAssistView(event.target.value as typeof assistView)}
+              >
+                <option value="all">All findings</option>
+                <option value="ACCEPTED_ADVISORY">Likely meaning (advisory)</option>
+                <option value="UNRESOLVED">Needs review</option>
+                <option value="REJECTED">Interpretation rejected</option>
+              </select>
+            </p>
+          )}
           <FilterPanel
             findings={snapshot.findings}
             filters={filters}
@@ -265,6 +292,9 @@ export function App(): JSX.Element {
                 highlighted={expanded === finding.id ? shownIndex : null}
                 onToggle={() => toggle(finding.id)}
                 onHighlight={(index, scroll) => show(finding.id, index, scroll)}
+                {...(assist.entries.get(finding.id)
+                  ? { assist: assist.entries.get(finding.id), provider: assist.provider }
+                  : {})}
               />
             ))}
             {filtered.length > shown.length && (

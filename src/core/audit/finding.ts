@@ -64,6 +64,11 @@ export function groupKeyOf(candidate: AuditCandidate): string {
   return `${candidate.ruleId}|${candidate.target.component}|${candidate.context}|${candidate.assessment}`;
 }
 
+/** The id of the finding (group) a candidate belongs to, as `groupFindings` will give it. */
+export function findingIdFor(candidate: AuditCandidate): string {
+  return `${candidate.ruleId}:${stableHash(groupKeyOf(candidate))}`;
+}
+
 /** Applies the registry and the severity model to a candidate. `null` for a rule that does not exist. */
 export function toInstance(candidate: AuditCandidate): AuditInstance | null {
   const rule = getRule(candidate.ruleId);

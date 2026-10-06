@@ -5,6 +5,7 @@ import type {
   HighlightRequest,
   HighlightResult,
 } from '@core/audit';
+import type { SemanticCasesRequest, SemanticCasesResponse } from '@core/semantic-ai';
 import type {
   AdaptationPlan,
   AnalysisResult,
@@ -43,6 +44,11 @@ export interface MessageMap {
   AUDIT_NOTE_EXPORT: { request: undefined; response: null };
   /** Debug/test channel: audit counters. Local only, never sent anywhere. */
   AUDIT_DIAGNOSTICS: { request: undefined; response: AuditDiagnostics };
+  /**
+   * AI-assisted review (M11, docs/AI_SEMANTIC_ENGINE.md): the bounded, redacted packets of the current
+   * snapshot's manual-review findings. Read-only; sent only when the developer asks for the review.
+   */
+  AUDIT_SEMANTIC_CASES: { request: SemanticCasesRequest; response: SemanticCasesResponse };
 }
 
 export type MessageType = keyof MessageMap;
@@ -64,6 +70,7 @@ export const MESSAGE_TYPES: readonly MessageType[] = [
   'AUDIT_CLOSE',
   'AUDIT_NOTE_EXPORT',
   'AUDIT_DIAGNOSTICS',
+  'AUDIT_SEMANTIC_CASES',
 ];
 
 export interface ColorAdaptMessage<T extends MessageType = MessageType> {

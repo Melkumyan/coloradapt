@@ -43,6 +43,17 @@ alone — there is no backend for it to send data to.
   from the browser only to compare its sanitized origin and path with the snapshot's; the raw address is
   neither stored nor exported. A report is always the whole snapshot, whatever the audit page's filters
   show. See `docs/DEVELOPER_AUDIT.md` and `docs/AUDIT_EXPORT_SCHEMA.md`.
+- **AI-assisted review (M11) is optional, off by default, local and advisory.** Off, it does nothing: no code
+  path waits for a model and the audit page makes no request. On, and only when the developer presses the
+  button, small bounded and redacted summaries of the audit's _manual-review_ findings (a handful of ARIA state
+  tokens, a bounded accessible name, up to five nearby labels, same-kind sibling names, the matched state words) are
+  sent to a model runtime on this computer's loopback (`127.0.0.1`, `localhost` or `[::1]` with a port) and nowhere
+  else; there is no cloud provider and no fallback to one. Form values, text of editable regions, URLs, ids, class
+  lists, `data-*`, cookies, storage, full text, HTML and image pixels are never part of a summary. Short visible
+  labels (which may include a person's name: M11 does not try to detect names) can be part of one, and go only to
+  your own computer. The runtime that receives them is separate software with its own behavior. Prompts and
+  answers are never stored or exported; a report may carry labels, ids, statuses and a fingerprint, apart from the
+  findings. What the local runtime does with a request is outside ColorAdapt's control. See `docs/AI_PRIVACY.md`.
 - **No telemetry.** There is no analytics or crash-reporting SDK in this
   project, and none is planned as a default-on feature.
 - **No account, no registration, no login.** The extension works
@@ -50,12 +61,11 @@ alone — there is no backend for it to send data to.
 
 ## If this ever changes
 
-Any future feature that would send data off-device (for example, an
-opt-in AI-assisted semantic module — see `docs/ROADMAP.md` M11) must:
+Any future feature that would send data off-device (the M11 AI-assisted review does not: it sends to this
+computer's loopback only, `docs/AI_PRIVACY.md`) must:
 
 1. Be strictly opt-in, off by default.
 2. Clearly disclose what is sent and why, before enabling it.
 3. Never be required for the core extension to function.
 
-This document reflects the current, foundation-stage policy and will be
-updated if/when such a feature is built.
+This document reflects the current policy and will be updated if/when such a feature is built.

@@ -1,4 +1,5 @@
 import type { AuditSnapshot } from '@core/audit';
+import type { AssistCase } from './collector';
 
 /**
  * The content script's copy of the current audit: the snapshot (data) and, beside it, the live
@@ -15,6 +16,7 @@ export class AuditStore {
   #snapshot: AuditSnapshot | null = null;
   #members = new Map<string, readonly string[]>();
   #refs = new Map<string, WeakRef<Element>>();
+  #assist = new Map<string, AssistCase>();
 
   /** Reserves the generation of the next pass. */
   nextGeneration(): number {
@@ -34,6 +36,7 @@ export class AuditStore {
     snapshot: AuditSnapshot,
     members: ReadonlyMap<string, readonly string[]>,
     elements: ReadonlyMap<string, Element>,
+    assist: ReadonlyMap<string, AssistCase> = new Map(),
   ): boolean {
     if (snapshot.generation <= this.#committed) return false;
     this.#committed = snapshot.generation;
@@ -47,7 +50,13 @@ export class AuditStore {
       }
     }
     this.#refs = refs;
+    this.#assist = new Map(assist);
     return true;
+  }
+
+  /** The AI-assisted review's case of a finding, when it has one. */
+  assistCase(findingId: string): AssistCase | undefined {
+    return this.#assist.get(findingId);
   }
 
   /** How many elements a finding covers (exact, not only the listed sample). */
@@ -77,5 +86,6 @@ export class AuditStore {
     this.#snapshot = null;
     this.#members = new Map();
     this.#refs = new Map();
+    this.#assist = new Map();
   }
 }

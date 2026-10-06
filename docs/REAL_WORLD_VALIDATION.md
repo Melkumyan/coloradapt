@@ -92,3 +92,19 @@ with an earlier run:
 - Some pages replace themselves once after load (a bot check that reloads into the real page, `tesla.com`): the
   audit then ran in the gap with no content script. The crawl now waits for a complete document, an answering
   content script and 1.5 s of an unchanged state (bounded to 25 s).
+
+## M11 semantic sample
+
+`semantic-sample.spec.ts` (not part of the crawl above) opens the corpus pages whose recorded audit left an eligible
+manual-review finding, runs the audit and asks the extension for the AI-assisted review's packets
+(`AUDIT_SEMANTIC_CASES`), read-only and with no model. The packets are frozen by `tools/freeze-semantic-sample.mjs`
+into `tests/fixtures/semantic-ai/` and replayed by `tests/realworld/semantic-sample.test.ts` (in `pnpm verify`).
+Results and what the sample changed in the product: `docs/AI_SEMANTIC_ENGINE.md`, "Evidence".
+
+M11.R1: 114 of the 159 frozen packets are ground-truthed (`tests/fixtures/semantic-ai/realworld-truth.json`, with a kind
+and a basis per case; the 45 a person could not settle are listed under `unresolvedRealWorld` and are never counted),
+and `ai-provider.spec.ts` runs the provider path in Chrome 154 and Firefox 151. Re-recording the live corpus
+(`RW_SEMANTIC_OUT=semantic-sample-r1`, 77 pages) reproduced 125 of the 159 frozen packets; 34 changed with the live
+pages and 35 are new. The frozen file was deliberately not rewritten (its fingerprints are the benchmark's history);
+the re-recording is the measurement of representative-group safety: of 243 eligible findings, 218 were asked
+about (68 through a representative of several elements) and 24 were left manual review because their elements differ.

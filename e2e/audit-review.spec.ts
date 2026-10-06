@@ -299,7 +299,12 @@ test('the audit persists nothing and talks to no one: storage is empty of it, re
   const baseline = new Set(hosts);
   expect([...auditHosts].every((h) => h.startsWith('chrome-extension://'))).toBe(true);
   // Page requests during the audit: nothing beyond what the page's own server already was.
-  expect([...baseline].every((h) => h === new URL(server.origin).host)).toBe(true);
+  // Requests security software injects into every page (this machine's antivirus calls home from the page)
+  // are not the audit's; everything else must be the page's own server.
+  const injected = /(^|\.)kaspersky-labs\.com$/;
+  expect(
+    [...baseline].filter((h) => h !== new URL(server.origin).host && !injected.test(h)),
+  ).toEqual([]);
 
   const stored = await ext.worker.evaluate(async () => {
     const out: Record<string, unknown> = {};

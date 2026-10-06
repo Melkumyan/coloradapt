@@ -33,8 +33,9 @@ ColorAdapt should be able to reason about:
 - Charts (M7): series made distinguishable without color (line style, marker, pattern), legends kept
   in step; and images (M8), which need fundamentally different detection strategies than flat UI color.
 - A developer-facing accessibility audit/report (M9).
-- An optional, isolated AI-assisted semantic understanding module (M11) —
-  explicitly not a dependency of the core engine.
+- An optional, isolated, local-only and advisory AI-assisted review of the developer audit's manual-review
+  findings (M11, `docs/AI_SEMANTIC_ENGINE.md`) — off by default, explicitly not a dependency of the core engine, and
+  never able to change a finding or a page.
 
 See `docs/ROADMAP.md` for the milestone breakdown.
 

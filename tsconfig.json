@@ -25,6 +25,7 @@
     "realworld",
     "playwright.realworld.config.ts",
     "vitest.config.ts",
+    "vitest.qualify.config.ts",
     "playwright.config.ts",
     "wxt.config.ts",
     "eslint.config.js"

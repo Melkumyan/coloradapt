@@ -98,6 +98,21 @@ stays PARTIAL (M2). The audit's image pixel analysis needs image adaptation (oth
 disabled, not as "no image issues"); shadow DOM, frames, borders and focus rings are not audited; Firefox
 runtime is NOT_VERIFIED.
 
+M11 adds an **optional, local, advisory AI-assisted review** to the developer audit. Off by default, never
+switched on by an upgrade, and the extension works identically without it. When enabled, a button in the audit
+asks a model running **on your own computer** (Ollama, or any runtime behind a small loopback protocol) what a
+`manual-review` finding may mean ("Likely meaning" or "Needs review"), sending only small, redacted, bounded
+summaries (no form values, URLs, ids, class lists or page text beyond a few short labels) to
+`127.0.0.1`, `localhost` or `[::1]` and nowhere else; there is no cloud provider and no fallback to one. The model's
+answer is parsed into a label and evidence ids and then judged by deterministic code from the audit's own evidence;
+a model's confidence never authorizes anything, and it cannot override, suppress or create a finding, or change a
+page. Results live in memory, are labelled as AI-assisted, and travel in a separate `semanticAssist` section of the
+report. See `docs/AI_SEMANTIC_ENGINE.md`, `docs/AI_PRIVACY.md` and `docs/AI_PROVIDER_PROTOCOL.md`. No model is
+bundled. M11.R1 validated it: nothing a model says is accepted unless deterministic evidence supports it (0
+incorrect accepted across 424 synthetic scenarios, 146 thousand adversarial claims, 109 hostile strings, 114
+ground-truthed real-world packets and two live local models), the provider path is proven in Chrome and Firefox, and
+a group of unlike elements is never given one answer. AI-authorized page changes: none.
+
 Status: **M3 engineering PASS** (validated in real Chromium); **upstream
 scientific confidence PARTIAL** (M2 model assumption). Known limitations:
 a page's own `:hover`/`:focus` colors are
@@ -173,6 +188,8 @@ docs/               Architecture, CSS/SVG analysis, semantic accessibility, dyna
 ## Privacy principles
 
 - Local-first: all analysis happens in your browser.
+- Optional AI-assisted review (M11): off by default, advisory only, and when on it talks only to a model runtime on
+  your own computer (loopback); no cloud provider exists. See `docs/AI_PRIVACY.md`.
 - No backend, no telemetry, no account, no cloud API.
 - Settings are stored with `browser.storage.local` only.
 
@@ -184,7 +201,7 @@ Full policy: `docs/PRIVACY.md`. Security posture and permission rationale:
 M0 (this repository) through M14 are tracked in `docs/ROADMAP.md`:
 
 - M10: real-world validation (M10.R1 is its findings closeout)
-- M11: the optional AI-assisted semantic engine
+- M11: the optional, local, advisory AI semantic engine (`docs/AI_SEMANTIC_ENGINE.md`)
 - M12: production hardening
 - M13: store release
 - M14: advanced product

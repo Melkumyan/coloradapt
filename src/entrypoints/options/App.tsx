@@ -1,7 +1,90 @@
-import { type JSX } from 'react';
+import { useState, type JSX } from 'react';
+import { parseLoopbackEndpoint } from '@core/semantic-ai/endpoint';
 import { VISION_PROFILE_INFO, VISION_PROFILES } from '@domain/models';
-import type { VisionProfile } from '@domain/models';
+import type { SemanticAIProviderSetting, UserSettings, VisionProfile } from '@domain/models';
 import { useSettings } from '@features/settings';
+
+/** The endpoint field: only a loopback address is ever saved; anything else is explained and kept out. */
+function EndpointField({
+  value,
+  onSave,
+}: {
+  value: string;
+  onSave: (endpoint: string) => void;
+}): JSX.Element {
+  const [text, setText] = useState(value);
+  const parsed = parseLoopbackEndpoint(text);
+  return (
+    <>
+      <label htmlFor="options-ai-endpoint">Local model address</label>
+      <input
+        id="options-ai-endpoint"
+        type="text"
+        inputMode="url"
+        spellCheck={false}
+        value={text}
+        aria-invalid={!parsed.ok}
+        aria-describedby="options-ai-endpoint-hint"
+        onChange={(event) => {
+          setText(event.target.value);
+          const next = parseLoopbackEndpoint(event.target.value);
+          if (next.ok) onSave(next.origin);
+        }}
+      />
+      <p
+        id="options-ai-endpoint-hint"
+        className="options__hint"
+        role={parsed.ok ? undefined : 'alert'}
+      >
+        {parsed.ok
+          ? 'Saved. Only this computer’s own loopback address is ever contacted.'
+          : 'Not saved: only http://127.0.0.1:<port>, http://localhost:<port> or http://[::1]:<port> (port 1024 or higher) are accepted.'}
+      </p>
+    </>
+  );
+}
+
+function AIProviderField({
+  settings,
+  update,
+}: {
+  settings: UserSettings;
+  update: (patch: Partial<UserSettings>) => Promise<void>;
+}): JSX.Element {
+  return (
+    <>
+      <label htmlFor="options-ai-provider">Local runtime</label>
+      <select
+        id="options-ai-provider"
+        value={settings.semanticAIProvider}
+        onChange={(event) =>
+          void update({ semanticAIProvider: event.target.value as SemanticAIProviderSetting })
+        }
+      >
+        <option value="local-ollama">Ollama</option>
+        <option value="local-http">
+          ColorAdapt local protocol (see docs/AI_PROVIDER_PROTOCOL.md)
+        </option>
+      </select>
+      <EndpointField
+        value={settings.semanticAIEndpoint}
+        onSave={(endpoint) => void update({ semanticAIEndpoint: endpoint })}
+      />
+      <label htmlFor="options-ai-model">Model name</label>
+      <input
+        id="options-ai-model"
+        type="text"
+        spellCheck={false}
+        defaultValue={settings.semanticAIModel}
+        maxLength={60}
+        onBlur={(event) => {
+          const model = event.target.value.trim();
+          if (/^[A-Za-z0-9_.:/-]{0,60}$/.test(model)) void update({ semanticAIModel: model });
+        }}
+      />
+    </>
+  );
+}
 
 export function App(): JSX.Element {
   const { settings, loading, update } = useSettings();
@@ -128,6 +211,31 @@ export function App(): JSX.Element {
           Adapt functional images (small single-color bitmap icons only; photos, logos, screenshots
           and charts are never changed)
         </label>
+      </section>
+
+      <section aria-labelledby="ai-heading" className="options__section">
+        <h2 id="ai-heading">AI-assisted review (local, optional)</h2>
+        <p className="options__hint">
+          Off by default. When on, the developer audit gets a “Run AI-assisted review” button that
+          asks a model running on this computer to suggest a meaning for findings that need manual
+          review. It is advisory: it never changes a finding, never changes a page, and does not
+          touch how ColorAdapt adapts pages. There is no cloud option and no fallback to one.
+        </p>
+        <label className="options__checkbox">
+          <input
+            type="checkbox"
+            checked={settings.semanticAIEnabled}
+            onChange={(event) => void update({ semanticAIEnabled: event.target.checked })}
+          />
+          Enable AI-assisted review in the developer audit
+        </label>
+        {settings.semanticAIEnabled && <AIProviderField settings={settings} update={update} />}
+        <p className="options__hint">
+          Only small, redacted summaries of the findings that need review are sent, only to the
+          address above, only when you press the button. Form values, URLs, cookies and page text
+          are never included. Your local runtime must allow requests from this extension (for
+          Ollama: set OLLAMA_ORIGINS to include chrome-extension://*).
+        </p>
       </section>
 
       <section aria-labelledby="sites-heading" className="options__section">

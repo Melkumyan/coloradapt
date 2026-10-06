@@ -492,6 +492,23 @@ See [PERFORMANCE.md](PERFORMANCE.md).
 `auditExports`, `auditPasses`, `auditLivePasses`, `auditWatching`, `auditHighlightVisible`,
 `auditStaleDiscarded`.
 
+## AI-assisted interpretation (M11)
+
+An optional panel and, per `manual-review` finding of a few rules, an optional interpretation (**Likely meaning**
+or **Needs review**), made on request by a model on this computer and checked by deterministic code
+(`docs/AI_SEMANTIC_ENGINE.md`). It is separate from everything above: it adds no finding, changes no severity,
+confidence, assessment or summary count, and is not part of the snapshot (the content script only hands out the
+packets; results live in the audit page's memory). The panel shows the coverage of the review (off, not run,
+unavailable, partial, reviewed); a finding shows the interpretation's source (AI semantic assist), provider and
+model, the validator's verdict and the deterministic evidence behind it, and always says it is not a confirmed
+deterministic finding. A view selector (all / likely meaning / needs review / rejected) filters what is shown, not
+what is exported. A finding that groups elements with different evidence is not sent (it stays manual review and the
+panel says so); an interpretation of a group says it concerns the representative element. M11 assists the existing
+`manual-review` findings; it does not analyze every `unknown` element. Off by default; with it off the audit is
+unchanged, and an open audit page follows the setting live. Messages: `AUDIT_SEMANTIC_CASES`
+(read-only; the packets of the current snapshot's eligible findings). The export carries a `semanticAssist` section
+(`docs/AUDIT_EXPORT_SCHEMA.md`).
+
 ## Limitations
 
 - **Images.** CA-IMG-001 needs "Adapt functional images" (`adaptImages`): pixels are only ever read with the

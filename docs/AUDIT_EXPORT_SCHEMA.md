@@ -32,16 +32,17 @@ For identical page state the JSON is byte-identical apart from `generatedAt`:
 
 ## Top level
 
-| Field           | Type                                      | Meaning                                                                                                                                          |
-| --------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `schemaVersion` | `1`                                       | format version                                                                                                                                   |
-| `generatedAt`   | string (ISO 8601)                         | when the export was made (the only intentionally variable field)                                                                                 |
-| `tool`          | `{ name: "ColorAdapt", version: string }` | extension and version                                                                                                                            |
-| `page`          | `{ origin, pathname }`                    | sanitized address (see below)                                                                                                                    |
-| `audit`         | object                                    | `basis: "original-page-state"`, `visionProfile` (the user's active profile), `auditedProfiles` (profiles audited), `adaptationEnabled` (boolean) |
-| `summary`       | object                                    | counts, never a score (below)                                                                                                                    |
-| `coverage`      | object                                    | what the pass looked at                                                                                                                          |
-| `findings`      | array of finding                          | see below                                                                                                                                        |
+| Field            | Type                                      | Meaning                                                                                                                                          |
+| ---------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `schemaVersion`  | `1`                                       | format version                                                                                                                                   |
+| `generatedAt`    | string (ISO 8601)                         | when the export was made (the only intentionally variable field)                                                                                 |
+| `tool`           | `{ name: "ColorAdapt", version: string }` | extension and version                                                                                                                            |
+| `page`           | `{ origin, pathname }`                    | sanitized address (see below)                                                                                                                    |
+| `audit`          | object                                    | `basis: "original-page-state"`, `visionProfile` (the user's active profile), `auditedProfiles` (profiles audited), `adaptationEnabled` (boolean) |
+| `summary`        | object                                    | counts, never a score (below)                                                                                                                    |
+| `coverage`       | object                                    | what the pass looked at                                                                                                                          |
+| `findings`       | array of finding                          | see below                                                                                                                                        |
+| `semanticAssist` | object, optional                          | the AI-assisted review (M11): a section of its own, see below                                                                                    |
 
 ### `summary`
 
@@ -110,6 +111,46 @@ both on: a report without image findings then says nothing about the images.
 | `inputType` | string / null  | for `<input>` only, from a known list (else `other`); never the value                                                             |
 | `text`      | string / null  | ≤ 40 characters of the element's own visible text, redacted; `null` for form controls and editable regions; the `alt` for `<img>` |
 | `path`      | string         | at most the last six steps of a structural path (`#app>ul:nth-of-type(1)>li:nth-of-type(3)`), prefixed `…>` when cut              |
+
+## `semanticAssist` (optional, M11)
+
+Added without a version bump: it is an optional top-level key, absent from a report made without it, and a
+report with it removed is byte-identical to one that never had it (tested). It never changes, adds or removes a
+finding, and no finding refers to it. The audit page always includes it (`coverage: "disabled"` when the setting
+is off), so an absent interpretation never looks like a clean result. Rules and wording: `docs/AI_SEMANTIC_ENGINE.md`.
+
+| Field                   | Type            | Meaning                                                                                                                                |
+| ----------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `schemaVersion`         | `1`             | version of this section                                                                                                                |
+| `aiAssisted`            | boolean         | `true` when the section lists interpretations a model produced                                                                         |
+| `coverage`              | string          | `disabled` \| `unavailable` \| `not-run` \| `partial` \| `completed`                                                                   |
+| `provider`              | `{ id, model }` | `disabled` \| `mock` \| `local-http` \| `local-ollama`; the model name as reported (or `null`)                                         |
+| `semanticSchemaVersion` | integer         | version of the packet and answer schema                                                                                                |
+| `instructionVersion`    | integer         | version of the fixed instructions                                                                                                      |
+| `note`                  | string          | fixed sentence: advisory, never a finding                                                                                              |
+| `stats`                 | object          | `eligible`, `queried`, `deduped`, `cacheHits`, `accepted`, `rejected`, `unresolved`, `modelErrors`, `timeouts`, `notQueued` (integers) |
+| `entries`               | array           | one per interpreted finding, sorted by finding id                                                                                      |
+
+An entry: `findingId` (an id of this report), `task`, `modelStatus` (`SUPPORTED_HYPOTHESIS` \| `AMBIGUOUS` \|
+`INSUFFICIENT_CONTEXT` \| `MODEL_ERROR`), `validatorStatus` (`ACCEPTED_ADVISORY` \| `REJECTED` \| `UNRESOLVED`),
+`validatorReason` (a stable code such as `accepted`, `insufficient-corroboration`, `timeout`), `hypothesis` (the
+label the model proposed, or `null`), `modelConfidence` (the model's own number in [0, 1], or `null`; not a
+finding confidence), `evidenceRefs` (ids it cited), `supportingEvidence` (`{ id, source, value }`, the
+deterministic evidence that supports the label, value at most 160 characters) and `inputFingerprint` (16 hex
+characters: a hash of the sanitized packet, so a result can be tied to its input without exporting the input),
+`instances` (how many elements the finding covers) and `sampled` (how many of them had their evidence compared; at
+least 1 and at most `instances`). An entry of a finding with `instances > 1` is an interpretation of its representative
+element, offered only because every sampled element gave the same evidence; the HTML report says so. The provider
+type, model, schema version and instruction version are in the section header; the task, fingerprint, model
+confidence, validator result and cited evidence ids are in each entry.
+
+Never in it: the prompt, the instructions, the packet, the raw model answer or any reasoning, provider logs, the
+endpoint. The HTML report shows the same coverage, counts, provider, model, task and verdicts as the JSON, apart from the
+deterministic findings, with every string escaped (tested by parsing the HTML and checking there is no script,
+image, frame or event attribute and every link is an in-page anchor). `parseAuditReport` checks the section when
+present: every field is in the schema, `instances` and `sampled` are consistent, enums and bounds hold,
+every `findingId` is a finding of the report and appears once, an accepted entry has a label and a supported
+hypothesis, ids are well formed, and no string holds an invisible character.
 
 ## Example (abridged)
 
