@@ -184,10 +184,11 @@ export interface OracleElement {
   readonly full: string;
   readonly tag: string;
   readonly color: string;
-  readonly opacity: number;
-  readonly layers: Array<
-    { kind: 'color'; color: string } | { kind: 'gradient' } | { kind: 'image' }
-  >;
+  /** The element, then each ancestor to the root: its own opacity and the background it paints (see `color.ts`). */
+  readonly chain: Array<{
+    opacity: number;
+    paint: { kind: 'color'; color: string } | { kind: 'gradient' } | { kind: 'image' } | null;
+  }>;
   readonly darkCanvas: boolean;
   readonly effects: boolean;
   readonly clipText: boolean;
@@ -200,6 +201,12 @@ export interface OracleElement {
   readonly inSvg: boolean;
   readonly sensitive: boolean;
   readonly textChars: number;
+  /** `-webkit-text-fill-color` paints something other than `color` (the oracle reads the fill). */
+  readonly textFillDiffers: boolean;
+  /** Another element is painted over the middle of the text (null: not in the viewport, so not asked). */
+  readonly occluded: boolean | null;
+  /** The element has `display: contents`: its text is painted in an ancestor's box. */
+  readonly displayContents: boolean;
   /** Whether the visible text could be seen at all (size, display, visibility, clip). */
   readonly visible: boolean;
   /** Why not (`display`, `visibility`, `opacity`, `zero-size`), or `offscreen` for an element that is rendered outside the page. */
@@ -226,6 +233,17 @@ export function oracleProbe(limit: number): OracleProbe {
     return cut === id;
   };
   const seen = new Set<Element>();
+  const colorMemo = new Map<string, string>();
+  const canvasContext = (() => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      return canvas.getContext('2d', { willReadFrequently: true });
+    } catch {
+      return null;
+    }
+  })();
   const out: OracleElement[] = [];
   let truncated = false;
   const pathMemo = new Map<Element, string>();
@@ -264,7 +282,15 @@ export function oracleProbe(limit: number): OracleProbe {
     return p;
   };
   const rootStyle = getComputedStyle(document.documentElement);
-  const darkCanvas = /dark/.test(rootStyle.colorScheme || '');
+  // the scheme the browser uses: a list with `dark` is dark when the visitor prefers dark or `dark` is alone
+  const schemes = (rootStyle.colorScheme || '').toLowerCase().split(' ');
+  let prefersDark = false;
+  try {
+    prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch {
+    prefersDark = false;
+  }
+  const darkCanvas = schemes.indexOf('dark') >= 0 && (schemes.indexOf('light') < 0 || prefersDark);
   const walker = document.createTreeWalker(
     document.body ?? document.documentElement,
     NodeFilter.SHOW_TEXT,
@@ -272,7 +298,8 @@ export function oracleProbe(limit: number): OracleProbe {
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     const el = node.parentElement;
     if (!el || seen.has(el)) continue;
-    if (!node.nodeValue || !/\S/.test(node.nodeValue)) continue;
+    // a character that can be painted: not whitespace, not a zero-width or invisible format character
+    if (!node.nodeValue || !/[^\s\u200B-\u200D\u2060\uFEFF]/.test(node.nodeValue)) continue;
     const tag = el.localName;
     if (tag === 'script' || tag === 'style' || tag === 'noscript' || tag === 'template') continue;
     seen.add(el);
@@ -281,86 +308,171 @@ export function oracleProbe(limit: number): OracleProbe {
       break;
     }
     const cs = getComputedStyle(el);
-    const rect = el.getBoundingClientRect();
+    // `display: contents` has no box of its own: its text is painted in the nearest ancestor that has one
+    let box: Element | null = el;
+    while (box && getComputedStyle(box).display === 'contents') box = box.parentElement;
+    const rendered = box ?? el;
     let visible = false;
     try {
-      visible = el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+      visible = rendered.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
     } catch {
-      visible = cs.display !== 'none' && cs.visibility === 'visible';
+      visible = getComputedStyle(rendered).display !== 'none' && cs.visibility === 'visible';
     }
-    const zero = !(rect.width > 0 && rect.height > 0);
-    visible = visible && !zero;
+    // the text's own boxes (a Range), not the element's: right for inline elements and display: contents
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    let rect: DOMRect | null = null;
+    for (const r of Array.from(range.getClientRects())) {
+      if (r.width > 0 && r.height > 0) {
+        rect = r;
+        break;
+      }
+    }
+    // a box of no size that clips (overflow or `clip: rect(0 0 0 0)`) paints nothing, whatever its text's Range says
+    const boxRect = rendered.getBoundingClientRect();
+    const boxStyle = getComputedStyle(rendered);
+    const clippedAway =
+      (boxRect.width === 0 && boxRect.height === 0 && boxStyle.overflow !== 'visible') ||
+      boxStyle.clip === 'rect(0px, 0px, 0px, 0px)' ||
+      /^inset\(\s*50%/.test(boxStyle.clipPath);
+    const zero = rect === null || clippedAway;
     let hiddenReason = '';
-    if (!visible) {
-      hiddenReason = zero
-        ? 'zero-size'
-        : cs.visibility !== 'visible'
-          ? 'visibility'
-          : parseFloat(cs.opacity || '1') === 0
-            ? 'opacity'
-            : 'display';
+    if (!visible || zero) {
+      for (let n: Element | null = rendered; n; n = n.parentElement) {
+        const s = getComputedStyle(n);
+        if (s.display === 'none') {
+          hiddenReason = 'display';
+          break;
+        }
+        if (parseFloat(s.opacity || '1') === 0) {
+          hiddenReason = 'opacity';
+          break;
+        }
+        if (
+          (s as unknown as Record<string, string>)['contentVisibility'] === 'hidden' &&
+          n !== rendered
+        ) {
+          hiddenReason = 'content-visibility';
+          break;
+        }
+      }
+      if (hiddenReason === '' && cs.visibility !== 'visible') hiddenReason = 'visibility';
+      if (hiddenReason === '') hiddenReason = zero ? 'zero-size' : 'not-rendered';
+      visible = false;
     } else if (
-      rect.right <= 0 ||
-      rect.bottom + window.scrollY <= 0 ||
-      rect.left >= document.documentElement.scrollWidth + 1
+      rect !== null &&
+      (rect.right <= 0 ||
+        rect.bottom + window.scrollY <= 0 ||
+        rect.left >= document.documentElement.scrollWidth + 1)
     ) {
       hiddenReason = 'offscreen';
     }
-    let opacity = 1;
+    // Colors the browser reports in a form the Node side does not read (lab, oklch, display-p3, ...) are asked
+    // of the browser's own canvas, which converts any CSS color to sRGB: independent of both implementations.
+    const rgbaOf = (value: string): string => {
+      if (value.startsWith('rgb') || value.startsWith('color(srgb') || canvasContext === null) {
+        return value;
+      }
+      const memo = colorMemo.get(value);
+      if (memo !== undefined) return memo;
+      let result = value;
+      try {
+        canvasContext.clearRect(0, 0, 1, 1);
+        canvasContext.fillStyle = '#123456';
+        canvasContext.fillStyle = value;
+        // an unreadable value leaves the previous fill: then the answer is "unknown", not a color
+        if (canvasContext.fillStyle !== '#123456') {
+          canvasContext.fillRect(0, 0, 1, 1);
+          const d = canvasContext.getImageData(0, 0, 1, 1).data;
+          result = `rgba(${d[0]}, ${d[1]}, ${d[2]}, ${Math.round(((d[3] ?? 255) / 255) * 1000) / 1000})`;
+        }
+      } catch {
+        result = value;
+      }
+      colorMemo.set(value, result);
+      return result;
+    };
+    const alphaOf = (color: string): number => {
+      // rgba(r, g, b, a) | rgb(r, g, b) | color(srgb r g b / a) | color(srgb r g b)
+      const comma = /^rgba\([^)]*,\s*([\d.]+)\)$/.exec(color);
+      if (comma) return parseFloat(comma[1] ?? '1');
+      const slash = /\/\s*([\d.]+)\s*\)$/.exec(color);
+      if (slash) return parseFloat(slash[1] ?? '1');
+      return 1;
+    };
     let effects = false;
     let clipText = false;
-    const layers: OracleElement['layers'] = [];
+    const chain: OracleElement['chain'] = [];
     let positioned = false;
-    let done = false;
+    let coverage = 0;
     for (let n: Element | null = el; n; n = n.parentElement) {
       const s = getComputedStyle(n);
-      opacity *= parseFloat(s.opacity || '1');
+      // a blend mode, a backdrop filter or a filter function that changes colors (CSS Filter Effects: grayscale,
+      // sepia, hue-rotate, invert, brightness, contrast, saturate, opacity, url()) makes the painted color
+      // differ from the computed one; a blur or a drop shadow does not
       if (
         (s.mixBlendMode && s.mixBlendMode !== 'normal') ||
-        (s.filter && s.filter !== 'none') ||
-        (s.backdropFilter && s.backdropFilter !== 'none')
+        (s.backdropFilter && s.backdropFilter !== 'none') ||
+        (s.filter &&
+          s.filter !== 'none' &&
+          /grayscale|sepia|hue-rotate|invert|brightness|contrast|saturate|opacity|url\(/i.test(
+            s.filter,
+          ))
       ) {
         effects = true;
       }
-      if (n === el) {
-        const bc =
-          (s as unknown as Record<string, string>)['webkitBackgroundClip'] || s.backgroundClip;
-        if (bc === 'text') clipText = true;
-        if (s.position === 'absolute' || s.position === 'fixed') positioned = true;
-      }
-      if (!done) {
+      // a clipped background paints only the glyphs of the element and what is inside it: text on it, or under
+      // it, has no solid background to measure (as long as something above has not covered it already)
+      const clip =
+        (s as unknown as Record<string, string>)['webkitBackgroundClip'] || s.backgroundClip;
+      if (clip === 'text' && coverage < 0.999999) clipText = true;
+      if (n === el && (s.position === 'absolute' || s.position === 'fixed')) positioned = true;
+      // What the group below this element already covers: a background behind a fully covered group is never
+      // seen. Each element composites its content over its own background and then fades the result, so the
+      // coverage after it is opacity x (coverage + (1 - coverage) x alpha of its background).
+      let paint: OracleElement['chain'][number]['paint'] = null;
+      let alpha = 0;
+      if (coverage < 0.999999) {
         const img = s.backgroundImage;
+        const bg = s.backgroundColor;
         if (img && img !== 'none') {
-          layers.push(
+          paint =
             img.indexOf('url(') >= 0 || img.indexOf('image-set(') >= 0
               ? { kind: 'image' }
-              : { kind: 'gradient' },
-          );
-        }
-        const bg = s.backgroundColor;
-        if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
-          layers.push({ kind: 'color', color: bg });
-          if (/^rgb\(/.test(bg) || /,\s*1\)$/.test(bg)) {
-            if (!(img && img !== 'none')) done = true;
-          }
+              : { kind: 'gradient' };
+          alpha = 1;
+        } else if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+          const color = rgbaOf(bg);
+          paint = { kind: 'color', color };
+          alpha = alphaOf(color);
         }
       }
+      coverage = parseFloat(s.opacity || '1') * (coverage + (1 - coverage) * alpha);
+      chain.push({ opacity: parseFloat(s.opacity || '1'), paint });
     }
     const fill = (cs as unknown as Record<string, string>)['webkitTextFillColor'];
-    const color = fill && fill !== cs.color && fill !== 'currentcolor' ? fill : cs.color;
-    const root = el.getRootNode();
+    const rawColor = fill && fill !== cs.color && fill !== 'currentcolor' ? fill : cs.color;
+    const color = rgbaOf(rawColor);
+    let occluded: boolean | null = null;
+    if (visible && rect !== null && rect.bottom > 0 && rect.right > 0) {
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      if (cx >= 0 && cy >= 0 && cx < window.innerWidth && cy < window.innerHeight) {
+        const top = document.elementFromPoint(cx, cy);
+        occluded = top !== null && top !== el && !el.contains(top) && !top.contains(el);
+      }
+    }
     out.push({
       path: anchored(el),
       full: full(el),
       tag,
       color,
-      opacity,
-      layers,
+      chain,
       darkCanvas,
       effects,
       clipText,
       fontSize: parseFloat(cs.fontSize),
-      fontWeight: parseInt(cs.fontWeight, 10) || 400,
+      fontWeight: parseFloat(cs.fontWeight) || 400,
       interactive:
         el.closest(
           'a[href],button,input,select,textarea,summary,[role="button"],[role="link"],[role="tab"],[role="menuitem"]',
@@ -374,9 +486,12 @@ export function oracleProbe(limit: number): OracleProbe {
         tag === 'option' ||
         el.closest('[contenteditable]:not([contenteditable="false"])') !== null,
       textChars: (node.nodeValue || '').trim().length,
+      textFillDiffers: rawColor !== cs.color,
+      occluded,
+      displayContents: box !== el,
       visible,
       hiddenReason,
-      inShadow: root instanceof ShadowRoot,
+      inShadow: el.getRootNode() instanceof ShadowRoot,
       inFrame: window !== window.top,
     });
   }

@@ -12,16 +12,39 @@ export interface Rgba {
   readonly a: number;
 }
 
-/** Parses `rgb(...)`/`rgba(...)` as `getComputedStyle` reports it (comma or space syntax), else null. */
+/**
+ * Parses what `getComputedStyle` reports for a color: `rgb()`/`rgba()` (comma or space syntax) and
+ * `color(srgb r g b [/ a])`, which Chrome reports for colors written with `color-mix()`, `color(srgb ...)` and
+ * relative colors. Anything else (`lab()`, `oklch()`, `color(display-p3 ...)`) is `null`: the caller must treat
+ * that as *unknown*, never as transparent (an earlier version skipped such a layer, took the background to be
+ * white and reported dark code blocks as 1.2:1).
+ */
 export function parseCssColor(value: string): Rgba | null {
+  const text = value.trim();
   const m =
     /^rgba?\(\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*[, ]\s*([\d.]+)\s*(?:[,/]\s*([\d.]+%?)\s*)?\)$/.exec(
-      value.trim(),
+      text,
     );
-  if (!m) return null;
-  const alpha =
-    m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
-  return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: Math.min(1, Math.max(0, alpha)) };
+  if (m) {
+    const alpha =
+      m[4] === undefined ? 1 : m[4].endsWith('%') ? parseFloat(m[4]) / 100 : parseFloat(m[4]);
+    return {
+      r: Number(m[1]),
+      g: Number(m[2]),
+      b: Number(m[3]),
+      a: Math.min(1, Math.max(0, alpha)),
+    };
+  }
+  const c =
+    /^color\(\s*srgb\s+([\d.e+-]+%?)\s+([\d.e+-]+%?)\s+([\d.e+-]+%?)\s*(?:\/\s*([\d.e+-]+%?)\s*)?\)$/.exec(
+      text,
+    );
+  if (!c) return null;
+  const unit = (v: string): number => (v.endsWith('%') ? parseFloat(v) / 100 : parseFloat(v));
+  const byte = (v: string): number => Math.min(255, Math.max(0, unit(v) * 255));
+  const alpha = c[4] === undefined ? 1 : Math.min(1, Math.max(0, unit(c[4])));
+  const rgba = { r: byte(c[1]!), g: byte(c[2]!), b: byte(c[3]!), a: alpha };
+  return [rgba.r, rgba.g, rgba.b, rgba.a].every(Number.isFinite) ? rgba : null;
 }
 
 /** `top` painted over `bottom` (source-over). `bottom` is treated as opaque for the final result. */
@@ -49,30 +72,42 @@ export function contrastRatio(a: Rgba, b: Rgba): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** One painted layer of a background stack, outermost last (as the probe walks child to root). */
-export type BackgroundLayer =
+/**
+ * What one element on the way from the text to the root contributes: its own `opacity` and the background it
+ * paints. CSS composites an element and its descendants as one *group*: the group is the content below it,
+ * painted over the element's own background, then faded by the element's opacity. So an `opacity: .5` ancestor
+ * fades its own background together with the text, not the text alone.
+ */
+export type ChainPaint =
   | { readonly kind: 'color'; readonly color: string }
   | { readonly kind: 'gradient' }
   | { readonly kind: 'image' };
+
+export interface ChainEntry {
+  readonly opacity: number;
+  readonly paint: ChainPaint | null;
+}
 
 export type OracleStatus =
   | 'RESOLVED'
   | 'UNRESOLVED_GRADIENT'
   | 'UNRESOLVED_IMAGE'
   | 'UNRESOLVED_TEXT_CLIP'
-  | 'UNRESOLVED_EFFECT';
+  | 'UNRESOLVED_EFFECT'
+  | 'UNRESOLVED_COLOR_FORMAT';
 
 export interface OracleInput {
   /** Computed text color (`color`, or the text fill when it differs). */
   readonly color: string;
-  /** Product of the `opacity` of the element and its ancestors. */
-  readonly opacity: number;
-  /** Layers from the element up to the root. */
-  readonly layers: readonly BackgroundLayer[];
-  /** Whether the canvas behind the root is dark (`color-scheme: dark`). */
+  /** The element itself first, then every ancestor up to the root. Background paint after the first fully opaque one may be omitted. */
+  readonly chain: readonly ChainEntry[];
+  /** Whether the canvas behind the root is dark (the used `color-scheme` is dark). */
   readonly darkCanvas: boolean;
-  /** `-webkit-background-clip: text`, `mix-blend-mode`, `filter`, `backdrop-filter` on the element or an ancestor. */
+  /** The dark canvas of the browser (measured with pixels: Chromium 18/18/18, Firefox 28/27/34). */
+  readonly darkCanvasRgb?: readonly [number, number, number];
+  /** `mix-blend-mode`, `filter`, `backdrop-filter` on the element or an ancestor. */
   readonly effects: boolean;
+  /** `-webkit-background-clip: text` on the element. */
   readonly clipText: boolean;
 }
 
@@ -83,30 +118,78 @@ export interface OracleResult {
   readonly background: Rgba | null;
 }
 
+/** Premultiplied color: channels already multiplied by alpha, which makes source-over and fading plain arithmetic. */
+interface Premultiplied {
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+  readonly a: number;
+}
+
+const premultiply = (c: Rgba): Premultiplied => ({
+  r: c.r * c.a,
+  g: c.g * c.a,
+  b: c.b * c.a,
+  a: c.a,
+});
+const over = (top: Premultiplied, bottom: Premultiplied): Premultiplied => ({
+  r: top.r + bottom.r * (1 - top.a),
+  g: top.g + bottom.g * (1 - top.a),
+  b: top.b + bottom.b * (1 - top.a),
+  a: top.a + bottom.a * (1 - top.a),
+});
+const fade = (c: Premultiplied, opacity: number): Premultiplied => ({
+  r: c.r * opacity,
+  g: c.g * opacity,
+  b: c.b * opacity,
+  a: c.a * opacity,
+});
+
+type Painted =
+  Premultiplied | 'unresolved-gradient' | 'unresolved-image' | 'unresolved-color-format';
+
+/** The group from the element up to the root, with `content` (the text, or nothing) at the innermost level. */
+function paintChain(content: Premultiplied, chain: readonly ChainEntry[]): Painted {
+  let group = content;
+  for (const entry of chain) {
+    if (entry.paint?.kind === 'gradient') return 'unresolved-gradient';
+    if (entry.paint?.kind === 'image') return 'unresolved-image';
+    if (entry.paint?.kind === 'color') {
+      const color = parseCssColor(entry.paint.color);
+      // a color the oracle cannot read is unknown, not transparent
+      if (!color) return 'unresolved-color-format';
+      group = over(group, premultiply(color));
+    }
+    group = fade(group, Math.min(1, Math.max(0, entry.opacity)));
+  }
+  return group;
+}
+
 /** Resolves the effective foreground and background of a text element, or says why it cannot. */
 export function resolveContrast(input: OracleInput): OracleResult {
   const none = { ratio: null, foreground: null, background: null } as const;
   if (input.clipText) return { status: 'UNRESOLVED_TEXT_CLIP', ...none };
   if (input.effects) return { status: 'UNRESOLVED_EFFECT', ...none };
   const fg = parseCssColor(input.color);
-  if (!fg) return { status: 'UNRESOLVED_EFFECT', ...none };
-  // A gradient or an image anywhere in the opaque-so-far stack decides the background: not a solid color.
-  let stack: Rgba = { r: 0, g: 0, b: 0, a: 0 };
-  for (const layer of input.layers) {
-    if (layer.kind === 'gradient') return { status: 'UNRESOLVED_GRADIENT', ...none };
-    if (layer.kind === 'image') return { status: 'UNRESOLVED_IMAGE', ...none };
-    const color = parseCssColor(layer.color);
-    if (!color || color.a === 0) continue;
-    // Layers are visited child to root: what is already in `stack` is on top of this one.
-    stack = stack.a === 0 ? color : compositeOver(stack, color);
-    if (stack.a >= 1) break;
-  }
-  const canvas: Rgba = input.darkCanvas
-    ? { r: 18, g: 18, b: 18, a: 1 }
+  if (!fg) return { status: 'UNRESOLVED_COLOR_FORMAT', ...none };
+  const dark = input.darkCanvasRgb ?? [18, 18, 18];
+  const canvas: Premultiplied = input.darkCanvas
+    ? { r: dark[0], g: dark[1], b: dark[2], a: 1 }
     : { r: 255, g: 255, b: 255, a: 1 };
-  const background = stack.a >= 1 ? stack : compositeOver(stack, canvas);
-  const alpha = fg.a * input.opacity;
-  const foreground = compositeOver({ ...fg, a: alpha }, background);
+  const withText = paintChain(premultiply(fg), input.chain);
+  const behind = paintChain({ r: 0, g: 0, b: 0, a: 0 }, input.chain);
+  for (const painted of [withText, behind]) {
+    if (painted === 'unresolved-gradient') return { status: 'UNRESOLVED_GRADIENT', ...none };
+    if (painted === 'unresolved-image') return { status: 'UNRESOLVED_IMAGE', ...none };
+    if (painted === 'unresolved-color-format')
+      return { status: 'UNRESOLVED_COLOR_FORMAT', ...none };
+  }
+  const flat = (p: Premultiplied): Rgba => {
+    const total = over(p, canvas);
+    return { r: total.r, g: total.g, b: total.b, a: 1 };
+  };
+  const foreground = flat(withText as Premultiplied);
+  const background = flat(behind as Premultiplied);
   return {
     status: 'RESOLVED',
     ratio: contrastRatio(foreground, background),

@@ -187,7 +187,7 @@ Details in `docs/SEMANTIC_ACCESSIBILITY.md`.
 - `semanticCuesEnabled` (default **true**: HIGH-only, color-only-confirmed, verified, reversible).
 - Benchmark: 55 scenarios, 0 false positives. Real-Chromium E2E for forms, tabs, alerts, dots,
   badges, buttons, SPA state changes.
-- Not in M6: AI inference (M10), charts, canvas, images, Shadow DOM, iframes, developer audit.
+- Not in M6: AI inference (M11), charts, canvas, images, Shadow DOM, iframes, developer audit.
   M2 stays PARTIAL.
 
 ### M6.R1 — Semantic Validation & Freeze ✅ PASS
@@ -389,17 +389,54 @@ verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5
     **5/5** (2489 tests), `pnpm verify` x3 **3/3**, Chromium E2E x5 **5/5** (582 passed / 1 skipped / 0
     failed). Firefox: build passes, runtime NOT_VERIFIED. The 90 s hang guard on one M4 benchmark is
     test-local: the same structural work and the same isolated time as at M8 (~11 s), so it never hid a regression.
-- Known technical debt, carried to **M11 Production Hardening**: the per-site `adaptCharts` setting is stored
+- Known technical debt, carried to **M12 Production Hardening**: the per-site `adaptCharts` setting is stored
   but the chart runtime does not consult it (frozen M7 behavior; not changed in M9, not exposed in the audit UI).
   M2 stays PARTIAL and is propagated into every simulation-based finding.
 - See `docs/DEVELOPER_AUDIT.md`.
 
-## M10 — AI Semantic Engine ⬜
+## M10 — Real-World Validation ✅ (engineering PASS; product validation closed by M10.R1)
+
+- A live-page harness (`realworld/`, `pnpm test:realworld`, not part of `pnpm verify`): 193 public pages, Chrome
+  154 and Firefox 151, an independent contrast oracle, privacy and source-integrity checks, scenario suites.
+- Tag `m10-real-world-validation`. See `docs/REAL_WORLD_VALIDATION.md`.
+
+## M10.R1 — Real-World Findings Closeout ✅ (PASS; tag `m10-real-world-validation-closeout`)
+
+- Classifies every discrepancy between the audit and the independent oracle (67 false positives, 392 misses
+  in the M10 baseline), fixes the genuine ColorAdapt defects and the genuine harness/oracle defects, and
+  quantifies what remains.
+- Roadmap numbering is canonical from here: M10 real-world validation, M11 AI Semantic Engine, M12 Production
+  Hardening, M13 Store Release, M14 Advanced Product. M0–M9 and the tag `m10-real-world-validation` are unchanged.
+- Result: all 459 baseline disagreements classified (287 ColorAdapt defects, 114 oracle, 42 harness, 16 page state,
+  0 ambiguous) and the defects fixed: text in any element (not a tag list) is now analyzed; the audit judges only
+  painted text (about half of its findings were on text the browser does not paint); the dark canvas,
+  `-webkit-text-fill-color`, `background-clip: text` and color-changing effects are modeled or listed as limits.
+  Final comparison: 3290–3636 text elements below target per run, 3284–3629 agree, 5 + 3 raw disagreements in
+  Chrome, 5 + 1 in Firefox, all explained. Gates: tests 2646, audit tests x50 50/50, discrepancy suite x50 50/50,
+  full x5 5/5, verify x3 3/3, Chromium E2E x5 5/5 (582 passed / 1 skipped).
+- Exception carried to M12: the Chrome SPA heap-growth budget (1.1021 against 1.1; the M10 build 1.0969).
+- M2 stays PARTIAL.
+
+## M11 — AI Semantic Engine ⬜
 
 - Optional, isolated module for richer semantic understanding
   (e.g. classifying a badge as "success" vs. "error" when CSS alone is
   ambiguous). Explicitly **not** a dependency of the core engine — the
   extension must keep working fully offline without it.
+
+## M12 — Production Hardening ⬜
+
+- Carries the known technical debt (per-site `adaptCharts` setting not consulted by the chart runtime), the slow
+  heap growth of route changes (about 0.2 KB per route change, both the M10 and the M10.R1 build) and the residual
+  animation-state items of M10.R1.
+
+## M13 — Store Release ⬜
+
+- Store listings, the final Firefox add-on id (the current one is a placeholder), review submissions.
+
+## M14 — Advanced Product ⬜
+
+- Features beyond the validated core; scope to be decided after M13.
 
 ## Minimal working vertical slice (proves the architecture)
 

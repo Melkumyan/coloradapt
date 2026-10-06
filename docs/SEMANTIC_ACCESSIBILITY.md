@@ -20,7 +20,7 @@ to classify anything: red is not "error", green is not "success".
 
 ## Non-goals
 
-No LLM / AI inference (M10), no charts (M7), canvas, image recoloring or OCR (M8), no Shadow DOM or
+No LLM / AI inference (M11), no charts (M7), canvas, image recoloring or OCR (M8), no Shadow DOM or
 iframes, no developer audit (M9), no interpretation of arbitrary prose. M6 does not repair a page's
 screen-reader experience, and it does **not** change the M2 scientific status (still PARTIAL).
 

@@ -16,7 +16,7 @@ export default defineConfig({
     host_permissions: ['http://*/*', 'https://*/*'],
     // Firefox only (Chromium ignores the key and WXT leaves it out): a stable add-on id gives the
     // extension a stable moz-extension:// origin and is required for MV3 and for signing. The id
-    // is a placeholder until the extension is published (M11). The extension collects nothing.
+    // is a placeholder until the extension is published (M13, Store Release). The extension collects nothing.
     ...(browser === 'firefox'
       ? {
           browser_specific_settings: {

@@ -324,7 +324,9 @@ describe('chart benchmark: M7 + M7.R1 scenarios', () => {
       }
       scenario.verify?.(ctx);
       cleanup();
-    });
+      // Hang guard only (no assertion depends on elapsed time; the 2000-mark scenario takes about 7 s alone and
+      // more than 30 s under CPU oversubscription, which twice failed a full run in M10.R1 for no code reason).
+    }, 90_000);
   }
 
   describe('canvases are detected, never adapted', () => {

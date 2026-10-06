@@ -14,6 +14,7 @@ export * from './snapshot';
 export * from './filter';
 export * from './labels';
 export * from './export';
+export * from './text-size';
 export * from './evaluate-color';
 export * from './evaluate-semantic';
 export * from './evaluate-chart';

@@ -6,6 +6,18 @@ import type { ElementRole } from '@domain/models';
  * charts, etc. — see docs/ROADMAP.md M6) will plug in later.
  */
 export function classifyElementRole(element: Element): ElementRole {
+  const structural = classifyStructuralRole(element);
+  if (structural) return structural;
+  const hasText = (element.textContent ?? '').trim().length > 0;
+  return hasText ? 'text' : 'generic';
+}
+
+/**
+ * The role an element has from its tag, `role` and class alone, or `null` when it would only be `text` or
+ * `generic`. Unlike {@link classifyElementRole} it never reads `textContent` (a subtree walk), so it is cheap
+ * to call on every candidate, wrappers included.
+ */
+export function classifyStructuralRole(element: Element): ElementRole | null {
   const tag = element.tagName.toLowerCase();
   const role = element.getAttribute('role');
   const className = typeof element.className === 'string' ? element.className.toLowerCase() : '';
@@ -18,9 +30,7 @@ export function classifyElementRole(element: Element): ElementRole {
   if (role === 'status' || role === 'alert' || className.includes('status')) return 'status';
   if (className.includes('badge') || className.includes('tag') || className.includes('chip'))
     return 'badge';
-
-  const hasText = (element.textContent ?? '').trim().length > 0;
-  return hasText ? 'text' : 'generic';
+  return null;
 }
 
 /**

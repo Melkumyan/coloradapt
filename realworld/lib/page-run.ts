@@ -3,12 +3,13 @@
  * (`PageResult`) so the judgements (FP/FN, privacy, source integrity, visual regression) can be made, repeated
  * and reviewed afterwards without touching the browser again.
  */
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { AuditSnapshot } from '../../src/core/audit';
 import { createAuditReport, renderAuditHtml, serializeAuditReport } from '../../src/core/audit';
 import { compareBitmaps, decodePng, type VisualDiff } from './png';
-import { resolveContrast, contrastTarget, type OracleStatus } from './color';
+import { resolveContrast, contrastTarget, toHex, type OracleStatus } from './color';
 import {
   call,
   featureProbe,
@@ -18,7 +19,14 @@ import {
   type IntegrityProbe,
   type OracleElement,
 } from './probe';
-import type { Driver, LogEntry, Tab } from './driver';
+import { ROOT, type Driver, type LogEntry, type Tab } from './driver';
+import { parseCsp } from './csp';
+import {
+  DOCUMENT_IDENTITY_SOURCE,
+  parseDocumentIdentity,
+  sameDocument,
+  type DocumentIdentity,
+} from './document-identity';
 
 export const OFF_SETTINGS = {
   enabled: false,
@@ -43,6 +51,32 @@ export interface OracleRow {
   readonly target: number;
   readonly flags: string;
   readonly chars: number;
+  /** M10.R1: what the oracle used. `fg`/`bg` are the effective colors it computed (hex), null when unresolved. */
+  readonly fg?: string | null;
+  readonly bg?: string | null;
+  readonly fontSizePx?: number;
+  readonly fontWeight?: number;
+  /** Product of the element's and its ancestors' `opacity`. */
+  readonly opacity?: number;
+  readonly occluded?: boolean | null;
+  /** The product's own decision for this element, replayed in the page (`features/audit/trace.ts`). */
+  readonly trace?: TraceCompact | null;
+  /** The same decision with the selector as it was up to M10 (before M10.R1 widened discovery). */
+  readonly traceLegacy?: TraceCompact | null;
+}
+
+export interface TraceCompact {
+  readonly stage: string;
+  readonly reason: string;
+  readonly reported: boolean;
+  readonly foreground: string | null;
+  readonly background: string | null;
+  readonly ratio: number | null;
+  readonly target: number | null;
+  readonly largeText: boolean | null;
+  readonly fontSizePx: number | null;
+  readonly fontWeight: string | null;
+  readonly backgroundKind: string | null;
 }
 
 export interface AuditCompact {
@@ -145,6 +179,8 @@ export interface PageResult {
     error: string | null;
   } | null;
   readonly sourceIdsStable: boolean | null;
+  /** The document the measurement started on is the one it ended on (no navigation replaced it); null: not asked. */
+  readonly documentStable?: boolean | null;
   /** Whether two audits with the extension doing nothing agree (false: the page itself changed between them). */
   readonly auditNoiseStable: boolean | null;
   readonly privacy: PrivacyCheck | null;
@@ -199,13 +235,74 @@ function failedAudit(error: string, ms: number): AuditCompact {
   };
 }
 
-function rows(elements: OracleElement[]): OracleRow[] {
+let traceBundleCache: string | null = null;
+
+/** The injected debug trace (`realworld/tools/build-trace.mjs`), built on first use. */
+function traceBundle(): string {
+  if (traceBundleCache) return traceBundleCache;
+  const file = path.join(ROOT, 'realworld', '.artifacts', 'trace.iife.js');
+  execFileSync(process.execPath, [path.join(ROOT, 'realworld', 'tools', 'build-trace.mjs')], {
+    stdio: 'ignore',
+  });
+  traceBundleCache = readFileSync(file, 'utf8');
+  return traceBundleCache;
+}
+
+/**
+ * The product's own decision (why is this element a CA-COLOR-001 finding, or why not) for the elements the
+ * comparison needs, replayed inside the page by the same functions the audit uses. Read-only.
+ */
+export async function traceElements(
+  tab: Tab,
+  fulls: readonly string[],
+): Promise<Record<string, { now: TraceCompact; legacy: TraceCompact } | null>> {
+  if (fulls.length === 0) return {};
+  // No regular expressions in this source: it travels as a template string, where backslashes are fragile.
+  const source = `(function () {
+    ${traceBundle()}
+    const lib = __caTrace;
+    const marker = ':nth-of-type(';
+    const find = (full) => {
+      const steps = full.split('>');
+      let el = document.documentElement;
+      for (let i = 1; i < steps.length; i++) {
+        const at = steps[i].indexOf(marker);
+        // html and body are written without an index
+        const tag = at < 0 ? steps[i] : steps[i].slice(0, at);
+        const nth = at < 0 ? 1 : Number(steps[i].slice(at + marker.length, steps[i].length - 1));
+        let n = 0; let hit = null;
+        for (const child of Array.from(el.children)) {
+          if (child.localName === tag) { n++; if (n === nth) { hit = child; break; } }
+        }
+        if (!hit) return null;
+        el = hit;
+      }
+      return el;
+    };
+    const compact = (t) => ({ stage: t.stage, reason: t.reason, reported: t.reported, foreground: t.foreground, background: t.background,
+      ratio: t.ratio === null ? null : Math.round(t.ratio * 1e6) / 1e6, target: t.target, largeText: t.largeText,
+      fontSizePx: t.fontSizePx === null ? null : Math.round(t.fontSizePx * 100) / 100, fontWeight: t.fontWeight, backgroundKind: t.backgroundKind });
+    const out = {};
+    for (const full of ${JSON.stringify(fulls)}) {
+      const el = find(full);
+      if (!el) { out[full] = null; continue; }
+      out[full] = { now: compact(lib.traceTextElement(el)), legacy: compact(lib.traceTextElement(el, undefined, lib.CORE_ANALYZER_SELECTOR)) };
+    }
+    return out;
+  })()`;
+  return tab.evaluate<Record<string, { now: TraceCompact; legacy: TraceCompact } | null>>(source);
+}
+
+export function oracleRows(
+  elements: OracleElement[],
+  browser: 'chrome' | 'firefox' = 'chrome',
+): OracleRow[] {
   return elements.map((e) => {
     const r = resolveContrast({
       color: e.color,
-      opacity: e.opacity,
-      layers: e.layers,
+      chain: e.chain,
       darkCanvas: e.darkCanvas,
+      darkCanvasRgb: browser === 'firefox' ? [28, 27, 34] : [18, 18, 18],
       effects: e.effects,
       clipText: e.clipText,
     });
@@ -219,18 +316,26 @@ function rows(elements: OracleElement[]): OracleRow[] {
       e.sensitive ? 'sensitive' : '',
       e.inShadow ? 'shadow' : '',
       e.interactive ? 'interactive' : '',
+      e.displayContents ? 'contents' : '',
     ]
       .filter(Boolean)
       .join(',');
+    const opacity = e.chain.reduce((product, entry) => product * entry.opacity, 1);
     return {
       path: e.path,
       full: e.full,
       tag: e.tag,
       status: r.status,
-      ratio: r.ratio === null ? null : Math.round(r.ratio * 1000) / 1000,
+      ratio: r.ratio === null ? null : Math.round(r.ratio * 1e6) / 1e6,
       target: contrastTarget(e.fontSize, e.fontWeight),
-      flags,
+      flags: e.textFillDiffers ? `${flags},textfill`.replace(/^,/, '') : flags,
       chars: e.textChars,
+      fg: r.foreground ? toHex(r.foreground) : null,
+      bg: r.background ? toHex(r.background) : null,
+      fontSizePx: Math.round(e.fontSize * 100) / 100,
+      fontWeight: e.fontWeight,
+      opacity: Math.round(opacity * 1000) / 1000,
+      occluded: e.occluded,
     };
   });
 }
@@ -359,6 +464,7 @@ export async function analyzePage(
     load: { loaded: opened.loaded, error: opened.error, finalOrigin, ms: timings['load']! },
   };
   const empty = {
+    documentStable: null,
     features: null,
     mutationsIn2s: 0,
     network: null,
@@ -413,6 +519,9 @@ export async function analyzePage(
       source: 'harness',
     });
   logs.push(...tab.drainLogs());
+  const identityAt = async (): Promise<DocumentIdentity> =>
+    parseDocumentIdentity(await tab.evaluate<string>(DOCUMENT_IDENTITY_SOURCE));
+  const identityStart = await identityAt().catch(() => null);
 
   let features: FeatureProbe | null = null;
   try {
@@ -435,28 +544,36 @@ export async function analyzePage(
 
   let network: PageResult['network'] = null;
   try {
-    network = await tab.evaluate<PageResult['network']>(
+    // The page only reports raw strings; the policy is parsed here, in Node (see csp.ts for why).
+    const raw = await tab.evaluate<{
+      status: number | null;
+      header: string;
+      meta: string[];
+      injectedByAntivirus: boolean;
+    }>(
       `(async () => {
-        let status = null; let csp = '';
-        try { const r = await fetch(location.href, { cache: 'force-cache', credentials: 'same-origin' }); status = r.status; csp = r.headers.get('content-security-policy') || ''; r.body && r.body.cancel(); } catch (e) {}
-        const metaCsp = [...document.querySelectorAll('meta[http-equiv="Content-Security-Policy" i]')].map((m) => m.content).join(';');
-        const all = csp + ';' + metaCsp;
-        const directives = all.split(';').map((d) => d.trim().split(/\\s+/)[0]).filter(Boolean);
-        const styleSrc = all.split(';').map((d) => d.trim()).find((d) => /^style-src(-elem)?\\s/.test(d)) || '';
+        let status = null; let header = '';
+        try { const r = await fetch(location.href, { cache: 'force-cache', credentials: 'same-origin' }); status = r.status; header = r.headers.get('content-security-policy') || ''; r.body && r.body.cancel(); } catch (e) {}
+        const meta = Array.from(document.querySelectorAll('meta[http-equiv]')).filter((m) => m.getAttribute('http-equiv').toLowerCase() === 'content-security-policy').map((m) => m.content);
+        const all = (header + ';' + meta.join(';')).toLowerCase();
         return {
-          status,
-          cspDirectives: [...new Set(directives)],
-          cspStyleInlineBlocked: styleSrc !== '' && styleSrc.indexOf("'unsafe-inline'") < 0,
-          injectedByAntivirus: /kaspersky/i.test(all) || document.querySelector('script[src*="kaspersky" i],link[href*="kaspersky" i]') !== null,
+          status, header, meta,
+          injectedByAntivirus: all.indexOf('kaspersky') >= 0 || document.querySelector('script[src*="kaspersky" i],link[href*="kaspersky" i]') !== null,
         };
       })()`,
     );
+    network = {
+      status: raw.status,
+      ...parseCsp(raw.header, raw.meta),
+      injectedByAntivirus: raw.injectedByAntivirus,
+    };
   } catch {
     // unknown
   }
 
   let before: OracleElement[] = [];
   let oracleTruncated = false;
+  let traces: Record<string, { now: TraceCompact; legacy: TraceCompact } | null> = {};
   try {
     const probe = await mark('oracle', () =>
       tab.evaluate<{ elements: OracleElement[]; truncated: boolean }>(
@@ -465,6 +582,22 @@ export async function analyzePage(
     );
     before = probe.elements;
     oracleTruncated = probe.truncated;
+    // The product's own decision for the same elements, in the same moment as the oracle: a page that animates
+    // (a fade-in, a carousel) must not be measured twice in two states.
+    try {
+      traces = await mark('trace', () =>
+        traceElements(
+          tab,
+          before.filter((e) => e.textChars > 0 && !e.inSvg).map((e) => e.full),
+        ),
+      );
+    } catch (e) {
+      logs.push({
+        level: 'harness',
+        text: `trace: ${(e as Error).message}`.slice(0, 200),
+        source: 'harness',
+      });
+    }
   } catch (e) {
     logs.push({
       level: 'harness',
@@ -472,7 +605,15 @@ export async function analyzePage(
       source: 'harness',
     });
   }
-  const beforeRows = rows(before);
+  const beforeRows = oracleRows(before, driver.name).map((row) =>
+    row.full in traces
+      ? {
+          ...row,
+          trace: traces[row.full]?.now ?? null,
+          traceLegacy: traces[row.full]?.legacy ?? null,
+        }
+      : row,
+  );
 
   let integrityBefore: IntegrityProbe | null = null;
   try {
@@ -522,6 +663,10 @@ export async function analyzePage(
     }
   }
   logs.push(...tab.drainLogs());
+
+  const identityEnd = await identityAt().catch(() => null);
+  const documentStable =
+    identityStart && identityEnd ? sameDocument(identityStart, identityEnd) : null;
 
   // -- noise control: the same probe and audit again, with the extension still doing nothing ---------------
   let integrityNoise: IntegrityProbe | null = null;
@@ -596,7 +741,7 @@ export async function analyzePage(
     const probe = await tab.evaluate<{ elements: OracleElement[]; truncated: boolean }>(
       call(oracleProbe, oracleLimit),
     );
-    afterRows = rows(probe.elements);
+    afterRows = oracleRows(probe.elements, driver.name);
     integrityAfter = await tab.evaluate<IntegrityProbe>(call(integrityProbe, 1500));
     if (withShots) on1 = await tab.screenshot();
   } catch (e) {
@@ -791,6 +936,7 @@ export async function analyzePage(
     integrity,
     visual,
     sourceIdsStable,
+    documentStable,
     auditNoiseStable,
     privacy,
     logs,

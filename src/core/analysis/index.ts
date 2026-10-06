@@ -6,3 +6,5 @@ export * from './colors';
 export * from './background-resolution';
 export * from './foreground-resolution';
 export * from './text';
+export * from './style-property';
+export * from './canvas';

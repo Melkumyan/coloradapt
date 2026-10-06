@@ -237,9 +237,31 @@ for (const browser of BROWSERS) {
       await burst(0, 50);
       const at50 = await page.ext<DynamicDiagnostics>('GET_DYNAMIC_DIAGNOSTICS');
       const c50 = isChrome(page) ? await counters(page) : null;
+      // structural proxies that need no heap or listener counters (Firefox, through geckodriver, has none):
+      // what ColorAdapt owns in the page's DOM, and the page's own node count
+      const structural = () =>
+        page.evaluate<{ owned: number; styles: number; nodes: number }>(
+          `({ owned: document.querySelectorAll('[data-coloradapt-id],[data-coloradapt-chart-node],[data-coloradapt-audit-overlay]').length, styles: document.querySelectorAll('style[id^="coloradapt-"]').length, nodes: document.getElementsByTagName('*').length })`,
+        );
+      const s50 = await structural();
       await burst(50, 500);
+      const s500 = await structural();
       const at500 = await page.ext<DynamicDiagnostics>('GET_DYNAMIC_DIAGNOSTICS');
       const c500 = isChrome(page) ? await counters(page) : null;
+      // M10.R1: warm-up versus leak. The 50 -> 500 ratio mixes the two; a steady state does not grow between
+      // 500 and 1500 route changes, a leak does.
+      const c500b = c500;
+      await burst(500, 1500);
+      const c1500 = isChrome(page) ? await counters(page) : null;
+      if (c500b && c1500) {
+        record(
+          driver,
+          'memory',
+          'SPA route changes: heap 500 -> 1500 (steady state, not warm-up)',
+          'INFO',
+          `heap ${(c500b.heapBytes / 1e6).toFixed(3)} -> ${(c1500.heapBytes / 1e6).toFixed(3)} MB, nodes ${c500b.nodes}->${c1500.nodes}, listeners ${c500b.listeners}->${c1500.listeners}`,
+        );
+      }
 
       expect(at500.observerStarts).toBe(at50.observerStarts);
       expect(at500.queuedRecords).toBe(0);
@@ -251,20 +273,35 @@ for (const browser of BROWSERS) {
       expect(audit.page.pathname).toMatch(/^\/spa\/[abc]$/);
       let detail = `tracked ${at50.trackedElements}->${at500.trackedElements}, rules ${at50.rules}->${at500.rules}, observerStarts ${at500.observerStarts}`;
       if (c50 && c500) {
-        expect(c500.heapBytes / c50.heapBytes).toBeLessThanOrEqual(BUDGETS.heapGrowthRatio);
+        expect(
+          c500.heapBytes / c50.heapBytes,
+          `heap ${c50.heapBytes} -> ${c500.heapBytes} bytes after a forced GC`,
+        ).toBeLessThanOrEqual(BUDGETS.heapGrowthRatio);
         expect(c500.nodes / c50.nodes).toBeLessThanOrEqual(BUDGETS.domGrowthRatio);
         expect(c500.listeners / Math.max(1, c50.listeners)).toBeLessThanOrEqual(
           BUDGETS.domGrowthRatio,
         );
-        detail += `; heap ${(c50.heapBytes / 1e6).toFixed(1)}->${(c500.heapBytes / 1e6).toFixed(1)} MB, nodes ${c50.nodes}->${c500.nodes}, listeners ${c50.listeners}->${c500.listeners}`;
+        detail += `; heap ${(c50.heapBytes / 1e6).toFixed(3)}->${(c500.heapBytes / 1e6).toFixed(3)} MB, nodes ${c50.nodes}->${c500.nodes}, listeners ${c50.listeners}->${c500.listeners}`;
         record(driver, 'memory', 'SPA route changes x500: heap/DOM/listeners flat', 'PASS', detail);
       } else {
+        // structural proxies instead: the elements ColorAdapt marked and the style nodes it owns do not grow
+        // with 450 more route changes, nor does the page's own node count
+        expect(s500.styles).toBeLessThanOrEqual(1);
+        expect(s500.owned).toBeLessThanOrEqual(s50.owned + 5);
+        expect(s500.nodes).toBeLessThanOrEqual(s50.nodes + 5);
+        record(
+          driver,
+          'memory',
+          'SPA route changes x500: structural proxies flat (owned DOM artifacts, style nodes, node count)',
+          'PASS',
+          `owned ${s50.owned}->${s500.owned}, style nodes ${s50.styles}->${s500.styles}, nodes ${s50.nodes}->${s500.nodes}; ${detail}`,
+        );
         record(
           driver,
           'memory',
           'SPA route changes x500: heap/DOM/listeners flat',
           'NOT_VERIFIED',
-          `no heap/listener counters in this browser's automation; pipeline counters flat: ${detail}`,
+          `NOT_MEASURABLE_WITH_CURRENT_HARNESS: geckodriver exposes no heap or listener counters; covered by the structural proxies and the pipeline counters (${detail})`,
         );
       }
       record(
@@ -274,6 +311,7 @@ for (const browser of BROWSERS) {
         'PASS',
         detail,
       );
+
       await page.close();
     });
   });

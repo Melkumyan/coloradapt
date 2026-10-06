@@ -409,7 +409,10 @@ function m6(): AuditScenario[] {
       'brand-colors',
       'brand red and green blocks are decoration',
       '<div id="t" style="background:#d62728;color:#fff;padding:4px">Acme</div><div style="background:#2ca02c;color:#fff;padding:4px">Acme</div>',
-      { issues: [] },
+      // Not a state (no CA-SEM finding). The green block's white text is 3.40:1 (WCAG formula, by hand:
+      // L(#2ca02c) = 0.2586, (1 + 0.05) / (0.2586 + 0.05)), below 4.5:1 for normal text: a real CA-COLOR-001 that
+      // went unseen while text directly inside a <div> was not analyzed (M10.R1). #d62728 is 5.02:1, fine.
+      { issues: ['CA-COLOR-001@html>body>div:nth-of-type(2)'] },
     ),
   ];
 }

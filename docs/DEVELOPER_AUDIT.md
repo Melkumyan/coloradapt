@@ -514,15 +514,17 @@ See [PERFORMANCE.md](PERFORMANCE.md).
 - **Regions.** Two bare landmarks of the same kind and no `id` or `role` (two `<nav>`s) are one region for
   grouping purposes.
 - **Per-site chart setting.** The per-site `adaptCharts` setting is not consulted by the chart runtime (a frozen
-  M7 behavior, recorded as technical debt for M11); the audit UI does not expose it as a working control.
-- **Firefox.** The Firefox build is produced and typed, but the audit has not been run in a Firefox runtime:
-  Firefox runtime status is `NOT_VERIFIED`.
+  M7 behavior, recorded as technical debt for M12); the audit UI does not expose it as a working control.
+- **Firefox.** The audit ran in a Firefox 151 runtime during the M10 real-world validation (a full 193-page
+  crawl, the scenario suites, the ground-truth pixel fixtures). What was _not_ run there: the full 582-test
+  Chromium E2E suite. Firefox full extension E2E parity is therefore `NOT_VERIFIED`; see
+  `docs/REAL_WORLD_FINDINGS_CLOSEOUT.md`.
 - **Charts.** Only HIGH-confidence inline-SVG charts get series verdicts; canvases and heatmaps are manual
   review. Charts with sequential palettes or gradient fills get no pair verdict.
 - **Borders.** M1 reads border colors, but borders and focus rings are not audited (no finding for a
   border-only state distinction yet; M6 covers the state cases it recognizes).
 - **Shadow DOM and iframes** are not audited (as in M1–M8).
-- **Known technical debt (M11, Production Hardening):** the per-site `adaptCharts` setting is stored but the
+- **Known technical debt (M12, Production Hardening):** the per-site `adaptCharts` setting is stored but the
   chart runtime does not consult it (frozen M7 behavior; the audit reports what the layer actually does and
   the UI does not expose the setting). M2 scientific status stays PARTIAL and is propagated into every
   simulation-based finding.

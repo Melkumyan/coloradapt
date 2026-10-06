@@ -52,7 +52,7 @@ export function buildSubsystemCoverage(facts: CoverageFacts): AuditSubsystemCove
           'color-contrast',
           'Text and color analysis (M1–M3)',
           'complete',
-          'Every element up to the budget was analyzed. Text over a gradient or an image is listed as not analyzed, not judged.',
+          'Text that is painted was analyzed, up to the budget: every element that holds text of its own, plus links, buttons and form controls. Text that is not rendered (display: none and similar) is not judged. Text over a gradient or an image is listed as not analyzed, not judged.',
         ),
     reached.has('semantic candidates')
       ? entry(

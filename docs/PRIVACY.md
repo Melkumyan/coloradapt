@@ -51,7 +51,7 @@ alone — there is no backend for it to send data to.
 ## If this ever changes
 
 Any future feature that would send data off-device (for example, an
-opt-in AI-assisted semantic module — see `docs/ROADMAP.md` M10) must:
+opt-in AI-assisted semantic module — see `docs/ROADMAP.md` M11) must:
 
 1. Be strictly opt-in, off by default.
 2. Clearly disclose what is sent and why, before enabling it.

@@ -1,6 +1,8 @@
 import type { BackgroundKind, ColorValue } from '@domain/models';
 import { parseColor } from '@core/color';
 import { clamp01 } from '@shared/utils';
+import { canvasColorOf } from './canvas';
+import { readStyleProperty } from './style-property';
 
 /** Bound on how far up the ancestor chain a single resolution may walk. */
 const MAX_ANCESTOR_DEPTH = 200;
@@ -18,6 +20,8 @@ const OPAQUE_WHITE: ColorValue = { r: 1, g: 1, b: 1, alpha: 1 };
 interface OwnLayer {
   readonly background: ColorValue;
   readonly opacity: number;
+  /** Only on the `<html>` element: the canvas color behind the page (see `canvas.ts`). */
+  readonly canvas?: ColorValue;
 }
 
 /**
@@ -67,6 +71,37 @@ function classifyBackgroundImage(backgroundImage: string): 'none' | 'gradient' |
   return 'image';
 }
 
+/**
+ * `background-clip: text` paints the background only inside the glyphs (the text is usually transparent): the
+ * element's `background-color` is the *text* color, not what the text sits on. Reading it as a background gave
+ * a confirmed 1:1 contrast for a legible link (M10.R1, the Angular docs table of contents), so a clipped
+ * background counts as a painted layer we cannot evaluate, like an image.
+ */
+function clipsBackgroundToText(style: CSSStyleDeclaration): boolean {
+  return (
+    readStyleProperty(style, 'background-clip').trim() === 'text' ||
+    readStyleProperty(style, '-webkit-background-clip').trim() === 'text'
+  );
+}
+
+/** Filter functions that change the colors that reach the screen (a blur or a drop shadow does not). */
+const COLOR_FILTER =
+  /grayscale|sepia|hue-rotate|invert|brightness|contrast|saturate|opacity|url\(/i;
+
+/**
+ * A blend mode, a color-changing `filter` or a `backdrop-filter` makes the painted color differ from the
+ * computed one: the model cannot be exact for anything inside (M10.R1: ColorAdapt reported a ratio for text
+ * under such an ancestor where the browser would show another).
+ */
+function altersPaintedColor(style: CSSStyleDeclaration): boolean {
+  const blend = readStyleProperty(style, 'mix-blend-mode').trim();
+  if (blend !== '' && blend !== 'normal') return true;
+  const backdrop = readStyleProperty(style, 'backdrop-filter').trim();
+  if (backdrop !== '' && backdrop !== 'none') return true;
+  const filter = readStyleProperty(style, 'filter').trim();
+  return filter !== '' && filter !== 'none' && COLOR_FILTER.test(filter);
+}
+
 function combineKind(
   previous: BackgroundKind,
   next: 'gradient' | 'image' | 'mixed',
@@ -83,7 +118,9 @@ function applyOwnLayer(
   style: CSSStyleDeclaration,
 ): ChainState {
   const ownOpacity = clamp01(Number.parseFloat(style.opacity || '1') || 0);
-  const imageKind = classifyBackgroundImage(style.backgroundImage || 'none');
+  const imageKind = clipsBackgroundToText(style)
+    ? 'image'
+    : classifyBackgroundImage(style.backgroundImage || 'none');
   const bgColor = parseColor(style.backgroundColor || 'transparent') ?? TRANSPARENT;
   // Occlusion within the element's own opacity stack (not a compositing weight).
   const occlusionAlpha = clamp01(bgColor.alpha * ownOpacity * parentState.cumulativeOpacity);
@@ -102,9 +139,15 @@ function applyOwnLayer(
 
   const isRootElement = element.tagName === 'HTML' || element.tagName === 'BODY';
 
+  const root = element.tagName === 'HTML';
   return {
-    layer: { background: bgColor, opacity: ownOpacity },
-    approximate: parentState.approximate || (isRootElement && ownOpacity < OPAQUE_ALPHA),
+    layer: root
+      ? { background: bgColor, opacity: ownOpacity, canvas: canvasColorOf(element, style) }
+      : { background: bgColor, opacity: ownOpacity },
+    approximate:
+      parentState.approximate ||
+      (isRootElement && ownOpacity < OPAQUE_ALPHA) ||
+      altersPaintedColor(style),
     kind,
     cumulativeOpacity: parentState.cumulativeOpacity * ownOpacity,
     truncated: parentState.truncated,
@@ -204,11 +247,13 @@ function composeOverPage(
   let b = content.b * content.alpha;
   let a = content.alpha;
 
+  let canvas = OPAQUE_WHITE;
   let current: Element | null = element;
   for (let depth = 0; current && depth < MAX_ANCESTOR_DEPTH; depth += 1) {
     const layer = cache.get(current)?.layer;
     if (!layer) break;
     const { background: bg, opacity } = layer;
+    if (layer.canvas) canvas = layer.canvas;
     const under = 1 - a;
     r = opacity * (r + under * bg.r * bg.alpha);
     g = opacity * (g + under * bg.g * bg.alpha);
@@ -219,9 +264,9 @@ function composeOverPage(
 
   const rest = 1 - a;
   return {
-    r: clamp01(r + rest * OPAQUE_WHITE.r),
-    g: clamp01(g + rest * OPAQUE_WHITE.g),
-    b: clamp01(b + rest * OPAQUE_WHITE.b),
+    r: clamp01(r + rest * canvas.r),
+    g: clamp01(g + rest * canvas.g),
+    b: clamp01(b + rest * canvas.b),
     alpha: 1,
   };
 }

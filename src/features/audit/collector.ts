@@ -8,6 +8,7 @@ import {
   evaluateSvg,
   evaluateText,
   instanceIdFor,
+  isLargeTextStyle,
   type AdaptationInfo,
   type AuditAdaptationStatus,
   type AuditCandidate,
@@ -25,6 +26,7 @@ import {
 } from '@domain/models';
 import type { AuditSources } from '../page-analysis';
 import { SEMANTIC_LIMITS } from '../semantics';
+import { isRendered } from './rendered';
 import {
   INTERACTIVE_SELECTOR as INTERACTIVE,
   LocatorContext,
@@ -139,9 +141,7 @@ function isDecorativeSvg(node: Element): boolean {
 
 function isLargeText(node: Element, getStyle: (element: Element) => CSSStyleDeclaration): boolean {
   const style = getStyle(node);
-  const size = Number.parseFloat(style.fontSize);
-  const weight = style.fontWeight === 'bold' ? 700 : Number.parseInt(style.fontWeight, 10);
-  return size >= 24 || (size >= 18.66 && weight >= 700);
+  return isLargeTextStyle(style.fontSize, style.fontWeight);
 }
 
 function planOutcomes(
@@ -220,6 +220,8 @@ export function collectAudit(input: CollectInput): Collected {
   for (const descriptor of sources.elements) {
     const node = sources.nodes.get(descriptor.id);
     if (!node?.isConnected || !descriptor.isVisible || node.closest(OWNED)) continue;
+    // text that is not painted (a closed menu, a collapsed panel) is not judged; see rendered.ts
+    if (!isRendered(node, sources.getStyle)) continue;
     const target = new LazyTarget(locators, node);
     if (descriptor.svg) {
       svgUnits += 1;
@@ -263,6 +265,7 @@ export function collectAudit(input: CollectInput): Collected {
   const cuesWanted = sources.semantic.enabled;
   for (const record of sources.semantic.records) {
     if (!record.element.isConnected || record.element.closest(OWNED)) continue;
+    if (!isRendered(record.element, sources.getStyle)) continue;
     let status: AuditAdaptationStatus = 'not-applicable';
     if (record.decision.action === 'cue') {
       status = record.hasCue ? 'adapted' : cuesWanted ? 'not-applied' : 'not-enabled';

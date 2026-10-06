@@ -1,5 +1,8 @@
 # Real-world validation (M10)
 
+> Findings closeout (M10.R1): `docs/REAL_WORLD_FINDINGS_CLOSEOUT.md`. The oracle described there replaces the
+> one this document's baseline numbers were measured with.
+
 Proof that ColorAdapt works in the two real browsers it ships for, on the live web and on hostile local
 fixtures. It is a harness plus its recorded results; it changes no product behaviour. The only product change is
 in `wxt.config.ts` (see "Firefox manifest").
@@ -61,11 +64,11 @@ acted, except `land-tesla` (Firefox), where the two affected links belong to a h
 the same elements varies between runs from 1.9 to 11.0 with 47 to 66 mutations in 2 s. That is page animation, not
 proven independent of the extension.
 
-Audit versus the independent oracle (Chrome, 186 pages): of the findings that could be decided, 4767 were
-CONFIRMED, 67 FALSE_POSITIVE and 392 FALSE_NEGATIVE (a visible element on a solid background below its target that
-the audit did not report), on 28 pages; 991 stay MANUAL_REVIEW (the audit lists only the first 50 elements of a
-group, blend modes or backdrop filters, the oracle sample cap). These are recorded as measured and are **not
-resolved**: the false negatives are the open follow-up of this milestone.
+Audit versus the independent oracle (Chrome, 186 pages, the M10 baseline): of the findings that could be decided,
+4767 were CONFIRMED, 67 FALSE_POSITIVE and 392 FALSE_NEGATIVE, on 28 pages. **M10.R1 classified every one of the
+459** (287 ColorAdapt defects, 114 oracle defects, 42 harness defects, 16 page-state differences, 0 ambiguous),
+fixed the defects, corrected the oracle and re-ran the comparison: see `docs/REAL_WORLD_FINDINGS_CLOSEOUT.md`. The
+baseline numbers above are kept as measured; do not compare them with a later run without that document.
 
 ## Firefox
 

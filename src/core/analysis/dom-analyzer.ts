@@ -1,8 +1,13 @@
 import type { AnalysisStatus, AnalysisResult, ElementDescriptor } from '@domain/models';
 import { ANALYSIS_BUDGET } from '@shared/constants';
-import { ANALYZER_SELECTOR, ELEMENT_ID_ATTRIBUTE } from './constants';
+import {
+  ANALYZER_SELECTOR,
+  CORE_ANALYZER_SELECTOR,
+  ELEMENT_ID_ATTRIBUTE,
+  NON_CANDIDATE_TAGS,
+} from './constants';
 import { readBorders, resolveColors } from './colors';
-import { classifyElementRole, isElementDisabled } from './roles';
+import { classifyElementRole, classifyStructuralRole, isElementDisabled } from './roles';
 import { isElementVisible } from './visibility';
 import { hasOwnText } from './text';
 import {
@@ -94,16 +99,6 @@ export function collectOwnedIds(root: Element, scope: AnalysisScope = 'subtree')
   return ids;
 }
 
-/**
- * Roles whose text (if any) is never considered redundant with a wrapper's:
- * they're analyzed for their own sake (interactive affordance, status,
- * decoration) even when all of their visible text actually lives in a
- * nested element.
- */
-function isAlwaysRelevantRole(role: ElementDescriptor['role']): boolean {
-  return role !== 'text' && role !== 'generic';
-}
-
 function resolveAnalysisStatus(
   backgroundKind: ElementDescriptor['backgroundKind'],
   truncated: boolean,
@@ -114,33 +109,39 @@ function resolveAnalysisStatus(
   return 'resolved';
 }
 
+/** Why a candidate element produced no descriptor (see {@link decideElement}). */
+export type SkipReason = 'not-visible' | 'wrapper-without-own-text' | 'no-parseable-color';
+
 /**
- * Extracts the descriptor for one candidate element, or null if it is not
- * visible, not worth analyzing, or has no parseable color. Assigns the
- * element's stable id as a side effect (only for elements that qualify).
+ * Decides one candidate element: its descriptor, or the reason it has none. Pure apart from the id it hands
+ * out (through `idFor`; a trace passes a no-op so it never marks the page) to an element that qualifies. The reason strings are the debug trace's vocabulary
+ * (`core/audit/trace.ts`); a skip allocates nothing.
+ *
+ * A wrapper (e.g. `<p>`) whose entire visible text lives inside a nested, independently-analyzed element (e.g.
+ * `<span>`) would otherwise produce a near-duplicate conflict for the same text, so an element without text of
+ * its own is analyzed only when its structural role (link, button, form control, status, badge, ...) makes it
+ * relevant by itself. That cheap check runs before the style is read.
  */
-function describeElement(
+export function decideElement(
   element: Element,
   getStyle: (element: Element) => CSSStyleDeclaration,
   backgroundCache: BackgroundResolutionCache,
-): ElementDescriptor | null {
-  const style = getStyle(element);
-  if (!isElementVisible(element, style)) return null;
-
-  const role = classifyElementRole(element);
+  idFor: (element: Element) => string = ensureElementId,
+): ElementDescriptor | SkipReason {
   const ownText = hasOwnText(element);
-  // A wrapper (e.g. `<p>`) whose entire visible text lives inside a
-  // nested, independently-analyzed element (e.g. `<span>`) would
-  // otherwise produce a near-duplicate conflict for the same text.
-  if (!isAlwaysRelevantRole(role) && !ownText) return null;
+  const structural = classifyStructuralRole(element);
+  if (!ownText && !structural) return 'wrapper-without-own-text';
+
+  const style = getStyle(element);
+  if (!isElementVisible(element, style)) return 'not-visible';
 
   const resolution = resolveColors(element, getStyle, backgroundCache);
-  if (!resolution) return null;
+  if (!resolution) return 'no-parseable-color';
 
   return {
-    id: ensureElementId(element),
+    id: idFor(element),
     tagName: element.tagName.toLowerCase(),
-    role,
+    role: structural ?? classifyElementRole(element),
     colorPair: resolution.colorPair,
     backgroundKind: resolution.backgroundKind,
     analysisStatus: resolveAnalysisStatus(
@@ -153,6 +154,34 @@ function describeElement(
     hasTextContent: ownText,
     disabled: isElementDisabled(element) || undefined,
   };
+}
+
+/** Whether the element's tag can ever be text a visitor reads (not metadata, a script, a template, a UA-styled option). */
+export function isCandidateTag(element: Element): boolean {
+  return !NON_CANDIDATE_TAGS.has(element.localName);
+}
+
+/**
+ * Whether a candidate can possibly produce a descriptor: a readable tag, and text of its own or a structural
+ * role that makes it relevant by itself. A cheap, style-free test, applied before a candidate is counted
+ * against any budget so that the bare wrappers of a modern page (a `<div>` around a `<p>`) cost nothing.
+ */
+function isWorthDescribing(element: Element): boolean {
+  // what is inside an inline SVG belongs to its unit (`core/svg`); only the outermost `<svg>` is a candidate
+  if (isSvgElement(element)) return isInlineSvgUnit(element);
+  return (
+    isCandidateTag(element) && (hasOwnText(element) || classifyStructuralRole(element) !== null)
+  );
+}
+
+/** The descriptor of one candidate element, or null if it is not visible, not worth analyzing, or has no parseable color. */
+function describeElement(
+  element: Element,
+  getStyle: (element: Element) => CSSStyleDeclaration,
+  backgroundCache: BackgroundResolutionCache,
+): ElementDescriptor | null {
+  const decision = decideElement(element, getStyle, backgroundCache);
+  return typeof decision === 'string' ? null : decision;
 }
 
 /**
@@ -198,7 +227,7 @@ function describeSvgBatch(
 
 /**
  * Performs a single, bounded pass over `root`, extracting a descriptor for
- * every element that matches {@link ANALYZER_SELECTOR}, is visible, and has
+ * every element that is a candidate (see {@link ANALYZER_SELECTOR}), is visible, and has
  * a parseable color. Honors a hard element-count and wall-clock budget
  * (see docs/PERFORMANCE.md) rather than exhaustively walking the DOM.
  */
@@ -220,6 +249,9 @@ export function analyzeDocument(options: AnalyzeDocumentOptions = {}): {
   let truncated = false;
 
   for (let i = 0; i < candidates.length; i += 1) {
+    const element = candidates[i];
+    // bare wrappers cost nothing, not even a look at the budget
+    if (!element || !isWorthDescribing(element)) continue;
     if (elements.length + svgs.length >= maxElements) {
       truncated = true;
       break;
@@ -228,9 +260,6 @@ export function analyzeDocument(options: AnalyzeDocumentOptions = {}): {
       truncated = true;
       break;
     }
-
-    const element = candidates[i];
-    if (!element) continue;
 
     // An inline SVG is analyzed as one unit; elements inside it are part of it.
     if (isSvgElement(element)) {
@@ -315,9 +344,16 @@ export function analyzeSubtrees(
       // A region inside an inline SVG is re-analyzed as the SVG it belongs to.
       const unit = outermostSvg(root.element);
       if (unit && unit !== root.element) candidates.push(unit);
-      else if (root.element.matches(ANALYZER_SELECTOR)) candidates.push(root.element);
+      // The region's own element is always inspected when it is one the analyzer has always looked at (a `<p>`
+      // that just lost its text must still be seen, to drop what was adapted); every element below it is a
+      // candidate only if it holds paintable text or a structural role.
+      else if (isWorthDescribing(root.element) || root.element.matches(CORE_ANALYZER_SELECTOR)) {
+        candidates.push(root.element);
+      }
       if (root.scope === 'subtree') {
-        for (const node of root.element.querySelectorAll(ANALYZER_SELECTOR)) candidates.push(node);
+        for (const node of root.element.querySelectorAll(ANALYZER_SELECTOR)) {
+          if (isWorthDescribing(node)) candidates.push(node);
+        }
       }
       // Does not fit in what is left: it waits for a pass where it is the first root.
       if (!first && elements.length + svgs.length + candidates.length > maxElements) break;

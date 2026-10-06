@@ -2,9 +2,11 @@
 
 ## Principles
 
-- Never walk the entire DOM. The DOM Analyzer only queries a narrow,
-  explicit CSS selector (`core/analysis/constants.ts#ANALYZER_SELECTOR`) of
-  tags/roles/classes likely to carry meaningful color information.
+- Never style-read the entire DOM. The DOM Analyzer queries elements (since M10.R1 all of them, because a
+  tag list is never complete) but only an element with paintable text of its own, or a structural role (link,
+  button, form control, image, status, badge, SVG), becomes a candidate: every other element is rejected by a
+  child-node scan _before its style is read_ and _before it counts_ against the element or time budget, so a
+  page of nested wrapper `<div>`s costs one cheap scan per wrapper, not one style read.
 - Never run a full analysis pass on every mutation. Dynamic re-analysis (M4)
   batches mutations per frame, re-analyzes only the affected regions, and treats
   a full rescan as a counted fallback (`docs/DYNAMIC_ANALYSIS.md`).
@@ -13,7 +15,12 @@
   `truncated: true`) rather than running unbounded.
 - Skip invisible elements cheaply (computed `display`/`visibility`/
   `opacity` only — no layout-forcing reads like `getBoundingClientRect` in
-  the hot path).
+  the hot path). The _audit_ (a user-triggered or live-refreshed run, not the adaptation hot path) additionally
+  asks `checkVisibility()` once per judged element, so it never reports text that is not painted
+  (`features/audit/rendered.ts`); it is the same call the browser uses for `display: none` ancestors.
+- Background resolution reads three more properties per ancestor (`background-clip`, `mix-blend-mode`,
+  `filter`/`backdrop-filter`) and the root's `color-scheme` once; the chain is memoized per pass, so the cost is
+  per distinct ancestor, not per analyzed element.
 - Adaptation is applied via a single injected stylesheet, not per-element
   inline style writes, which keeps DOM mutation cost constant regardless of
   how many elements are adapted.

@@ -18,6 +18,7 @@ import {
   type CDPSession,
   type Page,
 } from '@playwright/test';
+import { normalizeErrorSource, toError, type NormalizedError } from './errors';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -685,10 +686,11 @@ export class FirefoxDriver implements Driver {
   async run<T>(source: string): Promise<T> {
     const result = (await this.wd('POST', '/execute/async', {
       script: `const done = arguments[arguments.length - 1];
-        Promise.resolve().then(() => (${source})).then((v) => done({ ok: v === undefined ? null : v }), (e) => done({ err: String((e && e.message) || e) }));`,
+        const normalize = ${normalizeErrorSource};
+        Promise.resolve().then(() => (${source})).then((v) => done({ ok: v === undefined ? null : v }), (e) => done({ err: normalize(e) }));`,
       args: [],
-    })) as { ok?: T; err?: string };
-    if (result.err !== undefined) throw new Error(result.err.split('\n')[0]);
+    })) as { ok?: T; err?: NormalizedError };
+    if (result.err !== undefined) throw toError(result.err);
     return result.ok as T;
   }
 

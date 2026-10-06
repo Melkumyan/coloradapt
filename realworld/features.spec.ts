@@ -315,7 +315,7 @@ for (const browser of BROWSERS) {
       expect(snapOff.findings.some((f) => f.ruleId === 'CA-CHART-001')).toBe(true); // the audit still reports the source problem
       await tab.close();
 
-      // 3. the per-site setting: stored, not consulted by the chart runtime (frozen M7 behavior, M11 debt)
+      // 3. the per-site setting: stored, not consulted by the chart runtime (frozen M7 behavior, M12 debt)
       await driver.setSettings({
         ...SETTINGS_ON,
         adaptCharts: true,
@@ -349,7 +349,7 @@ for (const browser of BROWSERS) {
       record(
         driver,
         AREA,
-        'charts: per-site adaptCharts is not consulted by the runtime (KNOWN DEBT -> M11)',
+        'charts: per-site adaptCharts is not consulted by the runtime (KNOWN DEBT -> M12)',
         'INFO',
         `site override adaptCharts=false, global true: chart nodes marked=${perSite} (${perSite > 0 ? 'still adapted: debt confirmed' : 'respected'}); audit charts coverage=${coverageLevel(snapSite, 'charts')}`,
       );

@@ -1,0 +1,407 @@
+{
+  "schema": "coloradapt.m10r1-runs/1",
+  "runs": {
+    "chrome-g1": {
+      "funnel": {
+        "attempted": 193,
+        "loaded": 185,
+        "audited": 184,
+        "oracleCompleted": 184,
+        "comparable": 184
+      },
+      "notLoaded": {
+        "page.goto": 8
+      },
+      "staleDocument": [],
+      "totals": {
+        "pages": 184,
+        "rowsInScope": 76075,
+        "renderedRows": 43154,
+        "oracleLow": 3343,
+        "productReported": 3347,
+        "agreeLow": 3340,
+        "borderline": 2,
+        "falsePositives": 5,
+        "falseNegatives": 3
+      },
+      "byClass": {
+        "FALSE_POSITIVE ORACLE_BUG": 3,
+        "FALSE_NEGATIVE SCOPE_DIFFERENCE": 1,
+        "FALSE_NEGATIVE PRECISION_BOUNDARY": 1,
+        "FALSE_NEGATIVE AMBIGUOUS": 1,
+        "FALSE_POSITIVE AMBIGUOUS": 1,
+        "FALSE_POSITIVE PRODUCT_BUG": 1
+      },
+      "byCode": {
+        "FALSE_POSITIVE ORACLE_BUG / FORM_CONTROL_TEXT_RECT": 3,
+        "FALSE_NEGATIVE SCOPE_DIFFERENCE / DISABLED_ELEMENT": 1,
+        "FALSE_NEGATIVE PRECISION_BOUNDARY / WIDE_GAMUT_8BIT": 1,
+        "FALSE_NEGATIVE AMBIGUOUS / COLORS_DIFFER": 1,
+        "FALSE_POSITIVE AMBIGUOUS / COLORS_DIFFER": 1,
+        "FALSE_POSITIVE PRODUCT_BUG / VISIBILITY/hidden:opacity": 1
+      },
+      "byTier": {
+        "B": 5,
+        "C": 2,
+        "A": 1
+      },
+      "crossCheck": {
+        "tracedReported": 3347,
+        "listedByAudit": 3092,
+        "notListedGroupsTruncated": 252,
+        "notListedOther": 3
+      },
+      "notListedExamples": [
+        "gov-cdc span (1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>span:nth-of-type(1)",
+        "gov-cdc a ype(1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>a:nth-of-type(1)",
+        "saas-jsfiddle span pe(1)>ul:nth-of-type(1)>li:nth-of-type(3)>div:nth-of-type(1)>span:nth-of-type(1)"
+      ],
+      "topSites": {
+        "falsePositives": [
+          "land-linear: 2",
+          "dash-chartjs-samples: 1",
+          "doc-wikipedia-he: 1",
+          "fin-tradingview: 1"
+        ],
+        "falseNegatives": ["a11y-apple: 1", "blog-overreacted: 1", "fin-tradingview: 1"],
+        "productBugs": ["land-linear: 1"],
+        "ambiguous": ["fin-tradingview: 2"]
+      },
+      "residual": [
+        {
+          "page": "a11y-apple",
+          "side": "FALSE_NEGATIVE",
+          "primary": "SCOPE_DIFFERENCE",
+          "code": "DISABLED_ELEMENT",
+          "tier": "B",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>ul:nth-of-type(1)>li:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "disabled controls are out of scope for CA-COLOR-001 (the browser, not the author, styles them)"
+        },
+        {
+          "page": "blog-overreacted",
+          "side": "FALSE_NEGATIVE",
+          "primary": "PRECISION_BOUNDARY",
+          "code": "WIDE_GAMUT_8BIT",
+          "tier": "B",
+          "tag": "h2",
+          "locator": "div:nth-of-type(1)>a:nth-of-type(2)>article:nth-of-type(1)>h2:nth-of-type(1)",
+          "note": "same colors #f0649e/#ffffff; oracle 2.990752 vs product 3.003854, target 3"
+        },
+        {
+          "page": "dash-chartjs-samples",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "doc-wikipedia-he",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(4)>div:nth-of-type(1)>form:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "fin-tradingview",
+          "side": "FALSE_NEGATIVE",
+          "primary": "AMBIGUOUS",
+          "code": "COLORS_DIFFER",
+          "tier": "C",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "oracle #06806b/#f2f2f2 4.354616 vs product #0f0f0f/#f2f2f2 17.122586"
+        },
+        {
+          "page": "fin-tradingview",
+          "side": "FALSE_POSITIVE",
+          "primary": "AMBIGUOUS",
+          "code": "COLORS_DIFFER",
+          "tier": "C",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "oracle #0f0f0f/#f2f2f2 17.122586 vs product #06806b/#f2f2f2 4.354616"
+        },
+        {
+          "page": "land-linear",
+          "side": "FALSE_POSITIVE",
+          "primary": "PRODUCT_BUG",
+          "code": "VISIBILITY/hidden:opacity",
+          "tier": "A",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>div:nth-of-type(2)>p:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "ColorAdapt reports contrast for text the browser does not paint"
+        },
+        {
+          "page": "land-linear",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "pre:nth-of-type(1)>code:nth-of-type(1)>span:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        }
+      ]
+    },
+    "chrome-g2": {
+      "funnel": {
+        "attempted": 193,
+        "loaded": 184,
+        "audited": 183,
+        "oracleCompleted": 183,
+        "comparable": 183
+      },
+      "notLoaded": {
+        "page.goto": 9
+      },
+      "staleDocument": [],
+      "totals": {
+        "pages": 183,
+        "rowsInScope": 76736,
+        "renderedRows": 43432,
+        "oracleLow": 3286,
+        "productReported": 3290,
+        "agreeLow": 3284,
+        "borderline": 2,
+        "falsePositives": 4,
+        "falseNegatives": 2
+      },
+      "byClass": {
+        "FALSE_POSITIVE ORACLE_BUG": 3,
+        "FALSE_NEGATIVE SCOPE_DIFFERENCE": 1,
+        "FALSE_NEGATIVE PRECISION_BOUNDARY": 1,
+        "FALSE_POSITIVE AMBIGUOUS": 1
+      },
+      "byCode": {
+        "FALSE_POSITIVE ORACLE_BUG / FORM_CONTROL_TEXT_RECT": 3,
+        "FALSE_NEGATIVE SCOPE_DIFFERENCE / DISABLED_ELEMENT": 1,
+        "FALSE_NEGATIVE PRECISION_BOUNDARY / WIDE_GAMUT_8BIT": 1,
+        "FALSE_POSITIVE AMBIGUOUS / COLORS_DIFFER": 1
+      },
+      "byTier": {
+        "B": 5,
+        "C": 1
+      },
+      "crossCheck": {
+        "tracedReported": 3290,
+        "listedByAudit": 3053,
+        "notListedGroupsTruncated": 234,
+        "notListedOther": 3
+      },
+      "notListedExamples": [
+        "fin-tradingview span )>div:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)",
+        "gov-cdc span (1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>span:nth-of-type(1)",
+        "gov-cdc a ype(1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>a:nth-of-type(1)"
+      ],
+      "topSites": {
+        "falsePositives": [
+          "dash-chartjs-samples: 1",
+          "doc-wikipedia-he: 1",
+          "fin-tradingview: 1",
+          "land-linear: 1"
+        ],
+        "falseNegatives": ["a11y-apple: 1", "blog-overreacted: 1"],
+        "productBugs": [],
+        "ambiguous": ["fin-tradingview: 1"]
+      },
+      "residual": [
+        {
+          "page": "a11y-apple",
+          "side": "FALSE_NEGATIVE",
+          "primary": "SCOPE_DIFFERENCE",
+          "code": "DISABLED_ELEMENT",
+          "tier": "B",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>ul:nth-of-type(1)>li:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "disabled controls are out of scope for CA-COLOR-001 (the browser, not the author, styles them)"
+        },
+        {
+          "page": "blog-overreacted",
+          "side": "FALSE_NEGATIVE",
+          "primary": "PRECISION_BOUNDARY",
+          "code": "WIDE_GAMUT_8BIT",
+          "tier": "B",
+          "tag": "h2",
+          "locator": "div:nth-of-type(1)>a:nth-of-type(2)>article:nth-of-type(1)>h2:nth-of-type(1)",
+          "note": "same colors #f0649e/#ffffff; oracle 2.990752 vs product 3.003854, target 3"
+        },
+        {
+          "page": "dash-chartjs-samples",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "doc-wikipedia-he",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(4)>div:nth-of-type(1)>form:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "fin-tradingview",
+          "side": "FALSE_POSITIVE",
+          "primary": "AMBIGUOUS",
+          "code": "COLORS_DIFFER",
+          "tier": "C",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "oracle #cc2f3c/#f2f2f2 4.643955 vs product #06806b/#f2f2f2 4.354616"
+        },
+        {
+          "page": "land-linear",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "pre:nth-of-type(1)>code:nth-of-type(1)>span:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        }
+      ]
+    },
+    "firefox-g1": {
+      "funnel": {
+        "attempted": 193,
+        "loaded": 186,
+        "audited": 186,
+        "oracleCompleted": 186,
+        "comparable": 186
+      },
+      "notLoaded": {
+        "/url": 7
+      },
+      "staleDocument": [],
+      "totals": {
+        "pages": 186,
+        "rowsInScope": 85974,
+        "renderedRows": 48280,
+        "oracleLow": 3630,
+        "productReported": 3636,
+        "agreeLow": 3629,
+        "borderline": 2,
+        "falsePositives": 5,
+        "falseNegatives": 1
+      },
+      "byClass": {
+        "FALSE_POSITIVE ORACLE_BUG": 3,
+        "FALSE_POSITIVE PRODUCT_BUG": 2,
+        "FALSE_NEGATIVE AMBIGUOUS": 1
+      },
+      "byCode": {
+        "FALSE_POSITIVE ORACLE_BUG / FORM_CONTROL_TEXT_RECT": 3,
+        "FALSE_POSITIVE PRODUCT_BUG / VISIBILITY/hidden:zero-size": 2,
+        "FALSE_NEGATIVE AMBIGUOUS / COLORS_DIFFER": 1
+      },
+      "byTier": {
+        "A": 2,
+        "B": 3,
+        "C": 1
+      },
+      "crossCheck": {
+        "tracedReported": 3636,
+        "listedByAudit": 3101,
+        "notListedGroupsTruncated": 533,
+        "notListedOther": 2
+      },
+      "notListedExamples": [
+        "gov-cdc span (1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>span:nth-of-type(1)",
+        "gov-cdc a ype(1)>div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>a:nth-of-type(1)"
+      ],
+      "topSites": {
+        "falsePositives": [
+          "a11y-apple: 1",
+          "dash-chartjs-samples: 1",
+          "doc-wikipedia-he: 1",
+          "fin-nasdaq: 1",
+          "land-linear: 1"
+        ],
+        "falseNegatives": ["fin-tradingview: 1"],
+        "productBugs": ["a11y-apple: 1", "fin-nasdaq: 1"],
+        "ambiguous": ["fin-tradingview: 1"]
+      },
+      "residual": [
+        {
+          "page": "a11y-apple",
+          "side": "FALSE_POSITIVE",
+          "primary": "PRODUCT_BUG",
+          "code": "VISIBILITY/hidden:zero-size",
+          "tier": "A",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>a:nth-of-type(1)>span:nth-of-type(3)>span:nth-of-type(2)",
+          "note": "ColorAdapt reports contrast for text the browser does not paint"
+        },
+        {
+          "page": "dash-chartjs-samples",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "doc-wikipedia-he",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "div:nth-of-type(4)>div:nth-of-type(1)>form:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        },
+        {
+          "page": "fin-nasdaq",
+          "side": "FALSE_POSITIVE",
+          "primary": "PRODUCT_BUG",
+          "code": "VISIBILITY/hidden:zero-size",
+          "tier": "A",
+          "tag": "video",
+          "locator": "div:nth-of-type(1)>div:nth-of-type(1)>div:nth-of-type(1)>video:nth-of-type(1)",
+          "note": "ColorAdapt reports contrast for text the browser does not paint"
+        },
+        {
+          "page": "fin-tradingview",
+          "side": "FALSE_NEGATIVE",
+          "primary": "AMBIGUOUS",
+          "code": "COLORS_DIFFER",
+          "tier": "C",
+          "tag": "span",
+          "locator": "div:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)>span:nth-of-type(1)",
+          "note": "oracle #06806b/#f2f2f2 4.354616 vs product #0f0f0f/#f2f2f2 17.122586"
+        },
+        {
+          "page": "land-linear",
+          "side": "FALSE_POSITIVE",
+          "primary": "ORACLE_BUG",
+          "code": "FORM_CONTROL_TEXT_RECT",
+          "tier": "B",
+          "tag": "textarea",
+          "locator": "pre:nth-of-type(1)>code:nth-of-type(1)>span:nth-of-type(1)>textarea:nth-of-type(1)",
+          "note": "the text of a textarea is painted by the browser, not as a DOM text box: the oracle Range has no rectangle for it"
+        }
+      ]
+    }
+  },
+  "stability": {
+    "compared": ["chrome-g1", "chrome-g2"],
+    "discrepanciesA": 8,
+    "discrepanciesB": 6,
+    "inBoth": 6
+  }
+}

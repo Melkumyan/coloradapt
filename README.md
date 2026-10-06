@@ -181,8 +181,13 @@ Full policy: `docs/PRIVACY.md`. Security posture and permission rationale:
 
 ## Roadmap
 
-M0 (this repository) through M10 (optional AI-assisted semantic
-understanding) are tracked in `docs/ROADMAP.md`.
+M0 (this repository) through M14 are tracked in `docs/ROADMAP.md`:
+
+- M10: real-world validation (M10.R1 is its findings closeout)
+- M11: the optional AI-assisted semantic engine
+- M12: production hardening
+- M13: store release
+- M14: advanced product
 
 ## Scientific accuracy note
 

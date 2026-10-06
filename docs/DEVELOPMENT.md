@@ -315,8 +315,10 @@ pnpm test:realworld                         # everything, about two hours
 RW_BROWSER=firefox RW_ONLY=gov-uk pnpm test:realworld corpus-run   # one page, one browser
 ```
 
-It is not part of `pnpm verify`. Layout, environment, results and the known open findings are in
-`docs/REAL_WORLD_VALIDATION.md`.
+It is not part of `pnpm verify`. Layout, environment and results are in `docs/REAL_WORLD_VALIDATION.md`; the
+M10.R1 comparison tools (`compare.spec`, `classify.spec`, `ground-truth`, `inspect.spec`, the frozen discrepancy
+corpus in `docs/validation/`) and how to reproduce them are in `docs/REAL_WORLD_FINDINGS_CLOSEOUT.md`. Select
+specs by their full name (`compare.spec`, not `compare`, which also matches the slow `compare-builds.spec`).
 
 ## Debugging the analyzer on a real page
 
