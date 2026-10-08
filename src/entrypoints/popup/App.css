@@ -5,6 +5,8 @@
   --ca-border: #d0d0d0;
   --ca-accent: #2f6fed;
   --ca-accent-fg: #ffffff;
+  /* accent as TEXT on the page background: AA (4.5:1) in both schemes; the plain accent is for fills and outlines */
+  --ca-link: #2f6fed;
   --ca-muted: #5a5a5a;
   --ca-danger-bg: #fdeceb;
   --ca-danger-fg: #7a1f1f;
@@ -16,6 +18,7 @@
     --ca-fg: #f1f1f1;
     --ca-border: #44464a;
     --ca-muted: #b8b8b8;
+    --ca-link: #8ab4ff;
     --ca-danger-bg: #3a2222;
     --ca-danger-fg: #ffb4b4;
   }
@@ -123,7 +126,7 @@ input:focus-visible {
 .popup__link-button {
   border: none;
   background: none;
-  color: var(--ca-accent);
+  color: var(--ca-link);
   padding: 4px;
   text-decoration: underline;
 }

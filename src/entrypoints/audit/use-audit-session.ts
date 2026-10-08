@@ -86,7 +86,14 @@ export function useAuditSession(
   useEffect(() => {
     if (tabId === null) return undefined;
     let closed = false;
-    const port = browser.tabs.connect(tabId, { name: AUDIT_PORT_NAME });
+    let port: ReturnType<typeof browser.tabs.connect>;
+    try {
+      port = browser.tabs.connect(tabId, { name: AUDIT_PORT_NAME });
+    } catch {
+      // an id the browser rejects outright (out of range): no session, the page says it is disconnected
+      queueMicrotask(() => setStatus('disconnected'));
+      return undefined;
+    }
     port.onMessage.addListener(() => {
       if (!closed) void fetchLatest().catch(() => undefined);
     });

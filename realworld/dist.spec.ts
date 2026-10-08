@@ -41,7 +41,11 @@ for (const [name, dir] of Object.entries(BUNDLES)) {
         (m['host_permissions'] as string[] | undefined) ??
         permissions.filter((p) => /^https?:\/\//.test(p));
       expect([...hosts].sort()).toEqual(['http://*/*', 'https://*/*']);
-      expect(m['content_security_policy']).toBeUndefined(); // no override of the extension CSP
+      // M12: the one override of the extension CSP is the frozen one (scripts 'self'; network: itself and the loopback)
+      const policy = m['content_security_policy'] as string | { extension_pages: string };
+      expect(typeof policy === 'string' ? policy : policy.extension_pages).toBe(
+        "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*",
+      );
       expect(m['web_accessible_resources']).toBeUndefined(); // no page can load our files
       expect(m['externally_connectable']).toBeUndefined(); // no page can message us
       const scripts = m['content_scripts'] as Array<Record<string, unknown>>;

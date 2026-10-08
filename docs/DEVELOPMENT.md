@@ -35,6 +35,34 @@ pnpm zip
 pnpm zip:firefox
 ```
 
+## Release checks (M12)
+
+```bash
+pnpm audit:dist       # the built bundles against the frozen permission surface and the artifact rules (in `pnpm verify`)
+pnpm scan:secrets     # tracked files, both bundles and both zips; reviewed fixtures are in docs/m12/secret-scan-allowlist.json
+pnpm knip:diff a.json b.json    # new Knip findings between two `knip --reporter json` reports (Knip itself runs through `pnpm dlx knip`)
+pnpm release:repro                      # (node scripts/release/repro-check.mjs --zip) builds and packages twice, compares folders and archives
+pnpm release:hash                       # (node scripts/release/candidate-hash.mjs) the identity of the tree a certification run is about
+```
+
+The production-hardening suites drive the real Chrome and Firefox against the production builds (`pnpm build` and
+`pnpm build:firefox` first):
+
+```bash
+pnpm exec playwright test -c playwright.realworld.config.ts realworld/m12/<spec>.spec.ts
+RW_BROWSERS=chrome ...                          # one browser (default: chrome,firefox)
+M12_SOAK_MINUTES=120 M12_SOAK_LABEL=soak ...    # realworld/m12/soak.spec.ts (default 120 minutes, a sample per minute)
+```
+
+`realworld/m12/upgrade.spec.ts` needs the previous builds: add a worktree of each tag (for example
+`git worktree add --detach <dir>/wt-m11-ai-semantic-engine m11-ai-semantic-engine`), link `node_modules` into it,
+set its `package.json` version below the current one, build it with `node node_modules/wxt/bin/wxt.mjs build`, and
+point `M12_PREVIOUS_DIR` at `<dir>`. Method and results: `docs/m12/protocol.md`, `docs/m12/report.md`.
+
+The Firefox restart test (P04) records failure evidence to `realworld/.artifacts/m12-p04/<run>/` (geckodriver trace and
+browser console, every BiDi log entry, a correlated timeline, the raw extension-side error, process and profile state;
+`failure.json` only on failure). It is test-side only and is described in `docs/m12/protocol.md` section 12.
+
 ## Tests, lint, typecheck
 
 ```bash

@@ -165,6 +165,24 @@ before being dispatched, since both `runtime.onMessage` and
     (including re-scans while adapted) runs with the stylesheet suspended, so
     the original styles stay the source of truth and adaptation never compounds.
 
+## Lifecycle and failure behavior (M12)
+
+- **Every context is disposable.** The MV3 service worker holds no state that matters: it reads settings from storage
+  on every message, and a stopped worker is woken by the next one (tested: stopped five times in a row, and with
+  messages in flight). The only persisted state is the settings key (`docs/m12/storage.md`).
+- **A content script owns its page and gives it back.** `ctx.onInvalidated` (WXT) fires when the extension is
+  reloaded, updated or disabled, or when a newer copy of the script starts in the same page; a 5-second check of
+  `ctx.isInvalid` covers the browser that gives an orphan no event. On invalidation the script removes its message
+  listeners, closes the audit session and runs `disableAdaptation()` (stylesheet, observers). Firefox destroys an
+  orphan without running it: its stylesheet stays until the tab is reloaded.
+- **Fail closed.** If the settings cannot be read, a page stays unadapted; popup and options say so instead of
+  loading forever; a handler failure answers `undefined`; the audit page refuses a tab id that cannot name a tab; each
+  UI root has an error boundary.
+- **No History API hooks, no global patching.** Navigation is learned from the browser (`tabs.onUpdated`) and from the
+  DOM the page changes; a static check of the bundles fails on any reference to `pushState` or `replaceState`.
+- **Known limit.** The cost of one pass grows with the number of rules already in the stylesheet; adding thousands
+  of adaptable elements at once is slow but bounded and always ends idle (`docs/PERFORMANCE.md`, `docs/m12/report.md`).
+
 ## Why no `<all_urls>`
 
 Content scripts/host permissions are scoped to `http://*/*` and

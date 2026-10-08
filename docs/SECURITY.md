@@ -23,8 +23,18 @@ before being merged.
 
 ## Content Security Policy
 
-WXT's default MV3 CSP (`script-src 'self'; object-src 'self'`) is used
-unmodified. No remote code execution is permitted:
+Since M12 the manifest carries one policy for the extension's own pages (popup, options, developer audit):
+
+```
+script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*
+```
+
+Scripts are the extension's own files only (no `eval`, no inline script, no remote script, no `wasm-unsafe-eval`), and
+the pages can connect to themselves and to this computer's loopback only (where the optional local model runtime
+listens). The restriction on the AI client existed in code since M11; the browser now enforces it as well (tested in
+both browsers: remote and LAN fetches, a remote WebSocket, an inline script and a remote script are all blocked).
+Content scripts are governed by the page they run in, not by this policy. The policy is part of the frozen surface
+(`docs/m12/permission-surface.json`). No remote code execution is permitted:
 
 - No `eval`, `new Function(...)`, or remote script loading.
 - No loading of JavaScript from external servers — all code ships inside
@@ -175,3 +185,27 @@ please open an issue in the repository describing the concern (avoid
 posting exploit details in a public issue if the impact could be
 significant — use responsible disclosure judgment appropriate to the
 project's maturity).
+
+## Production hardening (M12)
+
+The full review, with what was found and fixed, is `docs/m12/security-review.md`. In short:
+
+- **The surface is frozen and checked on every build.** `docs/m12/permission-surface.json` holds the permissions,
+  host permissions, content-script matches, web-accessible resources, `externally_connectable` and CSP of both
+  browsers. `pnpm audit:dist` (part of `pnpm verify`) fails on any difference, on a manifest key it does not know, on
+  a file that should not ship (source maps, tests, fixtures, notes), on `eval`/`new Function`/remote code, on a
+  History API reference, on an absolute host path or credential-shaped string, on a network literal that is not on a
+  short allowlist, and on any drift between the two manifests beyond the platform differences. A change to the
+  surface is a deliberate edit of the golden and needs the owner's approval.
+- **Messages.** A handler that throws or rejects still answers (with `undefined`), so no sender waits on an open
+  channel; messages must come from this extension's own id; a content script whose extension was reloaded, updated
+  or disabled removes its adaptation, listeners and audit session instead of leaving a stale page.
+- **Writes are validated.** What is stored is always `parseUserSettings(...)` of the merged value. Hostname keys are
+  own properties only (a host named `__proto__` or `constructor` is not special).
+- **Diagnostics are codes, not content.** `[ColorAdapt] diagnostic: <code>` with at most the names of unusable fields
+  or an error class name: `storage-recovered`, `initial-settings-unavailable`, `content-script-orphaned`,
+  `ui-crashed`. Nothing a page or a user typed.
+- **Failure of one part does not take the extension down.** Each UI root has an error boundary; a settings read
+  failure shows an alert instead of "Loading"; the audit page rejects a `tabId` that cannot name a tab.
+- **Source maps are not shipped.** The release gate fails on any `.map` file or `sourceMappingURL`, so no build can
+  publish original paths by accident.

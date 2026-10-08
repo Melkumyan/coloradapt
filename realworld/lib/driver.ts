@@ -19,6 +19,13 @@ import {
   type Page,
 } from '@playwright/test';
 import { normalizeErrorSource, toError, type NormalizedError } from './errors';
+import { awaitReady, type ReadinessAttempt, type ReadinessPolicy } from './readiness';
+import {
+  captureRawErrorSource,
+  snapshotProcesses,
+  type EvidenceRecorder,
+  type RawError,
+} from './evidence';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -490,6 +497,8 @@ export interface FirefoxOptions {
   readonly prefs?: Record<string, unknown>;
   /** Use (and keep) this profile directory: browser restart scenarios. */
   readonly profileDir?: string;
+  /** Test-side failure evidence (M12.R1-P04): observes and records, never retries or alters a result. */
+  readonly evidence?: EvidenceRecorder;
 }
 
 type BidiPending = Map<number, (value: { error?: string; result?: unknown }) => void>;
@@ -648,6 +657,7 @@ export class FirefoxDriver implements Driver {
   #helper: string | null = null;
   #current = '';
   #ws: WebSocket | null = null;
+  #closed = false;
   #bidiId = 0;
   readonly #pending: BidiPending = new Map();
   readonly #logs = new Map<string, LogEntry[]>();
@@ -658,17 +668,29 @@ export class FirefoxDriver implements Driver {
   }
 
   async wd(method: string, route: string, body?: unknown): Promise<unknown> {
-    const res = await fetch(`${this.#base}/session/${this.#sid}${route}`, {
-      method,
-      headers: { 'content-type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const json = (await res.json()) as { value?: unknown };
-    const v = json.value as { error?: string; message?: string } | undefined;
-    if (v && typeof v === 'object' && 'error' in v && v.error) {
-      throw new Error(`${route}: ${v.error}: ${v.message ?? ''}`);
+    const evidence = this.#opts.evidence;
+    const started = Date.now();
+    let outcome = 'ok';
+    try {
+      const res = await fetch(`${this.#base}/session/${this.#sid}${route}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const json = (await res.json()) as { value?: unknown };
+      const v = json.value as { error?: string; message?: string } | undefined;
+      if (v && typeof v === 'object' && 'error' in v && v.error) {
+        outcome = `webdriver:${v.error}`;
+        throw new Error(`${route}: ${v.error}: ${v.message ?? ''}`);
+      }
+      return json.value;
+    } catch (e) {
+      if (outcome === 'ok') outcome = `transport:${String((e as Error).message).slice(0, 200)}`;
+      throw e;
+    } finally {
+      // the route and the outcome only: never the body (it carries scripts and settings)
+      evidence?.event('wd', { method, route, durationMs: Date.now() - started, outcome });
     }
-    return json.value;
   }
 
   async select(handle: string): Promise<void> {
@@ -687,10 +709,16 @@ export class FirefoxDriver implements Driver {
     const result = (await this.wd('POST', '/execute/async', {
       script: `const done = arguments[arguments.length - 1];
         const normalize = ${normalizeErrorSource};
-        Promise.resolve().then(() => (${source})).then((v) => done({ ok: v === undefined ? null : v }), (e) => done({ err: normalize(e) }));`,
+        const captureRaw = ${captureRawErrorSource};
+        const rawOf = (e) => { try { return captureRaw(e); } catch (_) { return null; } };
+        Promise.resolve().then(() => (${source})).then((v) => done({ ok: v === undefined ? null : v }), (e) => done({ err: normalize(e), raw: rawOf(e) }));`,
       args: [],
-    })) as { ok?: T; err?: NormalizedError };
-    if (result.err !== undefined) throw toError(result.err);
+    })) as { ok?: T; err?: NormalizedError; raw?: RawError | null };
+    if (result.err !== undefined) {
+      // keep what the extension page actually rejected with, before it becomes a generic exception
+      this.#opts.evidence?.extensionError(result.raw ?? null, result.err);
+      throw toError(result.err);
+    }
     return result.ok as T;
   }
 
@@ -706,7 +734,24 @@ export class FirefoxDriver implements Driver {
   async start(): Promise<this> {
     const port = this.#opts.port ?? 4500 + Math.floor(Math.random() * 400);
     this.#base = `http://127.0.0.1:${port}`;
-    this.#proc = spawn(geckodriverBinary(), ['--port', String(port)], { stdio: 'ignore' });
+    const evidence = this.#opts.evidence;
+    if (evidence) {
+      // geckodriver at trace level. Firefox's own stdout/stderr are inherited by geckodriver, so they arrive on the
+      // same two pipes. Both go to files from the first byte: the cause may predate any failure.
+      const out = evidence.sink('firefox.log');
+      const err = evidence.sink('geckodriver.log');
+      this.#proc = spawn(geckodriverBinary(), ['--port', String(port), '--log', 'trace'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      this.#proc.stdout?.on('data', (chunk: Buffer) => out.write(chunk));
+      this.#proc.stderr?.on('data', (chunk: Buffer) => err.write(chunk));
+      this.#proc.on('exit', (code, signal) =>
+        evidence.event('process.kill', { what: 'geckodriver exit', code, signal }),
+      );
+      evidence.event('geckodriver.spawn', { port, pid: this.#proc.pid ?? null });
+    } else {
+      this.#proc = spawn(geckodriverBinary(), ['--port', String(port)], { stdio: 'ignore' });
+    }
     for (let i = 0; i < 40; i++) {
       await sleep(250);
       try {
@@ -716,12 +761,18 @@ export class FirefoxDriver implements Driver {
         // not up yet
       }
     }
+    evidence?.event('geckodriver.ready');
     const prefs: Record<string, unknown> = {
       'extensions.webextensions.uuids': JSON.stringify({ [FIREFOX_ID]: FIREFOX_UUID }),
       'browser.shell.checkDefaultBrowser': false,
       'datareporting.policy.dataSubmissionEnabled': false,
+      // evidence only: route the browser's own console (extension and chrome code) to stdout, which is captured
+      ...(evidence
+        ? { 'devtools.console.stdout.content': true, 'devtools.console.stdout.chrome': true }
+        : {}),
       ...this.#opts.prefs,
     };
+    evidence?.event('session.create');
     const created = await fetch(`${this.#base}/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -753,8 +804,11 @@ export class FirefoxDriver implements Driver {
     if (body.value.error) throw new Error(`firefox session: ${body.value.message}`);
     this.#sid = body.value.sessionId;
     this.version = body.value.capabilities.browserVersion;
+    evidence?.setSession(this.#sid);
+    evidence?.event('session.created', { sessionId: this.#sid, browserVersion: this.version });
     const wsUrl = body.value.capabilities.webSocketUrl;
     if (wsUrl) await this.#connectBidi(wsUrl).catch(() => null);
+    evidence?.event('bidi.connected', { connected: this.#ws !== null });
     await this.wd('POST', '/window/rect', { width: VIEWPORT.width, height: VIEWPORT.height + 120 });
     this.#current = (await this.wd('GET', '/window')) as string;
     if (this.#opts.extension !== false) {
@@ -766,9 +820,11 @@ export class FirefoxDriver implements Driver {
         temporary: true,
       })) as string;
       if (id !== FIREFOX_ID) throw new Error(`unexpected add-on id ${id}`);
+      evidence?.event('addon.install', { id });
       this.#helper = await this.#newHandle();
       await this.select(this.#helper);
       await this.wd('POST', '/url', { url: `${this.extensionOrigin}/popup.html` });
+      evidence?.event('extension.ready');
     }
     return this;
   }
@@ -813,6 +869,7 @@ export class FirefoxDriver implements Driver {
       }
       if (msg.method === 'log.entryAdded' && msg.params) {
         const p = msg.params;
+        this.#opts.evidence?.bidi({ ...p, method: msg.method }); // every level, before the filter below
         if (p.level !== 'error' && p.level !== 'warn') return;
         const entry: LogEntry = {
           level: p.level,
@@ -859,15 +916,59 @@ export class FirefoxDriver implements Driver {
   }
 
   async setSettings(settings: Record<string, unknown>): Promise<void> {
-    await this.extensionEval(
-      `(async () => { const api = globalThis.browser ?? globalThis.chrome; await api.storage.local.set({ ${JSON.stringify(SETTINGS_KEY)}: ${JSON.stringify(settings)} }); })()`,
-    );
+    const write = async () => {
+      await this.extensionEval(
+        `(async () => { const api = globalThis.browser ?? globalThis.chrome; await api.storage.local.set({ ${JSON.stringify(SETTINGS_KEY)}: ${JSON.stringify(settings)} }); })()`,
+      );
+    };
+    const evidence = this.#opts.evidence;
+    if (evidence) await evidence.operation('storage.local.set', [SETTINGS_KEY], write);
+    else await write();
   }
 
   getSettings(): Promise<unknown> {
-    return this.extensionEval(
-      `(async () => { const api = globalThis.browser ?? globalThis.chrome; return (await api.storage.local.get(${JSON.stringify(SETTINGS_KEY)}))[${JSON.stringify(SETTINGS_KEY)}]; })()`,
-    );
+    const read = () =>
+      this.extensionEval(
+        `(async () => { const api = globalThis.browser ?? globalThis.chrome; return (await api.storage.local.get(${JSON.stringify(SETTINGS_KEY)}))[${JSON.stringify(SETTINGS_KEY)}]; })()`,
+      );
+    const evidence = this.#opts.evidence;
+    return evidence ? evidence.operation('storage.local.get', [SETTINGS_KEY], read) : read();
+  }
+
+  /**
+   * Explicit, bounded precondition: the storage backend has answered one read of the settings key (see readiness.ts).
+   * Every attempt is returned and recorded. Exhausting the budget throws; nothing here makes a failure pass.
+   */
+  async awaitStorageReady(policy?: ReadinessPolicy): Promise<ReadinessAttempt[]> {
+    const evidence = this.#opts.evidence;
+    try {
+      const { attempts } = await awaitReady(
+        () =>
+          this.extensionEval<boolean>(
+            `(async () => { const api = globalThis.browser ?? globalThis.chrome; await api.storage.local.get(${JSON.stringify(SETTINGS_KEY)}); return true; })()`,
+          ),
+        policy,
+        {
+          cancelled: () => this.#closed,
+          onAttempt: (a) => evidence?.event('readiness', { ...a }),
+        },
+      );
+      return attempts;
+    } catch (e) {
+      // the exhausted precondition is the failure of this operation; the last raw extension error is in the evidence
+      if (evidence)
+        await evidence
+          .operation('storage.readiness', [SETTINGS_KEY], () =>
+            Promise.reject(e instanceof Error ? e : new Error(String(e))),
+          )
+          .catch(() => null);
+      throw e;
+    }
+  }
+
+  /** Session id, for evidence correlation. */
+  get sessionId(): string {
+    return this.#sid;
   }
 
   /** `runtime.reload()` from the extension's own page: Firefox closes the extension's tabs, so the helper is rebuilt. */
@@ -884,13 +985,25 @@ export class FirefoxDriver implements Driver {
   }
 
   async close(): Promise<void> {
+    this.#closed = true;
+    const evidence = this.#opts.evidence;
+    evidence?.writeProcessSnapshot('beforeClose', snapshotProcesses());
+    const started = Date.now();
+    evidence?.event('session.delete', { phase: 'start' });
+    let outcome = 'ok';
     try {
       this.#ws?.close();
       if (this.#sid) await fetch(`${this.#base}/session/${this.#sid}`, { method: 'DELETE' });
-    } catch {
-      // already gone
+    } catch (e) {
+      outcome = `error:${String((e as Error).message).slice(0, 200)}`; // already gone
     }
+    evidence?.event('session.delete', {
+      phase: 'finish',
+      durationMs: Date.now() - started,
+      outcome,
+    });
     killTree(this.#proc);
+    evidence?.event('process.kill', { what: 'killTree geckodriver', pid: this.#proc?.pid ?? null });
   }
 }
 

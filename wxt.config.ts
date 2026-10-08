@@ -3,6 +3,14 @@ import { defineConfig } from 'wxt';
 
 const root = import.meta.dirname;
 
+const EXTENSION_PAGES_CSP =
+  "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*";
+
+/** MV3 takes a policy per page type; Firefox's MV2 build takes one string. */
+function extensionCsp(browser: string): string | { extension_pages: string } {
+  return browser === 'firefox' ? EXTENSION_PAGES_CSP : { extension_pages: EXTENSION_PAGES_CSP };
+}
+
 // See https://wxt.dev/api/config.html
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -14,6 +22,10 @@ export default defineConfig({
       'Adapts web pages for people with color vision deficiencies by detecting and fixing hard-to-distinguish color combinations.',
     permissions: ['storage'],
     host_permissions: ['http://*/*', 'https://*/*'],
+    // M12: the browser, not only the code, keeps the extension's own pages (popup, options, developer audit, where
+    // the optional local AI client runs) from connecting anywhere but themselves and the loopback. Scripts stay
+    // `'self'` (no eval, no remote code). Content scripts are governed by the page they run in, not by this policy.
+    content_security_policy: extensionCsp(browser),
     // Firefox only (Chromium ignores the key and WXT leaves it out): a stable add-on id gives the
     // extension a stable moz-extension:// origin and is required for MV3 and for signing. The id
     // is a placeholder until the extension is published (M13, Store Release). The extension collects nothing.

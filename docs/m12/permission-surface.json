@@ -1,0 +1,52 @@
+{
+  "chrome-mv3": {
+    "manifest_version": 3,
+    "permissions": ["storage"],
+    "optional_permissions": [],
+    "host_permissions": ["http://*/*", "https://*/*"],
+    "content_scripts": [
+      {
+        "matches": ["http://*/*", "https://*/*"],
+        "all_frames": null,
+        "run_at": null,
+        "match_about_blank": null,
+        "world": null
+      }
+    ],
+    "web_accessible_resources": null,
+    "externally_connectable": null,
+    "content_security_policy": {
+      "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*"
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "gecko_id": null,
+    "data_collection": null
+  },
+  "firefox-mv2": {
+    "manifest_version": 2,
+    "permissions": ["http://*/*", "https://*/*", "storage"],
+    "optional_permissions": [],
+    "host_permissions": [],
+    "content_scripts": [
+      {
+        "matches": ["http://*/*", "https://*/*"],
+        "all_frames": null,
+        "run_at": null,
+        "match_about_blank": null,
+        "world": null
+      }
+    ],
+    "web_accessible_resources": null,
+    "externally_connectable": null,
+    "content_security_policy": "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*",
+    "background": {
+      "scripts": ["background.js"]
+    },
+    "gecko_id": "coloradapt@coloradapt.invalid",
+    "data_collection": {
+      "required": ["none"]
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { ErrorBoundary } from '@shared/ui';
 import { App } from './App';
 import './App.css';
 
@@ -8,6 +9,8 @@ if (!container) throw new Error('Options root element #app not found');
 
 ReactDOM.createRoot(container).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>,
 );

@@ -1,6 +1,7 @@
 import { DEFAULT_USER_SETTINGS } from '@domain/models';
 import type { SiteProfile, UserSettings } from '@domain/models';
 import { parseUserSettings } from './schema';
+import type { RecoveryReport } from './schema';
 import type { StorageBackend } from './storage-backend';
 
 const SETTINGS_KEY = 'coloradapt:settings';
@@ -12,6 +13,7 @@ const SETTINGS_KEY = 'coloradapt:settings';
  */
 export class SettingsStore {
   #backend: StorageBackend;
+  #lastRecovery = '';
 
   constructor(backend: StorageBackend) {
     this.#backend = backend;
@@ -19,12 +21,24 @@ export class SettingsStore {
 
   async get(): Promise<UserSettings> {
     const raw = await this.#backend.get<unknown>(SETTINGS_KEY);
-    return raw === undefined ? DEFAULT_USER_SETTINGS : parseUserSettings(raw);
+    if (raw === undefined) return DEFAULT_USER_SETTINGS;
+    const report: RecoveryReport = [];
+    const settings = parseUserSettings(raw, report);
+    // A diagnostic, once per worker/page lifetime and per distinct damage: which stored fields were unusable
+    // (names only, never values). The settings that come back are valid either way.
+    const signature = report.join(',');
+    if (signature !== '' && signature !== this.#lastRecovery) {
+      this.#lastRecovery = signature;
+      console.warn('[ColorAdapt] diagnostic: storage-recovered', signature);
+    }
+    return settings;
   }
 
   async update(patch: Partial<UserSettings>): Promise<UserSettings> {
     const current = await this.get();
-    const next: UserSettings = { ...current, ...patch };
+    // What is stored is always what the schema accepts (clamped numbers, known enums, loopback endpoints only):
+    // a patch from any context cannot persist a shape the readers would have to defend against.
+    const next: UserSettings = parseUserSettings({ ...current, ...patch });
     await this.#backend.set(SETTINGS_KEY, next);
     return next;
   }

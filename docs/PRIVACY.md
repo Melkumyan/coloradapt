@@ -56,6 +56,10 @@ alone — there is no backend for it to send data to.
   findings. What the local runtime does with a request is outside ColorAdapt's control. See `docs/AI_PRIVACY.md`.
 - **No telemetry.** There is no analytics or crash-reporting SDK in this
   project, and none is planned as a default-on feature.
+- **Local diagnostics only.** When something recovers or fails, ColorAdapt writes one line to the browser's own
+  developer console (`[ColorAdapt] diagnostic: <code>`), with at most the _names_ of unusable settings fields or the
+  class name of an error. It never includes a stored value, a URL, a page's text or anything you typed, and it is
+  never sent anywhere. The only thing ColorAdapt stores is its settings (one key, no page content; `docs/m12/storage.md`).
 - **No account, no registration, no login.** The extension works
   immediately after installation.
 

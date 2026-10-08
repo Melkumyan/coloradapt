@@ -24,8 +24,10 @@ const PAGE_SIZE = 200;
 
 function readTabId(): number | null {
   const raw = new URLSearchParams(window.location.search).get('tabId');
-  if (raw === null || !/^\d+$/.test(raw)) return null;
-  return Number(raw);
+  if (raw === null || !/^\d{1,10}$/.test(raw)) return null;
+  const id = Number(raw);
+  // browser tab ids are 32-bit integers; anything larger cannot name a tab
+  return id <= 2_147_483_647 ? id : null;
 }
 
 const SCOPE_LABEL: Record<AuditProfileScope, string> = {

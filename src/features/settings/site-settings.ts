@@ -10,7 +10,11 @@ export function resolveEffectiveSettings(
   settings: UserSettings,
   hostname: string | null,
 ): UserSettings {
-  const site = hostname ? settings.siteOverrides[hostname] : undefined;
+  // Own properties only: a host named `constructor` or `toString` is not a stored profile.
+  const site =
+    hostname && Object.hasOwn(settings.siteOverrides, hostname)
+      ? settings.siteOverrides[hostname]
+      : undefined;
   if (!site) return settings;
 
   return {

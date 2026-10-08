@@ -17,6 +17,7 @@ export default tseslint.config(
       'test-results/**',
       'dist-profile/**',
       'realworld/tools/**',
+      'scripts/release/**',
       'realworld/.tools/**',
       'realworld/.artifacts/**',
     ],

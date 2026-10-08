@@ -476,13 +476,44 @@ verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5
   by the concurrency of 2); ground truth is small and written by one person.
 - M2 stays PARTIAL; AI cannot change scientific evidence.
 
-## M12 — Production Hardening ⬜
+## M12 — Production Hardening ✅ (M12.R1 PASS / FROZEN; tag `m12-production-hardening`)
 
-- Carries the known technical debt (per-site `adaptCharts` setting not consulted by the chart runtime), the slow
-  heap growth of route changes (about 0.2 KB per route change, both the M10 and the M10.R1 build) and the residual
-  animation-state items of M10.R1.
+- Turns the frozen feature set into a production-hardened extension without adding a feature, a permission or an
+  algorithm. Protocol (frozen before any formal run): `docs/m12/protocol.md`; result: `docs/m12/report.md`.
+- Product changes: an orphaned content script gives its page back (Chrome); a failing message handler still answers and
+  messages must come from the extension; settings writes are validated; hostname keys are own properties only (a host
+  named `__proto__` or `constructor` is no longer special); popup and options fail visibly instead of loading forever;
+  error boundaries; the audit page rejects a `tabId` that cannot name a tab; dark-mode link contrast; an extension-page
+  CSP that keeps scripts `'self'` and the network on the loopback; local diagnostics that carry codes, not content.
+- New gates: `pnpm audit:dist` (in `pnpm verify`) freezes the permission surface and audits the built artifacts;
+  `pnpm scan:secrets`; Knip diff; reproducible-build check. New suites: `realworld/m12/` (clean install, restart,
+  extension reload, MV3 worker restart, navigation and tab lifecycle, storage corruption, upgrade and downgrade,
+  messaging and forged messages, crash recovery, AI failure and stale results, UI accessibility in both color schemes,
+  resource and 120-minute soak).
+- **M12.R1 final result: PASS.** Candidate `669548fc…b48d`, one full formal sequence, no retry: `pnpm verify` 144 files /
+  3410 tests, E2E 595 passed / 2 skipped, 120-minute soak and the relative idle-CPU control (0.15 pp against 1.0) pass,
+  Knip new findings 0, secret scan 0, audit 0 vulnerabilities, byte-reproducible builds, P04 and P11 pass. The Firefox P04
+  blocker was a storage-layer first-access refusal (Firefox file-lock error hidden behind "An unexpected error occurred"),
+  closed by a bounded readiness precondition in the test harness; no product change. See `docs/m12/report.md`.
+- First-freeze result, kept as history: both browsers' suites pass on the frozen candidate; E2E 595 passed / 2 skipped; `pnpm verify` 142 files, 3385
+  tests; builds and archives byte-reproducible. **Not met:** P25, the soak's frozen idle-CPU budget (median 2.06 % against
+  2.0 %; every growth, error and queue budget passed, and a control shows the browser alone idles at the same level) and
+  P27, Knip (2 new findings: two release scripts not referenced from `package.json`). Decision for the owner in the report.
+- Known limits carried on: the cost of a pass grows with the rules in the sheet (thousands of adaptable elements added at
+  once: seconds, bounded; `docs/PERFORMANCE.md`), Firefox's orphaned stylesheet after an extension reload, downgrade is
+  unsupported, the M10 SPA warm-up ratio (1.1014 against 1.1; the control shows warm-up, steady state is 18.6 bytes per
+  route change), per-site `adaptCharts`.
+
+## M12.5 — Burst Scalability Remediation ⬜ (must close before the M13 Store release candidate)
+
+- Registered by M12.R1 from M12 measurements: ~1,000 adaptable elements added at once: longest task ~100 ms; ~10,000:
+  longest task ~3.9 s, time to idle ~15 to 28 s (`docs/PERFORMANCE.md`). Cause: the cost of a pass grows with the rules
+  already in the stylesheet. Remedy is an engine change (fewer rules than elements, or selectors the browser can index);
+  it needs its own protocol and a regression run of M4, M10 and M12. Not an M12 acceptance criterion.
 
 ## M13 — Store Release ⬜
+
+- Precondition: M12.5 closed.
 
 - Store listings, the final Firefox add-on id (the current one is a placeholder), review submissions.
 

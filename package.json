@@ -23,7 +23,12 @@
     "qualify:ai": "vitest run -c vitest.qualify.config.ts",
     "test:e2e": "pnpm build:e2e && playwright test",
     "test:realworld": "playwright test -c playwright.realworld.config.ts",
-    "verify": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test && pnpm build"
+    "audit:dist": "node scripts/release/audit-dist.mjs",
+    "scan:secrets": "node scripts/release/secret-scan.mjs",
+    "knip:diff": "node scripts/release/knip-diff.mjs",
+    "release:hash": "node scripts/release/candidate-hash.mjs",
+    "release:repro": "node scripts/release/repro-check.mjs --zip",
+    "verify": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test && pnpm build && pnpm audit:dist"
   },
   "dependencies": {
     "culori": "^4.0.2",

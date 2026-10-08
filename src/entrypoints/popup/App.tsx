@@ -7,14 +7,14 @@ import { usePageAnalysis } from '@features/page-analysis';
 import { getActiveTabId, sendToTab } from '@infrastructure/messaging';
 
 export function App(): JSX.Element {
-  const { settings, loading, update } = useSettings();
+  const { settings, loading, failed, update } = useSettings();
   const { analysis, analyzing, error, analyze } = usePageAnalysis();
   const [plan, setPlan] = useState<AdaptationPlan | null>(null);
 
   const toggleEnabled = useCallback(async () => {
     if (!settings) return;
     const nextEnabled = !settings.enabled;
-    await update({ enabled: nextEnabled });
+    if (!(await update({ enabled: nextEnabled }))) return;
 
     const tabId = await getActiveTabId();
     if (tabId === undefined) return;
@@ -30,7 +30,7 @@ export function App(): JSX.Element {
   // page's original styles (REFRESH_ADAPTATION never compounds).
   const updateAndRefresh = useCallback(
     async (patch: Partial<UserSettings>) => {
-      await update(patch);
+      if (!(await update(patch))) return;
       if (!settings?.enabled) return;
       try {
         const tabId = await getActiveTabId();
@@ -52,6 +52,16 @@ export function App(): JSX.Element {
     if (tabId === undefined) return;
     await browser.tabs.create({ url: `${browser.runtime.getURL('/audit.html')}?tabId=${tabId}` });
   }, []);
+
+  if (failed && !settings) {
+    return (
+      <main className="popup">
+        <p role="alert">
+          ColorAdapt could not load its settings. Close this window and open it again.
+        </p>
+      </main>
+    );
+  }
 
   if (loading || !settings) {
     return (

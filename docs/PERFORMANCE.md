@@ -89,6 +89,50 @@ The benchmark (`tests/benchmarks/dynamic-benchmark.test.ts`, report in
 inserts = 1 pass; 1000 inserts = 1 full rescan; 1 insert into a 1000-row page = 1 element
 analyzed. Wall-clock is recorded for information and never asserted.
 
+### Known limit: thousands of adaptable elements added at once (M12)
+
+The budgets above are structural (elements per pass, regions per batch) and bound the _work_ of a pass, not the _time_
+it takes. The time of one pass also grows with the rules already in the stylesheet, because the browser matches the
+attribute-value selectors of the engine (one rule per adapted element) against every tagged element on each style
+recalculation. M12 measured it in Chrome 154 on a page that adds new adaptable elements in one task (300-element page,
+a third of the new elements needing a rule):
+
+| Elements added at once | Longest main-thread task | Time until the pipeline is idle | Rules in the sheet |
+| ---------------------- | ------------------------ | ------------------------------- | ------------------ |
+| 1,000                  | 90 to 100 ms             | about 0.1 to 0.7 s              | about 440          |
+| 2,000                  | 213 to 231 ms            | about 0.4 to 0.9 s              | about 780          |
+| 5,000                  | 875 to 979 ms            | about 3.0 to 3.7 s              | about 1,800        |
+| 10,000                 | 3.5 to 3.9 s             | about 15 to 28 s                | about 3,500        |
+
+With the extension off the same page has no long task. In every case the pipeline ends idle with empty queues, never
+loops and never overflows; up to 1,000 added elements the M10 budget (a longest task of at most 200 ms) holds and is
+tested. Beyond that the page stays correct but can stutter while the work is spread over passes. Removing the cost
+means changing how rules are emitted (fewer rules than elements, or selectors the browser can index); that is an
+engine change and is not part of M12. Wall-clock numbers are recorded, not asserted, in line with the rule above.
+
+**Registered limitation (M12.R1): burst scalability.** Measured, Chrome 154, extension on:
+
+- about 1,000 adaptable elements added at once: longest task about 100 ms (inside the 200 ms M10 budget);
+- about 10,000 adaptable elements added at once: longest task about 3.9 s, time to idle about 15 to 28 s.
+
+The adaptation engine was deliberately not changed in M12 or M12.R1. This is open debt, owned by a separate
+remediation milestone (**M12.5, Burst Scalability Remediation**, `docs/ROADMAP.md`) that must be closed before the Store
+release candidate of M13. It is not an M12 acceptance criterion and is not counted as one.
+
+### Idle CPU is judged relative to a control (M12.R1)
+
+The CPU of a whole browser process tree at idle sits on a host noise floor of about 1 to 2 % of one core, with or
+without the extension (M12 control: extension off 2.06 %, extension on 1.33 %; single 10 s windows range from 0.15 to
+5 %). An absolute limit such as "median at most 2 %" therefore cannot attribute load to ColorAdapt and is not used. The
+criterion is the load ColorAdapt **adds**: `median idle CPU (extension on) - median idle CPU (extension off)`, at most
+**1.0 percentage point of one core**. Method (frozen in `docs/m12/protocol.md` section 6, `realworld/m12/idle-cpu.spec.ts`):
+the extension-off control runs first and the extension-on candidate second, once each, with the same window (30 s settle,
+30 windows of 10 s, 20 s apart), the same browser configuration and page, and the same host state (no other browser
+process). The threshold was set before the run, from the control above: it is above the run-to-run noise of the median
+(the two modes of that control differed by 0.73 points in the direction that favours the extension) so a clean extension
+does not fail by chance, and it is far below what a real idle cost would be (an extension that keeps a page's main
+thread busy for 1 % of the time is visible in battery and in profilers). It is not adjusted after a result.
+
 ### Repair cadence is not a performance claim about time
 
 `stylesheetRepairMinIntervalMs` only bounds how _often_ the page-deleted `<style>` is put back.

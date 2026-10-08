@@ -49,7 +49,7 @@ function AIProviderField({
   update,
 }: {
   settings: UserSettings;
-  update: (patch: Partial<UserSettings>) => Promise<void>;
+  update: (patch: Partial<UserSettings>) => Promise<boolean>;
 }): JSX.Element {
   return (
     <>
@@ -87,7 +87,17 @@ function AIProviderField({
 }
 
 export function App(): JSX.Element {
-  const { settings, loading, update } = useSettings();
+  const { settings, loading, failed, update } = useSettings();
+
+  if (failed && !settings) {
+    return (
+      <main className="options">
+        <p role="alert">
+          ColorAdapt could not load its settings. Close this tab and open it again.
+        </p>
+      </main>
+    );
+  }
 
   if (loading || !settings) {
     return (
