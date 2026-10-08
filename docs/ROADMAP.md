@@ -504,16 +504,20 @@ verify` x3 **3/3**; Chromium E2E **509 passed / 1 skipped / 0 failed**, x5 **5/5
   unsupported, the M10 SPA warm-up ratio (1.1014 against 1.1; the control shows warm-up, steady state is 18.6 bytes per
   route change), per-site `adaptCharts`.
 
-## M12.5 — Burst Scalability Remediation ⬜ (must close before the M13 Store release candidate)
+## M12.5 — Burst Scalability Remediation ✅ (PASS; tag `m12.5-burst-scalability`)
 
-- Registered by M12.R1 from M12 measurements: ~1,000 adaptable elements added at once: longest task ~100 ms; ~10,000:
-  longest task ~3.9 s, time to idle ~15 to 28 s (`docs/PERFORMANCE.md`). Cause: the cost of a pass grows with the rules
-  already in the stylesheet. Remedy is an engine change (fewer rules than elements, or selectors the browser can index);
-  it needs its own protocol and a regression run of M4, M10 and M12. Not an M12 acceptance criterion.
+- Closed the M12 debt (10,000 elements added at once: longest task about 3.9 s, 15 to 28 s to idle). Cause measured: the browser
+  does not index attribute-value selectors and the sheet had a rule per element. Remedy: one rule per declaration
+  (`data-coloradapt-s`), delta commits that write attributes only, no sheet suspension for fresh regions, and a slice budget
+  over the existing frame scheduler and work queue. Result (Chrome): longest ColorAdapt slice 21 ms and idle 0.42 s at 10,000
+  (Firefox 34 ms, 1.2 s), identical final state to the M12 build in 10 of 10 gated sets. Protocol `docs/m125/protocol.md`,
+  report `docs/m125/report.md`, benchmark `pnpm test:burst`.
+- Limits carried on: the M3 caps on one region or one full rescan; indivisible regions (semantic/icon/chart-heavy regions are
+  slices of 50 to 90 ms); the M10 SPA warm-up ratio, per-site `adaptCharts`, Firefox orphan stylesheet, M2 PARTIAL.
 
 ## M13 — Store Release ⬜
 
-- Precondition: M12.5 closed.
+- Precondition: M12.5 closed (done).
 
 - Store listings, the final Firefox add-on id (the current one is a placeholder), review submissions.
 

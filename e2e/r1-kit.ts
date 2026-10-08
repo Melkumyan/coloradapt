@@ -111,23 +111,30 @@ export async function load(
   };
 }
 
+/**
+ * M12.5: the sheet has one rule per distinct declaration; an element is styled when it names such a rule in
+ * `data-coloradapt-s` and the sheet has it. Whether the element `id` is styled:
+ */
 export const rule = (page: Page, id: string): Promise<boolean> =>
   page.evaluate((elementId) => {
-    const el = document.getElementById(elementId);
-    const cid = el?.getAttribute('data-coloradapt-id');
+    const tokens = document.getElementById(elementId)?.getAttribute('data-coloradapt-s') ?? '';
     const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-    return !!cid && text.includes(`[data-coloradapt-id="${cid}"]`);
+    return tokens.split(' ').some((t) => t !== '' && text.includes(`[data-coloradapt-s~="${t}"]`));
   }, id);
 
-/** Ids targeted by rules in the injected stylesheet (with repeats). */
+/** Ids of the elements the sheet styles, once per rule that styles them. */
 export const ruleSelectors = (page: Page): Promise<string[]> =>
-  page.evaluate(() =>
-    [
-      ...(document.getElementById('coloradapt-stylesheet')?.textContent ?? '').matchAll(
-        /\[data-coloradapt-id="([^"]+)"\]/g,
-      ),
-    ].map((m) => m[1]!),
-  );
+  page.evaluate(() => {
+    const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+    const ids: string[] = [];
+    for (const el of document.querySelectorAll('[data-coloradapt-s]')) {
+      const id = el.getAttribute('data-coloradapt-id') ?? '';
+      for (const t of (el.getAttribute('data-coloradapt-s') ?? '').split(' ')) {
+        if (t !== '' && text.includes(`[data-coloradapt-s~="${t}"]`)) ids.push(id);
+      }
+    }
+    return ids;
+  });
 
 export const ruleTotal = async (page: Page): Promise<number> => (await ruleSelectors(page)).length;
 
@@ -146,14 +153,25 @@ export async function duplicateRules(page: Page): Promise<number> {
   return ids.length - new Set(ids).size;
 }
 
-/** Rules whose target element is not in the document any more (stale). */
-export const staleRules = async (page: Page): Promise<number> => {
-  const ids = await ruleSelectors(page);
-  return page.evaluate(
-    (list) => list.filter((id) => !document.querySelector(`[data-coloradapt-id="${id}"]`)).length,
-    ids,
-  );
-};
+/**
+ * Stale rules: a token on an element that the sheet has no rule for, or a rule of the sheet that no element in
+ * the document names any more (its elements are gone).
+ */
+export const staleRules = (page: Page): Promise<number> =>
+  page.evaluate(() => {
+    const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+    const used = new Set<string>();
+    let orphans = 0;
+    for (const el of document.querySelectorAll('[data-coloradapt-s]')) {
+      for (const t of (el.getAttribute('data-coloradapt-s') ?? '').split(' ')) {
+        if (t === '') continue;
+        used.add(t);
+        if (!text.includes(`[data-coloradapt-s~="${t}"]`)) orphans += 1;
+      }
+    }
+    const declared = [...text.matchAll(/\[data-coloradapt-s~="([^"]+)"\]:not/g)].map((m) => m[1]!);
+    return orphans + declared.filter((t) => !used.has(t)).length;
+  });
 
 /** The full invariant set every settled state must satisfy. */
 export async function expectConsistent(page: Page): Promise<void> {

@@ -56,6 +56,7 @@ const owned = (page: Page) =>
         (name) =>
           name.startsWith('data-coloradapt-') &&
           name !== 'data-coloradapt-id' &&
+          name !== 'data-coloradapt-s' &&
           !name.startsWith('data-coloradapt-chart'),
       ),
   }));
@@ -70,7 +71,9 @@ const pristine = (page: Page) =>
       node.remove();
     for (const el of [clone, ...clone.querySelectorAll('*')]) {
       for (const name of el.getAttributeNames())
-        if (name.startsWith('data-coloradapt-id')) el.removeAttribute(name);
+        if (name.startsWith('data-coloradapt-id') || name === 'data-coloradapt-s') {
+          el.removeAttribute(name);
+        }
     }
     return clone.outerHTML;
   });

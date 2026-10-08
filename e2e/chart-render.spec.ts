@@ -406,7 +406,9 @@ test.describe('reversibility, idempotency, accessibility', () => {
     await disable(ext.worker, view.page);
     await settle(view.page);
     // (ids M3/M5 gave elements while analyzing are bookkeeping of the older layers, not of this one)
-    expect((await markup(view.page)).replace(/ data-coloradapt-id="[^"]*"/g, '')).toBe(original);
+    expect((await markup(view.page)).replace(/ data-coloradapt-(id|s)="[^"]*"/g, '')).toBe(
+      original,
+    );
     expect(await artifacts(view.page)).toEqual(NOTHING);
   });
 
@@ -464,11 +466,8 @@ test('chart-owned SVGs are not recolored by M5, even a one-series chart', async 
     legend: 'none',
   });
   const ownedRules = await view.page.evaluate(() => {
-    const css = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-    const ids = [...document.querySelectorAll('#one [data-coloradapt-id], #one')]
-      .map((e) => e.getAttribute('data-coloradapt-id'))
-      .filter(Boolean);
-    return ids.filter((id) => css.includes(`[data-coloradapt-id="${id}"]`)).length;
+    // a rule reaches an element through its token (M12.5)
+    return document.querySelectorAll('#one[data-coloradapt-s], #one [data-coloradapt-s]').length;
   });
   expect(ownedRules).toBe(0);
   expect((await artifacts(view.page)).owned).toBe(1);

@@ -91,9 +91,9 @@ test.describe('M5.R1 adaptSVG default = true', () => {
     // SVG rules are gone: no rule targets an element in the SVG namespace (HTML inside a
     // <foreignObject> is HTML and keeps adapting as such).
     const rulesOff = await page.evaluate(() => {
-      const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-      return [...text.matchAll(/\[data-coloradapt-id="([^"]+)"\]/g)].filter(
-        ([, id]) => document.querySelector(`[data-coloradapt-id="${id}"]`) instanceof SVGElement,
+      // (one rule is shared by every element with the declaration, M12.5: an SVG element is styled when it carries a token)
+      return [...document.querySelectorAll('[data-coloradapt-s]')].filter(
+        (e) => e instanceof SVGElement,
       ).length;
     });
     expect(rulesOff).toBe(0);

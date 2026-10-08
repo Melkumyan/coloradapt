@@ -68,11 +68,11 @@ describe('StylesheetManager cue CSS', () => {
     const manager = new StylesheetManager(document);
     manager.applyDelta({ upsert: [change('a', '#112233')], remove: [] });
     manager.setCueCss(CUES);
-    expect(text()).toContain('data-coloradapt-id="a"');
+    expect(text()).toContain('data-coloradapt-s~="color:#112233"');
     expect(text()).toContain(CUES);
 
     manager.setCueCss(null);
-    expect(text()).toContain('data-coloradapt-id="a"');
+    expect(text()).toContain('data-coloradapt-s~="color:#112233"');
     expect(text()).not.toContain('data-coloradapt-cue');
 
     manager.setCueCss(CUES);

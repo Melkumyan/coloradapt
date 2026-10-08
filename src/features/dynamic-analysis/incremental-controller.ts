@@ -98,6 +98,13 @@ function emptyCounters(): Counters {
     charts: EMPTY_CHART_DIAGNOSTICS,
     images: EMPTY_IMAGE_DIAGNOSTICS,
     semanticInvalidations: 0,
+    slices: 0,
+    maxSliceMs: 0,
+    totalSliceMs: 0,
+    peakQueuedRecords: 0,
+    peakDeferredRoots: 0,
+    staleRoots: 0,
+    cancelledRoots: 0,
   };
 }
 
@@ -144,7 +151,10 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
   function onRecords(records: readonly MutationRecord[]): void {
     counters.observerCallbacks += 1;
     const real = ingest(records);
-    if (real.length > 0) batcher.enqueue(real);
+    if (real.length > 0) {
+      batcher.enqueue(real);
+      counters.peakQueuedRecords = Math.max(counters.peakQueuedRecords, batcher.queued);
+    }
   }
 
   /** Splits off ColorAdapt's own records (counting them). Removal of our `<style>` stays: it needs repair. */
@@ -255,7 +265,24 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     return true;
   }
 
+  /** One scheduled flush is one slice: timed, so the budget (docs/PERFORMANCE.md) can be checked in a real browser. */
   function process(batch: MutationBatch): void {
+    const startedAt = now();
+    const hadWorkBefore = counters.batches;
+    try {
+      processBatch(batch);
+    } finally {
+      if (counters.batches !== hadWorkBefore) {
+        const elapsed = Math.max(0, now() - startedAt);
+        counters.slices += 1;
+        counters.totalSliceMs += elapsed;
+        counters.maxSliceMs = Math.max(counters.maxSliceMs, elapsed);
+      }
+      counters.peakDeferredRoots = Math.max(counters.peakDeferredRoots, deferredRoots.length);
+    }
+  }
+
+  function processBatch(batch: MutationBatch): void {
     const records = [...batch.records, ...ingest(observer.takeRecords())];
     pruneLinks();
     if (batch.overflowed) {
@@ -345,6 +372,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
     counters.rulesAdded += result.rules.added;
     counters.rulesUpdated += result.rules.updated;
     counters.rulesRemoved += result.rules.removed;
+    counters.staleRoots += result.staleRoots;
     if (result.truncated) counters.truncatedPasses += 1;
 
     deferredRoots = roots.slice(result.rootsConsumed);
@@ -375,6 +403,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
   }
 
   function stop(): void {
+    counters.cancelledRoots += deferredRoots.length;
     observer.stop();
     batcher.stop();
     cancelThrottle?.();
@@ -442,6 +471,7 @@ export function createDynamicPipeline(options: DynamicPipelineOptions): DynamicP
 
     discardPending() {
       if (!observer.connected) return;
+      counters.cancelledRoots += deferredRoots.length;
       observer.takeRecords();
       batcher.discard();
       cancelThrottle?.();

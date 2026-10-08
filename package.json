@@ -23,6 +23,7 @@
     "qualify:ai": "vitest run -c vitest.qualify.config.ts",
     "test:e2e": "pnpm build:e2e && playwright test",
     "test:realworld": "playwright test -c playwright.realworld.config.ts",
+    "test:burst": "playwright test -c playwright.realworld.config.ts realworld/m125/burst.spec.ts",
     "audit:dist": "node scripts/release/audit-dist.mjs",
     "scan:secrets": "node scripts/release/secret-scan.mjs",
     "knip:diff": "node scripts/release/knip-diff.mjs",

@@ -40,7 +40,10 @@ describe('StylesheetManager', () => {
 
     const style = document.getElementById('coloradapt-stylesheet');
     expect(style).toBeInstanceOf(HTMLStyleElement);
-    expect(style?.textContent).toContain('[data-coloradapt-id="ca-1"]');
+    expect(style?.textContent).toContain('[data-coloradapt-s~="color:#000000"]');
+    expect(
+      document.querySelector('[data-coloradapt-id="ca-1"]')?.getAttribute('data-coloradapt-s'),
+    ).toBe('color:#000000');
     expect(style?.textContent).toContain('color: #000000 !important');
   });
 
@@ -85,8 +88,13 @@ describe('StylesheetManager', () => {
 
     const styles = document.querySelectorAll('#coloradapt-stylesheet');
     expect(styles).toHaveLength(1);
-    expect(styles[0]?.textContent).toContain('ca-2');
-    expect(styles[0]?.textContent).not.toContain('ca-1');
+    expect(styles[0]?.textContent).toContain('color: #000000 !important');
+    expect(
+      document.querySelector('[data-coloradapt-id="ca-2"]')?.hasAttribute('data-coloradapt-s'),
+    ).toBe(true);
+    expect(
+      document.querySelector('[data-coloradapt-id="ca-1"]')?.hasAttribute('data-coloradapt-s'),
+    ).toBe(false);
   });
 
   it('reports a change as applied only when the computed color is the planned one', () => {
@@ -119,8 +127,11 @@ describe('StylesheetManager', () => {
     expect(result.applied.map((c) => c.elementId)).toEqual(['ca-1']);
     expect(result.notApplied.map((c) => c.elementId)).toEqual(['ghost']);
     const css = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-    expect(css).toContain('ca-1');
+    expect(css).toContain('color: #000000 !important');
     expect(css).not.toContain('ghost');
+    expect(
+      document.querySelector('[data-coloradapt-id="ca-1"]')?.hasAttribute('data-coloradapt-s'),
+    ).toBe(true);
   });
 
   it('withOriginalStyles restores the adapted stylesheet text exactly', () => {

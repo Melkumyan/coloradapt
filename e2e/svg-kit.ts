@@ -142,12 +142,23 @@ export async function pixelAt(page: Page, id: string, dx: number, dy: number): P
 
 /** Rules in the sheet, as `[target id, property, value]`. */
 export async function sheetRules(page: Page): Promise<Array<[string, string, string]>> {
-  const text = await sheetText(page);
-  return [
-    ...text.matchAll(
-      /\[data-coloradapt-id="([^"]+)"\]:not\(#coloradapt-specificity\) \{ ([a-z-]+): (#[0-9a-f]{6}) !important; \}/g,
-    ),
-  ].map((m) => [m[1]!, m[2]!, m[3]!]);
+  return page.evaluate(() => {
+    const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+    const declared = new Map<string, [string, string]>();
+    for (const m of text.matchAll(
+      /\[data-coloradapt-s~="([^"]+)"\]:not\(#coloradapt-specificity\) \{ ([a-z-]+): (#[0-9a-f]{6}) !important; \}/g,
+    )) {
+      declared.set(m[1]!, [m[2]!, m[3]!]);
+    }
+    const rules: Array<[string, string, string]> = [];
+    for (const el of document.querySelectorAll('[data-coloradapt-s]')) {
+      for (const token of (el.getAttribute('data-coloradapt-s') ?? '').split(' ')) {
+        const rule = declared.get(token);
+        if (rule) rules.push([el.getAttribute('data-coloradapt-id') ?? '', rule[0], rule[1]]);
+      }
+    }
+    return rules;
+  });
 }
 
 /** Every rule of the sheet is one of ours: a tagged target, one property, a hex color. */
@@ -156,7 +167,7 @@ export async function expectOnlyOwnRules(page: Page): Promise<void> {
   const lines = css.split('\n').filter(Boolean);
   for (const line of lines) {
     expect(line).toMatch(
-      /^\[data-coloradapt-id="[^"]+"\]:not\(#coloradapt-specificity\) \{ (color|fill|stroke): #[0-9a-f]{6} !important; \}$/,
+      /^\[data-coloradapt-s~="(color|fill|stroke):#[0-9a-f]{6}"\]:not\(#coloradapt-specificity\) \{ \1: #[0-9a-f]{6} !important; \}$/,
     );
   }
   expect(css).not.toContain('transition');

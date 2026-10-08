@@ -477,7 +477,10 @@ test.describe('R1-6. budget boundaries', () => {
     const firstDiag = await diag();
     void firstDiag;
     const delta = await natural();
-    expect(delta.incrementalPasses).toBe(2);
+    // M12.5: a pass is one slice, and a slice (600 elements) no longer holds two such roots: one root per pass.
+    // (Before M12.5 two shared a 1500-element pass and this was 2; what the test is about, no root cut and none
+    // lost, is unchanged.)
+    expect(delta.incrementalPasses).toBe(4);
     expect(delta.truncatedPasses).toBe(0); // no root was cut: the straddling one was retried whole
     expect(delta.rootsDeferred).toBeGreaterThanOrEqual(1);
     expect(delta.fullRescans).toBe(0);

@@ -247,9 +247,11 @@ Master switch off, site disabled, `normal`, strength 0 → no changes.
 
 ## Reversibility and idempotency
 
-- Output is one `<style id="coloradapt-stylesheet">` with
-  `[data-coloradapt-id="…"]:not(#coloradapt-specificity) { color: … !important }`;
-  no inline styles. Disabling removes the element → exact original.
+- Output is one `<style id="coloradapt-stylesheet">` with one rule per distinct declaration,
+  `[data-coloradapt-s~="color:#112233"]:not(#coloradapt-specificity) { color: #112233 !important }`
+  (M12.5; before it the rule targeted `[data-coloradapt-id="…"]`, one per element). An element is subject to a rule
+  when its `data-coloradapt-s` attribute lists the declaration; no inline styles. Disabling removes the
+  element and the attribute → exact original.
 - **The original page is always the source of truth.** Every analysis runs
   inside `StylesheetManager.withOriginalStyles()`, which swaps the stylesheet
   for a `transition: none` rule for the duration of the synchronous read and

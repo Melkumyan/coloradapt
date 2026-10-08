@@ -386,6 +386,32 @@ M10.R1 comparison tools (`compare.spec`, `classify.spec`, `ground-truth`, `inspe
 corpus in `docs/validation/`) and how to reproduce them are in `docs/REAL_WORLD_FINDINGS_CLOSEOUT.md`. Select
 specs by their full name (`compare.spec`, not `compare`, which also matches the slow `compare-builds.spec`).
 
+### Burst scalability (M12.5)
+
+How long ColorAdapt takes, per scheduled slice, to adapt thousands of elements added at once, in the real browsers. Run after
+`pnpm build` and `pnpm build:firefox`; not part of `pnpm verify`. Protocol, frozen budgets and results: `docs/m125/`.
+
+```sh
+pnpm test:burst                                   # Chrome and Firefox: the canonical 1k/5k/10k bursts, the corpus (A to I),
+                                                  # input delay, a 10 s mutation stream, cancellation, churn, repeated bursts
+RW_BROWSERS=chrome pnpm test:burst                # one browser (RW_BROWSERS=firefox for the other)
+M125_ONLY=canonical pnpm test:burst               # one group: canonical, corpus, input, stream, cancel, churn, repeat, hidden,
+                                                  # variance (10 repetitions of the canonical bursts), parity
+M125_SIZES=10000 M125_ONLY=canonical pnpm test:burst   # only the canonical 10,000-element gate
+
+# group parity: the same bursts through the unchanged M12 build, element by element (needs that build):
+git archive 36b9089 | tar -x -C ../baseline-src && (cd ../baseline-src && ln -s ../coloradapt/node_modules node_modules && pnpm exec wxt prepare && pnpm exec wxt build && pnpm exec wxt build -b firefox)
+M125_BASELINE_DIR=../baseline-src M125_ONLY=parity pnpm test:burst
+```
+
+The 10k gate is `canonical 10000`: a longest ColorAdapt slice (`maxSliceMs`, the pipeline's own counter, read from
+`GET_DYNAMIC_DIAGNOSTICS`) of at most 50 ms in Chrome and the time to idle at most 2 s. The numbers it is judged against are
+in `realworld/m125/budgets.ts`. A burst is inserted by the page in one task, so the Long Tasks API sees the page's own
+insertion and the browser's rendering of it as well; the slice counter is what is ColorAdapt's. Firefox has no Long Tasks
+API and is read by the same slice counter. Unit-level counterparts (`tests/features/dynamic/slices.test.ts`,
+`tests/core/adaptation/stylesheet-tokens.test.ts`) run in `pnpm test`: chunk-boundary parity at slice sizes 1 to 256 and on
+60 seeded pages, randomized boundaries, mutations between slices, cancellation, starvation and failure inside a slice.
+
 ## Debugging the analyzer on a real page
 
 Set `data-coloradapt-debug` on `<html>` (e.g. via devtools:

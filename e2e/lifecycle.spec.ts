@@ -96,7 +96,7 @@ test.describe('real browser: adaptation lifecycle', () => {
     const ids = await allIds(page);
     const pristine = await computedColors(page, ids);
     const pristineHtml = await page.evaluate(() =>
-      document.body.outerHTML.replace(/ data-coloradapt-id="[^"]*"/g, ''),
+      document.body.outerHTML.replace(/ data-coloradapt-(id|s)="[^"]*"/g, ''),
     );
 
     await configure({ visionProfile: 'deuteranopia' });
@@ -117,7 +117,7 @@ test.describe('real browser: adaptation lifecycle', () => {
     // Apart from the targeting attribute, the page DOM is untouched.
     expect(
       await page.evaluate(() =>
-        document.body.outerHTML.replace(/ data-coloradapt-id="[^"]*"/g, ''),
+        document.body.outerHTML.replace(/ data-coloradapt-(id|s)="[^"]*"/g, ''),
       ),
     ).toBe(pristineHtml);
   });

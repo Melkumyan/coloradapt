@@ -233,7 +233,8 @@ STOPPED -start-> IDLE -enqueue/request-> SCHEDULED -flush-> RUNNING -> IDLE
   | ------------------------------- | ------- | --------------------------------------------------------------------------------------------- |
   | `maxQueuedRecords`              | 5000    | More than 5000 queued records: queue dropped; next batch is one `queue-overflow` rescan       |
   | `maxAffectedRoots`              | 512     | More than 512 distinct roots: the batch becomes one `too-many-roots` rescan                   |
-  | `maxElements` (analyzer)        | 1500    | A root that does not fit is left whole for the next pass; one root alone over 1500 is cut     |
+  | `maxElements` (analyzer)        | 1500    | One root alone over 1500 is cut (the cap on what a region covers; unchanged by M12.5)         |
+  | `SLICE_BUDGET.maxElements`      | 600     | A root that does not fit in what is left of a slice is left whole for the next slice (M12.5)  |
   | `maxPassesPerFlush`             | 64      | Safety bound for a forced `flush()`                                                           |
   | `stylesheetRepairMinIntervalMs` | 500 ms  | Spacing between repairs of our `<style>` after the page deleted it (postponed, never dropped) |
 
@@ -296,6 +297,15 @@ plus rule counts. An element previously `notApplied` is retried whenever its
 region is re-analyzed, and an adapted element that a page later out-ranks (an
 inline `!important`) is re-verified against the browser and moves to
 `notApplied`.
+
+**Slices (M12.5).** A pass is a _slice_: one scheduled flush. Within the analysis cap above, how many roots share
+a slice is decided by the slice budget (`sliceElements`, with `sliceWeight` giving an inline SVG unit and an
+element the semantic layer will examine a larger share than a plain element, from measured per-unit costs); the
+first root of a slice is taken whole whatever its weight, so the budget changes the number of passes of a burst and
+never what is analyzed. The roots left over are `deferredRoots`, in order, ahead of anything that arrives later
+(no starvation), re-validated when their turn comes (`staleRoots` counts the ones that left the page meanwhile) and
+cancelled by `stop`, `discardPending` and a full refresh (`cancelledRoots`). Local counters: `slices`, `maxSliceMs`,
+`totalSliceMs`, `peakQueuedRecords`, `peakDeferredRoots`. See `docs/PERFORMANCE.md`, "Burst model".
 
 Budgets (`analyzeSubtrees`): the first root of a pass is always started and always
 finished, up to `maxElements`. **The clock never cuts a root short** (a forced style
@@ -455,7 +465,8 @@ Nothing is printed to the console.
   conflict list may lag. `IncrementalAdaptation.summary()` stays current.
 - A single root larger than `maxElements` (1500) is truncated, as a whole page
   already is; its tail stays unadapted until a restructure splits it (a full refresh
-  has the same cap).
+  has the same cap). M12.5 bounds the time of a slice, not this coverage: ten thousand elements under one
+  container, or as thousands of flat siblings (more than 512 regions: one full rescan), are adapted up to the cap.
 - **Theme switches on `<html>`/`<body>` are recognised by attribute name**
   (`/theme|color-?mode|color-?scheme|^data-mode$/`, plus `class`, `style`, `hidden`,
   `role`, `disabled`, `aria-disabled`). `data-theme`, `data-bs-theme`,

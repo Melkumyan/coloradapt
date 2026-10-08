@@ -5,6 +5,7 @@ import {
   CORE_ANALYZER_SELECTOR,
   ELEMENT_ID_ATTRIBUTE,
   NON_CANDIDATE_TAGS,
+  STYLE_TOKENS_ATTRIBUTE,
 } from './constants';
 import { readBorders, resolveColors } from './colors';
 import { classifyElementRole, classifyStructuralRole, isElementDisabled } from './roles';
@@ -27,6 +28,17 @@ export interface AnalyzeDocumentOptions {
   readonly root?: ParentNode;
   readonly maxElements?: number;
   readonly maxDurationMs?: number;
+  /**
+   * Slice budget of an incremental pass (M12.5): a root after the first starts only while the elements of this
+   * pass stay within it. Batching only: the first root is still taken whole (up to `maxElements`), so what is
+   * analyzed never depends on this value, only in how many passes.
+   */
+  readonly sliceElements?: number;
+  /**
+   * What an element weighs against `sliceElements` (default 1): the callers know which elements cost far more than
+   * their count says (an inline SVG unit, an element the semantic layer will examine). Batching only.
+   */
+  readonly sliceWeight?: (element: Element) => number;
   readonly now?: () => number;
   readonly getStyle?: (element: Element) => CSSStyleDeclaration;
   /**
@@ -69,6 +81,8 @@ function ensureElementId(element: Element): string {
   const id = nextElementId();
   assignedIds.set(element, id);
   element.setAttribute(ELEMENT_ID_ATTRIBUTE, id);
+  // A clone also carries the original's rule tokens; they are not this element's until the stylesheet says so.
+  element.removeAttribute(STYLE_TOKENS_ATTRIBUTE);
   return id;
 }
 
@@ -317,6 +331,13 @@ export function analyzeSubtrees(
 ): SubtreeAnalysis {
   const maxElements = options.maxElements ?? ANALYSIS_BUDGET.maxElements;
   const maxDurationMs = options.maxDurationMs ?? ANALYSIS_BUDGET.maxDurationMs;
+  const sliceElements = Math.min(options.sliceElements ?? maxElements, maxElements);
+  const weightOf = options.sliceWeight ?? (() => 1);
+  /** What this pass has taken so far, in slice units. */
+  let weightUsed = 0;
+  const used = () => weightUsed;
+  const weigh = (list: readonly Element[]) =>
+    list.reduce((sum, element) => sum + weightOf(element), 0);
   const now = options.now ?? (() => performance.now());
   const getStyle = options.getStyle ?? ((el: Element) => getComputedStyle(el));
 
@@ -332,10 +353,7 @@ export function analyzeSubtrees(
 
   for (const root of roots) {
     const first = rootsCompleted === 0;
-    if (
-      !first &&
-      (elements.length + svgs.length >= maxElements || now() - startedAt > maxDurationMs)
-    ) {
+    if (!first && (used() >= sliceElements || now() - startedAt > maxDurationMs)) {
       break;
     }
 
@@ -356,7 +374,7 @@ export function analyzeSubtrees(
         }
       }
       // Does not fit in what is left: it waits for a pass where it is the first root.
-      if (!first && elements.length + svgs.length + candidates.length > maxElements) break;
+      if (!first && used() + weigh(candidates) > sliceElements) break;
 
       let rootTruncated = false;
       for (const element of candidates) {
@@ -368,12 +386,16 @@ export function analyzeSubtrees(
         seen.add(element);
         candidatesInspected += 1;
         if (isSvgElement(element)) {
-          if (isInlineSvgUnit(element)) svgs.push(element);
+          if (isInlineSvgUnit(element)) {
+            svgs.push(element);
+            weightUsed += weightOf(element);
+          }
           continue;
         }
         const descriptor = describeElement(element, getStyle, backgroundCache);
         if (!descriptor) continue;
         elements.push(descriptor);
+        weightUsed += weightOf(element);
         nodes.set(descriptor.id, element);
       }
       if (rootTruncated) {

@@ -237,7 +237,7 @@ describe('M6 interplay with M3 recoloring', () => {
     expect(cueOf('#a')).toBe('after:2713');
     expect(cueOf('#b')).toBe('after:d7');
     // Both channels live in the one managed stylesheet.
-    expect(sheetText()).toContain('data-coloradapt-id');
+    expect(sheetText()).toContain('data-coloradapt-s');
     expect(sheetText()).toContain('data-coloradapt-cue');
   });
 

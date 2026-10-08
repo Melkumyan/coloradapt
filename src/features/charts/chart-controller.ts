@@ -435,7 +435,7 @@ export class ChartController {
       const seen = new Set<Element>();
       let budget = CHART_LIMITS.maxMarksPerPass;
       let consumed = 0;
-      this.#sheet.withOriginalStyles(() => {
+      const readRegions = () => {
         for (const svgs of regions) {
           // The first region is always finished (progress); later ones wait whole when the budget is gone.
           if (consumed > 0 && budget <= 0 && svgs.some((svg) => !seen.has(svg))) break;
@@ -447,7 +447,10 @@ export class ChartController {
           }
           consumed += 1;
         }
-      });
+      };
+      // M12.5: suspending the sheet restyles every tagged element, so it is done only when there is a chart to read.
+      if (regions.some((svgs) => svgs.length > 0)) this.#sheet.withOriginalStyles(readRegions);
+      else readRegions();
       for (const svg of handled) this.#processSafely(svg);
       this.#classifyCanvases(canvases);
       this.#syncWatch();

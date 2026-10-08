@@ -73,10 +73,27 @@ export function html(markup: string): void {
   document.body.innerHTML = markup;
 }
 
-/** Element ids that currently have a rule in the injected stylesheet, as written in its text. */
-export function sheetRuleIds(): string[] {
+/**
+ * One entry per (element, property) the injected stylesheet currently styles: the element carries the rule's token
+ * in `data-coloradapt-s` and the sheet has the rule for it (M12.5: one rule per distinct declaration).
+ */
+function sheetRules(): Array<{ id: string; property: string; value: string }> {
   const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-  return [...text.matchAll(/\[data-coloradapt-id="([^"]+)"\]:not/g)].map((match) => match[1]!);
+  const rules: Array<{ id: string; property: string; value: string }> = [];
+  for (const element of document.querySelectorAll('[data-coloradapt-s]')) {
+    const id = element.getAttribute('data-coloradapt-id') ?? '';
+    for (const token of (element.getAttribute('data-coloradapt-s') ?? '').split(' ')) {
+      if (!token || !text.includes(`[data-coloradapt-s~="${token}"]`)) continue;
+      const colon = token.indexOf(':');
+      rules.push({ id, property: token.slice(0, colon), value: token.slice(colon + 1) });
+    }
+  }
+  return rules;
+}
+
+/** Element ids that currently have a rule in the injected stylesheet. */
+export function sheetRuleIds(): string[] {
+  return sheetRules().map((rule) => rule.id);
 }
 
 /** Whether `element` currently has an adaptation rule. */

@@ -256,10 +256,11 @@ test.describe('M6 next to M3', () => {
     expect(now.m3b).toBe('after:d7');
     // M3 did recolor the conflicting one: the two channels are independent.
     const adapted = await page.evaluate(() => {
-      const id = document.getElementById('m3a')!.getAttribute('data-coloradapt-id');
-      return (document.getElementById('coloradapt-stylesheet')?.textContent ?? '').includes(
-        `data-coloradapt-id="${id}"`,
-      );
+      const tokens = document.getElementById('m3a')!.getAttribute('data-coloradapt-s') ?? '';
+      const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+      return tokens
+        .split(' ')
+        .some((t) => t !== '' && text.includes(`[data-coloradapt-s~="${t}"]`));
     });
     expect(adapted).toBe(true);
     expect((await diag()).rules).toBeGreaterThan(0);

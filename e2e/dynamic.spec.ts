@@ -94,20 +94,23 @@ function diffCounters(now: DynamicDiagnostics, before: DynamicDiagnostics): Dyna
 const rule = async (page: Page, id: string): Promise<boolean> =>
   page.evaluate((elementId) => {
     const el = document.getElementById(elementId);
-    const cid = el?.getAttribute('data-coloradapt-id');
+    const tokens = el?.getAttribute('data-coloradapt-s') ?? '';
     const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
-    return !!cid && text.includes(`[data-coloradapt-id="${cid}"]`);
+    return tokens.split(' ').some((t) => t !== '' && text.includes(`[data-coloradapt-s~="${t}"]`));
   }, id);
 
+/** Rules in force: one per (element, declaration), since the sheet shares a rule between elements (M12.5). */
 const ruleTotal = (page: Page): Promise<number> =>
-  page.evaluate(
-    () =>
-      (
-        (document.getElementById('coloradapt-stylesheet')?.textContent ?? '').match(
-          /\[data-coloradapt-id="[^"]+"\]/g,
-        ) ?? []
-      ).length,
-  );
+  page.evaluate(() => {
+    const text = document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+    let total = 0;
+    for (const el of document.querySelectorAll('[data-coloradapt-s]')) {
+      for (const t of (el.getAttribute('data-coloradapt-s') ?? '').split(' ')) {
+        if (t !== '' && text.includes(`[data-coloradapt-s~="${t}"]`)) total += 1;
+      }
+    }
+    return total;
+  });
 
 const duplicateIds = (page: Page): Promise<number> =>
   page.evaluate(() => {

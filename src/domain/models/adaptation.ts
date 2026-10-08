@@ -105,8 +105,10 @@ export interface AdaptationMetrics {
 
 /**
  * A single reversible style change for one element, expressed as plain data
- * so it can be applied by an infrastructure layer (a stylesheet rule
- * targeting `[data-coloradapt-id="..."]`) without the core ever writing CSS.
+ * so it can be applied by an infrastructure layer (the element is subject to a
+ * stylesheet rule for this declaration, named in its `data-coloradapt-s` attribute;
+ * the rule is shared by every element with the same declaration) without the core
+ * ever writing CSS.
  */
 export interface AdaptationChange {
   readonly elementId: string;

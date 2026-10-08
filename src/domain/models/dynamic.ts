@@ -76,4 +76,18 @@ export interface DynamicDiagnostics {
   readonly images: ImageDiagnostics;
   /** Full rescans' counterpart for semantics: elements re-examined by external invalidation (form events). */
   readonly semanticInvalidations: number;
+  /** Passes (slices of work, one per scheduled flush) that had any work; local counters, never sent anywhere. */
+  readonly slices: number;
+  /** Longest single slice, milliseconds of the injected clock (M12.5 budget gate). */
+  readonly maxSliceMs: number;
+  /** Total time spent in slices, milliseconds. */
+  readonly totalSliceMs: number;
+  /** Most mutation records ever queued at once. */
+  readonly peakQueuedRecords: number;
+  /** Most roots ever deferred to a later slice at once. */
+  readonly peakDeferredRoots: number;
+  /** Regions that had left the page when their turn came: dropped without work. */
+  readonly staleRoots: number;
+  /** Regions still waiting for a slice when the pipeline was stopped or superseded by a full refresh. */
+  readonly cancelledRoots: number;
 }

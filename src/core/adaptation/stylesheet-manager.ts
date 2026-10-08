@@ -1,9 +1,17 @@
 import type { AdaptationChange } from '@domain/models';
-import { ELEMENT_ID_ATTRIBUTE } from '@core/analysis';
+import { ELEMENT_ID_ATTRIBUTE, STYLE_TOKENS_ATTRIBUTE, getOwnedElementId } from '@core/analysis';
 import { parseColor } from '@core/color';
 import { verifySvgPaints } from '@core/svg';
 
 export const STYLE_ELEMENT_ID = 'coloradapt-stylesheet';
+
+/**
+ * The transient `<style>` of a delta commit (M12.5): present for one synchronous style flush, never left in the
+ * document. It suppresses transitions only on the elements marked with {@link SUPPRESS_ATTRIBUTE}.
+ */
+export const SUPPRESS_ELEMENT_ID = 'coloradapt-suppress';
+const SUPPRESS_ATTRIBUTE = 'data-coloradapt-t';
+const SUPPRESS_MARKED = `[${SUPPRESS_ATTRIBUTE}] { transition: none !important; }`;
 
 /**
  * Tolerance when comparing the browser's computed color with the planned one.
@@ -27,6 +35,27 @@ const SPECIFICITY_BUMP = ':not(#coloradapt-specificity)';
  */
 const SUPPRESS_TRANSITIONS = `[${ELEMENT_ID_ATTRIBUTE}] { transition: none !important; }`;
 
+/**
+ * What forces the suspension of the sheet for a read. The attributes the sheet (or a layer that writes into it) styles
+ * through: an element that has none of them, below or above it, is not touched by the sheet. And the id attribute: an
+ * element that was analyzed before may have a page transition in flight, which the suspension stops (it reports the
+ * value the transition is heading for, never a mid-flight one); only a region of fresh elements, below fresh
+ * ancestors, can be read as it is.
+ */
+const STYLED_SELECTOR = [
+  ELEMENT_ID_ATTRIBUTE,
+  STYLE_TOKENS_ATTRIBUTE,
+  'data-coloradapt-cue',
+  'data-coloradapt-chart-mark',
+  'data-coloradapt-chart-legend',
+  'data-coloradapt-chart-owned',
+  'data-coloradapt-chart-owner',
+  'data-coloradapt-chart-node',
+  'data-coloradapt-image',
+]
+  .map((name) => `[${name}]`)
+  .join(',');
+
 function escapeAttributeValue(value: string): string {
   return value.replace(/["\\]/g, '\\$&');
 }
@@ -36,16 +65,41 @@ export function ruleKey(change: AdaptationChange): string {
   return `${change.elementId}\u0000${change.property}`;
 }
 
-function selectorFor(change: AdaptationChange): string {
-  return `[${ELEMENT_ID_ATTRIBUTE}="${escapeAttributeValue(change.elementId)}"]${SPECIFICITY_BUMP}`;
+/**
+ * The sheet's unit of emission (M12.5): one declaration, shared by every element that gets it. The token is a
+ * pure function of the declaration (never of arrival order), so the same page yields the same sheet however
+ * its elements were processed. Whitespace is dropped because the attribute is a space-separated list.
+ */
+function tokenFor(change: AdaptationChange): string {
+  return `${change.property}:${change.adaptedValue.replace(/\s+/g, '')}`;
 }
 
-function buildRule(change: AdaptationChange): string {
-  return `${selectorFor(change)} { ${change.property}: ${change.adaptedValue} !important; }`;
+function selectorForToken(token: string): string {
+  return `[${STYLE_TOKENS_ATTRIBUTE}~="${escapeAttributeValue(token)}"]${SPECIFICITY_BUMP}`;
 }
 
-function buildCss(changes: readonly AdaptationChange[]): string {
-  return changes.map(buildRule).join('\n');
+interface Declaration {
+  readonly property: string;
+  readonly value: string;
+  /** Rules (elements) currently subject to it. */
+  uses: number;
+}
+
+/** One rule per distinct declaration in use, in token order. */
+function buildCss(declarations: ReadonlyMap<string, Declaration>): string {
+  return [...declarations.keys()]
+    .sort()
+    .map((token) => {
+      const { property, value } = declarations.get(token)!;
+      return `${selectorForToken(token)} { ${property}: ${value} !important; }`;
+    })
+    .join('\n');
+}
+
+/** A region a read looks at: the element, and everything below it when the scope is a subtree. */
+export interface SuspensionScope {
+  readonly element: Element;
+  readonly scope: 'subtree' | 'self';
 }
 
 export interface RuleDelta {
@@ -94,6 +148,14 @@ export interface ApplyResult {
  * several elements (its `<svg>` and some shapes) but share an *owner*: they are
  * replaced, verified and dropped as one group. The sheet text is regenerated
  * from the map only when the delta changes something.
+ *
+ * The sheet has one rule per distinct *declaration* (M12.5), not per element: an element
+ * names the declarations it is subject to in `data-coloradapt-s`. Browsers do not index
+ * attribute-value selectors, so one rule per element made every style recalculation cost
+ * (tagged elements x rules). Adding elements to existing declarations therefore writes only
+ * attributes (transitions suppressed for just those elements, `#commitElements`); the sheet text
+ * is rewritten only when a declaration appears or goes. The attribute is taken off every element
+ * on `restore()` and on a full `apply()`, including nodes the page removed meanwhile.
  */
 export class StylesheetManager {
   #doc: Document;
@@ -102,6 +164,16 @@ export class StylesheetManager {
   #rules = new Map<string, AdaptationChange>();
   /** Rule keys by element id *and* by owner id: one lookup finds everything an id owns. */
   #index = new Map<string, Set<string>>();
+  /** The declarations the sheet emits, by token (one rule each, however many elements share it). */
+  #declarations = new Map<string, Declaration>();
+  /** Each element's tokens by property: what its {@link STYLE_TOKENS_ATTRIBUTE} must say. */
+  #tokensOf = new Map<string, Map<string, string>>();
+  /** Elements whose attribute is not yet in line with `#tokensOf`. */
+  #dirty = new Set<string>();
+  /** Where an element with tokens was last seen: weak, so a removed element is never kept alive by it. */
+  #seen = new Map<string, WeakRef<Element>>();
+  /** All tagged elements by id, collected at most once per operation and dropped at its end. */
+  #sweep: Map<string, Element> | null = null;
   /**
    * Static CSS of the semantic cues (M6): a pure function of the cue kinds currently in use,
    * keyed on an attribute, so it never needs per-element rules. `null`: no cue on the page.
@@ -124,14 +196,21 @@ export class StylesheetManager {
       return { applied: [], notApplied: [] };
     }
 
-    this.#clearRules();
-    for (const change of changes) this.#setRule(change);
-    const styleElement = this.#ensureStyleElement();
-    this.#commit(styleElement, this.#css());
+    try {
+      // A full apply replaces everything, tokens left by an earlier script instance included.
+      this.#stripAttributes();
+      this.#clearRules();
+      for (const change of changes) this.#setRule(change);
+      const styleElement = this.#ensureStyleElement();
+      this.#syncAttributes();
+      this.#commit(styleElement, this.#css());
 
-    const { applied, notApplied } = this.#verify(changes);
-    this.#dropUnapplied(notApplied, styleElement);
-    return { applied, notApplied };
+      const { applied, notApplied } = this.#verify(changes);
+      this.#dropUnapplied(notApplied, styleElement);
+      return { applied, notApplied };
+    } finally {
+      this.#sweep = null;
+    }
   }
 
   /**
@@ -141,6 +220,14 @@ export class StylesheetManager {
    * against the browser, so a page that has since out-ranked it is noticed.
    */
   applyDelta(delta: RuleDelta, nodes?: ReadonlyMap<string, Element>): DeltaApplyResult {
+    try {
+      return this.#applyDelta(delta, nodes);
+    } finally {
+      this.#sweep = null;
+    }
+  }
+
+  #applyDelta(delta: RuleDelta, nodes?: ReadonlyMap<string, Element>): DeltaApplyResult {
     let removed = 0;
     let pruned = 0;
     let dirty = false;
@@ -188,12 +275,17 @@ export class StylesheetManager {
     // Content changed, or the page deleted our <style> out from under us.
     const wasAttached = this.#styleElement?.isConnected === true;
     const styleElement = this.#ensureStyleElement();
+    const changed = this.#syncAttributes(nodes);
     if (dirty || !wasAttached) {
-      this.#commit(styleElement, this.#css());
+      const css = this.#css();
+      // Same declarations as the sheet already holds (the elements merely joined or left a rule): the sheet text
+      // is not rewritten, because any rewrite restyles every tagged element however little changed.
+      if (wasAttached && styleElement.textContent === css) this.#commitElements(changed);
+      else this.#commit(styleElement, css);
     }
 
     const { applied, notApplied } = this.#verify(delta.upsert, nodes);
-    removed += this.#dropUnapplied(notApplied, styleElement);
+    removed += this.#dropUnapplied(notApplied, styleElement, nodes);
     return { applied, notApplied, added, updated, removed, pruned };
   }
 
@@ -287,7 +379,7 @@ export class StylesheetManager {
   }
 
   #css(): string {
-    return [buildCss([...this.#rules.values()]), this.#cueCss, this.#chartCss]
+    return [buildCss(this.#declarations), this.#cueCss, this.#chartCss]
       .filter((part): part is string => part !== null && part !== '')
       .join('\n');
   }
@@ -326,15 +418,107 @@ export class StylesheetManager {
   }
 
   /** Removes the rules the browser did not honor (whole owner groups); returns how many existed. */
-  #dropUnapplied(notApplied: readonly AdaptationChange[], styleElement: HTMLStyleElement): number {
+  #dropUnapplied(
+    notApplied: readonly AdaptationChange[],
+    styleElement: HTMLStyleElement,
+    nodes?: ReadonlyMap<string, Element>,
+  ): number {
     if (notApplied.length === 0) return 0;
     let dropped = 0;
     for (const change of notApplied) {
       dropped += this.#deleteRulesOf(change.ownerId ?? change.elementId);
     }
     if (this.#isEmpty()) this.restore();
-    else this.#commit(styleElement, this.#css());
+    else {
+      this.#syncAttributes(nodes);
+      this.#commit(styleElement, this.#css());
+    }
     return dropped;
+  }
+
+  /**
+   * Commits elements whose token attribute changed while the sheet text stays as it is. Transitions are
+   * suppressed exactly where this flush can change a computed value, the elements and the tagged elements below
+   * them (which inherit), by a marker attribute and a transient `<style>`; both are gone before the task ends.
+   * The cost follows the elements, not the page.
+   */
+  #commitElements(changed: readonly Element[]): void {
+    if (changed.length === 0) return;
+    const marked = new Set<Element>();
+    for (const element of changed) {
+      marked.add(element);
+      if (element.firstElementChild === null) continue;
+      for (const below of element.querySelectorAll(`[${ELEMENT_ID_ATTRIBUTE}]`)) marked.add(below);
+    }
+    for (const element of marked) element.setAttribute(SUPPRESS_ATTRIBUTE, '');
+    const suppress = this.#doc.createElement('style');
+    suppress.id = SUPPRESS_ELEMENT_ID;
+    suppress.textContent = SUPPRESS_MARKED;
+    (this.#doc.head ?? this.#doc.documentElement).appendChild(suppress);
+    try {
+      this.#flushStyle();
+    } finally {
+      suppress.remove();
+      for (const element of marked) element.removeAttribute(SUPPRESS_ATTRIBUTE);
+    }
+  }
+
+  /**
+   * Brings every changed element's {@link STYLE_TOKENS_ATTRIBUTE} in line with its rules. An element that is
+   * gone is skipped (nothing to style); the attribute is written only when its value differs. Returns the live
+   * elements whose attribute changed.
+   */
+  #syncAttributes(nodes?: ReadonlyMap<string, Element>): Element[] {
+    const changed: Element[] = [];
+    for (const id of this.#dirty) {
+      const tokens = this.#tokensOf.get(id);
+      if (!tokens || tokens.size === 0) {
+        // An element that left the page is cleaned too: the page may put the same node back.
+        const gone = this.#nodeFor(id, nodes?.get(id), true);
+        this.#seen.delete(id);
+        if (gone?.hasAttribute(STYLE_TOKENS_ATTRIBUTE)) {
+          gone.removeAttribute(STYLE_TOKENS_ATTRIBUTE);
+          if (gone.isConnected) changed.push(gone);
+        }
+        continue;
+      }
+      const node = this.#nodeFor(id, nodes?.get(id));
+      if (!node) continue;
+      this.#seen.set(id, new WeakRef(node));
+      const value = [...tokens.values()].sort().join(' ');
+      if (node.getAttribute(STYLE_TOKENS_ATTRIBUTE) !== value) {
+        node.setAttribute(STYLE_TOKENS_ATTRIBUTE, value);
+        changed.push(node);
+      }
+    }
+    this.#dirty.clear();
+    return changed;
+  }
+
+  /**
+   * The live element behind an id: the one the caller holds, the one last seen, or, only when neither is
+   * known, a single document-wide collection per operation (never one lookup per id).
+   */
+  #nodeFor(id: string, known?: Element, detached = false): Element | null {
+    if (known?.isConnected) return known;
+    const seen = this.#seen.get(id);
+    if (seen) {
+      const node = seen.deref();
+      return node && (detached || node.isConnected) ? node : null;
+    }
+    if (!this.#sweep) {
+      this.#sweep = new Map();
+      for (const node of this.#doc.querySelectorAll(`[${ELEMENT_ID_ATTRIBUTE}]`)) {
+        const owned = getOwnedElementId(node);
+        if (owned) this.#sweep.set(owned, node);
+        else {
+          // Not handed out by the analyzer (a clone's stale copy, or a hand-tagged element): only if nothing owns the id.
+          const raw = node.getAttribute(ELEMENT_ID_ATTRIBUTE) ?? '';
+          if (!this.#sweep.has(raw)) this.#sweep.set(raw, node);
+        }
+      }
+    }
+    return this.#sweep.get(id) ?? null;
   }
 
   /**
@@ -347,9 +531,12 @@ export class StylesheetManager {
    * `getComputedStyle` report a mid-flight (adapted) value; the adaptation
    * is put back with the same suppression, so it does not fade in again.
    */
-  withOriginalStyles<T>(read: () => T): T {
+  withOriginalStyles<T>(read: () => T, scope?: readonly SuspensionScope[]): T {
     const styleElement = this.#styleElement;
     if (!styleElement || !styleElement.isConnected) return read();
+    // M12.5: swapping the sheet restyles every tagged element (cost grows with the page, not with the work), so a
+    // read that provably cannot see the sheet does not swap it.
+    if (scope && !this.#mayBeStyled(scope)) return read();
 
     const adaptedCss = styleElement.textContent;
     styleElement.textContent = SUPPRESS_TRANSITIONS;
@@ -388,8 +575,40 @@ export class StylesheetManager {
     }
   }
 
+  /**
+   * Whether the sheet can influence what a read of `scope` sees: an element of the region, or one of its ancestors
+   * (which it inherits from), carries a styling attribute, or the region sits in an inline SVG (read as a unit).
+   */
+  #mayBeStyled(scope: readonly SuspensionScope[]): boolean {
+    for (const { element, scope: extent } of scope) {
+      if (!element.isConnected) continue;
+      if (element.closest('svg') !== null) return true;
+      for (let node: Element | null = element; node; node = node.parentElement) {
+        if (node.matches(STYLED_SELECTOR)) return true;
+      }
+      if (extent === 'subtree' && element.querySelector(STYLED_SELECTOR) !== null) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Takes {@link STYLE_TOKENS_ATTRIBUTE} off every element: the ones in the document, and the ones the page has taken
+   * out meanwhile (it may put the same node back).
+   */
+  #stripAttributes(): void {
+    this.#dirty.clear();
+    this.#sweep = null;
+    for (const ref of this.#seen.values()) ref.deref()?.removeAttribute(STYLE_TOKENS_ATTRIBUTE);
+    this.#seen.clear();
+    for (const node of this.#doc.querySelectorAll(`[${STYLE_TOKENS_ATTRIBUTE}]`)) {
+      node.removeAttribute(STYLE_TOKENS_ATTRIBUTE);
+    }
+  }
+
   restore(): void {
     this.#clearRules();
+    // The tokens leave with the rules; the page's elements are as they were (but for their id).
+    this.#stripAttributes();
     this.#cueCss = null;
     this.#chartCss = null;
     const styleElement = this.#styleElement;
@@ -417,7 +636,7 @@ export class StylesheetManager {
 
   #isApplied(change: AdaptationChange, known?: Element): boolean {
     const view = this.#doc.defaultView;
-    const node = known?.isConnected ? known : this.#doc.querySelector(selectorFor(change));
+    const node = this.#nodeFor(change.elementId, known);
     if (!view || !node) return false;
 
     const computed = parseColor(view.getComputedStyle(node).getPropertyValue(change.property));
@@ -445,9 +664,7 @@ export class StylesheetManager {
     const view = this.#doc.defaultView;
     const first = group[0];
     if (!view || !first) return false;
-    const owner =
-      nodes?.get(ownerId) ??
-      this.#doc.querySelector(`[${ELEMENT_ID_ATTRIBUTE}="${escapeAttributeValue(ownerId)}"]`);
+    const owner = this.#nodeFor(ownerId, nodes?.get(ownerId));
     const planned = parseColor(first.adaptedValue);
     if (!owner || !planned) return false;
     return verifySvgPaints(owner, planned, (element) => view.getComputedStyle(element));
@@ -462,6 +679,20 @@ export class StylesheetManager {
       keys.add(key);
       this.#index.set(id, keys);
     }
+    const token = tokenFor(change);
+    const declaration = this.#declarations.get(token);
+    if (declaration) declaration.uses += 1;
+    else {
+      this.#declarations.set(token, {
+        property: change.property,
+        value: change.adaptedValue,
+        uses: 1,
+      });
+    }
+    const tokens = this.#tokensOf.get(change.elementId) ?? new Map<string, string>();
+    tokens.set(change.property, token);
+    this.#tokensOf.set(change.elementId, tokens);
+    this.#dirty.add(change.elementId);
   }
 
   #deleteRule(key: string): boolean {
@@ -473,6 +704,13 @@ export class StylesheetManager {
       keys?.delete(key);
       if (keys?.size === 0) this.#index.delete(id);
     }
+    const token = tokenFor(change);
+    const declaration = this.#declarations.get(token);
+    if (declaration && (declaration.uses -= 1) <= 0) this.#declarations.delete(token);
+    const tokens = this.#tokensOf.get(change.elementId);
+    tokens?.delete(change.property);
+    if (tokens?.size === 0) this.#tokensOf.delete(change.elementId);
+    this.#dirty.add(change.elementId);
     return true;
   }
 
@@ -486,6 +724,8 @@ export class StylesheetManager {
   #clearRules(): void {
     this.#rules.clear();
     this.#index.clear();
+    this.#declarations.clear();
+    this.#tokensOf.clear();
   }
 
   #ensureStyleElement(): HTMLStyleElement {

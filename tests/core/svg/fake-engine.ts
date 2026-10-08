@@ -94,16 +94,19 @@ export function createFakeEngine(
   let probes = 0;
   let nextId = 0;
 
-  /** Rules of ColorAdapt's own sheet that target `element` (`[data-coloradapt-id="x"] { prop: value !important }`). */
+  /**
+   * Rules of ColorAdapt's own sheet that target `element`: one rule per declaration
+   * (`[data-coloradapt-s~="token"] { prop: value !important }`), matched through the element's token list.
+   */
   function sheetDeclarations(element: Element): Record<string, string> {
-    const id = element.getAttribute('data-coloradapt-id');
+    const tokens = new Set((element.getAttribute('data-coloradapt-s') ?? '').split(' '));
     const text = doc.getElementById('coloradapt-stylesheet')?.textContent ?? '';
     const out: Record<string, string> = {};
-    if (!id) return out;
+    if (tokens.size === 0) return out;
     for (const m of text.matchAll(
-      /\[data-coloradapt-id="([^"]+)"\][^{]*\{\s*([a-z-]+):\s*([^;!]+?)\s*!important;/g,
+      /\[data-coloradapt-s~="([^"]+)"\][^{]*\{\s*([a-z-]+):\s*([^;!]+?)\s*!important;/g,
     )) {
-      if (m[1] === id) out[m[2]!] = m[3]!;
+      if (tokens.has(m[1]!)) out[m[2]!] = m[3]!;
     }
     return out;
   }

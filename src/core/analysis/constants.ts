@@ -2,6 +2,13 @@
 export const ELEMENT_ID_ATTRIBUTE = 'data-coloradapt-id';
 
 /**
+ * Attribute that names the rules of the injected stylesheet an element is subject to (M12.5): a space-separated
+ * list of rule tokens, one per adapted property. The stylesheet has one rule per distinct (property, value), not
+ * one per element, because the browser does not index attribute-value selectors (docs/PERFORMANCE.md).
+ */
+export const STYLE_TOKENS_ATTRIBUTE = 'data-coloradapt-s';
+
+/**
  * The selector up to and including M10: interactive and content-bearing elements, status and badge
  * classes. Kept as its own export because the real-world harness replays the pre-M10.R1 audit decision
  * with it (`features/audit/trace.ts`).

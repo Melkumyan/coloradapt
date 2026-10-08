@@ -161,6 +161,84 @@ describe('analyzeSubtrees', () => {
   });
 });
 
+describe('analyzeSubtrees: the slice budget (M12.5)', () => {
+  const group = (id: string, rows: number) =>
+    `<div id="${id}">${`<p style="${STYLE}">x</p>`.repeat(rows)}</div>`;
+  const rootsOf = (...ids: string[]) =>
+    ids.map((id) => ({ element: byId(id), scope: 'subtree' as const }));
+
+  it('sliceElements decides how many regions share a pass, never what is analyzed', () => {
+    document.body.innerHTML = ['a', 'b', 'c', 'd'].map((id) => group(id, 4)).join('');
+    const roots = rootsOf('a', 'b', 'c', 'd');
+
+    const whole = analyzeSubtrees(roots, opts);
+    expect(whole.rootsCompleted).toBe(4);
+
+    // slices of 8: two regions per pass, the same sixteen elements in two passes
+    const first = analyzeSubtrees(roots, { ...opts, sliceElements: 8 });
+    const second = analyzeSubtrees(roots.slice(first.rootsCompleted), {
+      ...opts,
+      sliceElements: 8,
+    });
+    expect([first.rootsCompleted, second.rootsCompleted]).toEqual([2, 2]);
+    const ids = (pass: ReturnType<typeof analyzeSubtrees>) =>
+      [...pass.nodes.values()].map((n) => n.id);
+    expect(new Set([...ids(first), ...ids(second)])).toEqual(new Set(ids(whole)));
+    expect(first.truncated || second.truncated).toBe(false);
+  });
+
+  it('the first region is taken whole whatever the slice budget (the analysis cap is what cuts)', () => {
+    document.body.innerHTML = group('big', 12);
+    const result = analyzeSubtrees(rootsOf('big'), { ...opts, sliceElements: 1 });
+    expect(result.rootsCompleted).toBe(1);
+    expect(result.truncated).toBe(false);
+    expect(result.elements).toHaveLength(12);
+  });
+
+  it('the slice budget is capped by the analysis cap', () => {
+    document.body.innerHTML = ['a', 'b'].map((id) => group(id, 3)).join('');
+    const result = analyzeSubtrees(rootsOf('a', 'b'), {
+      ...opts,
+      maxElements: 4,
+      sliceElements: 1000,
+    });
+    expect(result.rootsCompleted).toBe(1); // 3 + 3 > 4
+  });
+
+  it('a weight makes an element count for more: three heavy elements fill a slice of 30', () => {
+    document.body.innerHTML = ['a', 'b', 'c'].map((id) => group(id, 3)).join('');
+    const roots = rootsOf('a', 'b', 'c');
+    const heavy = { ...opts, sliceElements: 30, sliceWeight: () => 10 };
+    // a = 3 x 10 = 30 fills the slice; b would have to fit on top of it
+    expect(analyzeSubtrees(roots, heavy).rootsCompleted).toBe(1);
+    // the same slice with plain weights holds all three
+    expect(analyzeSubtrees(roots, { ...opts, sliceElements: 30 }).rootsCompleted).toBe(3);
+  });
+
+  it('weights change only the number of passes: every region is analyzed once, in order', () => {
+    document.body.innerHTML = ['a', 'b', 'c'].map((id) => group(id, 3)).join('');
+    const roots = rootsOf('a', 'b', 'c');
+    const run = (options: Parameters<typeof analyzeSubtrees>[1]) => {
+      const analyzed: string[] = [];
+      let rest = roots;
+      let passes = 0;
+      while (rest.length > 0) {
+        const pass = analyzeSubtrees(rest, options);
+        analyzed.push(...[...pass.nodes.values()].map((node) => node.id));
+        rest = rest.slice(Math.max(1, pass.rootsCompleted));
+        passes += 1;
+      }
+      return { passes, analyzed };
+    };
+    const heavy = run({ ...opts, sliceElements: 30, sliceWeight: () => 10 });
+    const plain = run({ ...opts, sliceElements: 30 });
+    expect(heavy.passes).toBe(3);
+    expect(plain.passes).toBe(1);
+    expect(heavy.analyzed).toHaveLength(9);
+    expect(new Set(heavy.analyzed)).toEqual(new Set(plain.analyzed));
+  });
+});
+
 describe('stable element ids', () => {
   it('keeps an element id across re-analysis', () => {
     document.body.innerHTML = `<p id="p" style="${STYLE}">x</p>`;

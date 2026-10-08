@@ -74,6 +74,18 @@ structural; none changes what is computed, only how it is batched or escalated:
 (`ANALYSIS_BUDGET.mutationDebounceMs` from M0 was removed: nothing is debounced by time;
 batching is per animation frame.)
 
+Slice budget (M12.5), `SLICE_BUDGET` in the same file. They decide how many regions share one scheduled flush
+(a slice) and change neither what is analyzed nor the final state:
+
+| Budget           | Default | Meaning                                                                                                |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `maxElements`    | 600     | Slice units a slice may hold once its first region (always taken whole) is in; a later region must fit |
+| `svgWeight`      | 12 + 3  | Units of an inline SVG unit: `12 + 3 x descendants` (at most 60 counted); its analysis costs far more  |
+| `semanticWeight` | 5       | Units of an element the semantic layer will examine                                                    |
+| `maxStartMs`     | 10 ms   | A further region is started only while the slice has used less than this of the analysis clock         |
+
+(The E2E build runs the analyzer on a logical clock, so `maxStartMs` never splits a batch there.)
+
 The incremental-analysis hook anticipated here turned out to be different from
 "skip tagged elements": ids are only identity; what bounds the work is _which
 regions_ are analyzed. `analyzeSubtrees` takes explicit roots. The element budget
@@ -89,13 +101,85 @@ The benchmark (`tests/benchmarks/dynamic-benchmark.test.ts`, report in
 inserts = 1 pass; 1000 inserts = 1 full rescan; 1 insert into a 1000-row page = 1 element
 analyzed. Wall-clock is recorded for information and never asserted.
 
-### Known limit: thousands of adaptable elements added at once (M12)
+### Burst model (M12.5): thousands of adaptable elements added at once
 
-The budgets above are structural (elements per pass, regions per batch) and bound the _work_ of a pass, not the _time_
-it takes. The time of one pass also grows with the rules already in the stylesheet, because the browser matches the
-attribute-value selectors of the engine (one rule per adapted element) against every tagged element on each style
-recalculation. M12 measured it in Chrome 154 on a page that adds new adaptable elements in one task (300-element page,
-a third of the new elements needing a rule):
+M12 registered a limit: 1,000 adaptable elements added at once cost a longest task of about 100 ms, 10,000 cost about
+3.9 s and took 15 to 28 s to settle. M12.5 closed it (`docs/m125/protocol.md`, `docs/m125/report.md`).
+
+**Why it was slow (measured).** A CPU profile of the burst put the time in forced style recalculation, not in
+analysis. Chrome does not index attribute-value selectors, and the sheet had one `[data-coloradapt-id="x"]` rule per
+adapted element, so every recalculation matched every tagged element against every rule: cost = tagged elements x
+rules (a micro-benchmark with 10,000 tagged elements and 3,500 rules: 410 ms per recalculation, against 7 ms for id
+selectors and 17 ms for 20 grouped attribute rules). A pass also wrote the sheet several times, so a pass cost several
+of those, and a pass grew with the page.
+
+**What changed.**
+
+- **One rule per declaration.** The sheet has one rule per distinct (property, value),
+  `[data-coloradapt-s~="color:#112233"]:not(#coloradapt-specificity) { color: #112233 !important; }`, and an element names
+  its declarations in `data-coloradapt-s`. A page has tens of rules, not thousands. The logical model (a rule per element
+  and property, owners, verification) and the specificity and `!important` policy are unchanged.
+- **Delta commits do not rewrite the sheet.** Adding elements to existing declarations writes attributes only, with
+  transitions suppressed for just those elements (and the tagged elements below them) by a marker attribute and a transient
+  `<style>` that are gone before the task ends. A new or removed declaration still rewrites the sheet.
+- **No suspension for a read that cannot see the sheet.** The analysis reads a region with the sheet suspended only if the
+  region, its subtree or its ancestors carry a styling attribute or were analyzed before (a transition may be in flight);
+  a region of fresh elements is read as it is. The chart layer no longer suspends the sheet when there is no `<svg>`.
+- **Slices.** One scheduled flush (one animation frame while the page is visible, a zero timeout otherwise) is a
+  _slice_: the regions that fit `SLICE_BUDGET`. Slice units: an element is 1, an inline SVG `12 + 3 x descendants`, an element
+  the semantic layer will examine 5; at most 600 units after the first region, which is always taken whole; a further region
+  starts only within 10 ms of analysis clock. The rest is the ordered work queue (`deferredRoots`), worked off in later
+  frames, ahead of anything newer (no starvation), re-validated when its turn comes and cancelled by `stop`, a full refresh
+  and OFF. The budget decides how many regions share a slice, never what is analyzed: the analysis caps (1,500 candidates per
+  region or per full rescan, 512 regions, 5,000 records) are unchanged.
+
+**Result** (Chrome 154, Firefox 151; hosts of 100 text elements added to a 300-element page in one task, the same fixture
+through the unchanged M12 build and through M12.5; `realworld/m125/burst.spec.ts`; median of 5 runs, `maxSliceMs` is the
+pipeline's own counter for the longest slice):
+
+| Elements added | M12: longest page task | M12: time to idle | M12.5: longest ColorAdapt slice | M12.5: longest page task | M12.5: time to idle |
+| -------------- | ---------------------- | ----------------- | ------------------------------- | ------------------------ | ------------------- |
+| 1,000          | 92 ms                  | 0.20 s            | 22 ms                           | none over 50 ms          | 0.19 s              |
+| 5,000          | 996 ms                 | 4.2 s             | 21 ms                           | none over 50 ms          | 0.24 s              |
+| 10,000         | 3,185 ms               | 15.2 s            | 21 ms                           | 56 to 59 ms (1 task)     | 0.42 s              |
+
+Firefox 151 (no Long Tasks report; the same slice counter): 10,000 elements settle in 1.2 s with a longest slice of 34 ms
+(M12 build: 15 s); 1,000 and 5,000 in 0.33 s and 0.6 s with 25 and 31 ms. The 56 to 59 ms task in Chrome is the browser
+rendering ten thousand new nodes together with a slice (the same page with the extension off has none above 50 ms);
+the frozen gates are 50 ms for a slice and 100 ms for that task. A slice no longer grows with the burst: the
+clock guard stops starting regions after about 10 ms of analysis, so a slice is the cost of a commit plus about 10 ms of
+analysis (22 ms at 1k, 5k and 10k alike). Throughput of the 10,000 burst: about 23,000 elements per second in Chrome (M12
+build: 650).
+
+Other shapes (Chrome, median longest slice; M12: longest page task / time to idle): mixed element types 10k 22 ms
+(3,616 ms / 13.5 s); nested backgrounds 5k 29 ms (980 ms / 3.1 s); 2,000 inline SVG icons 51 ms (761 ms / 1.3 s);
+about 4,800 elements in semantic rows 86 ms (348 ms / 0.92 s); 500 line charts 59 ms (492 ms / 0.52 s). For these the
+total time to idle is longer than in M12 (1.9 s, 2.1 s and 1.8 s): the work was split into 40 to 50 slices of one frame
+each instead of one long task, which is the trade the budget makes. Every one ends in the same per-element computed
+state as the M12 build (hash of the color, background and semantic cue of every element of the burst, 10 of 10 gated sets).
+
+**Known limits (not hidden).**
+
+- A slice takes its first region whole (so that what is analyzed never depends on the budget), so a region that is itself
+  costly is indivisible: about 25 rows of semantic cues are one slice of about 90 ms, 50 icons about 50 ms, 5 charts about 55
+  ms. A single container holding all 5,000 elements, or 5,000 to 10,000 flat siblings (more than 512 regions, so one full
+  rescan), go through the M3 caps unchanged and are one slice of one M3 analysis budget (55 to 70 ms in Chrome, 100 to 140 ms
+  in Firefox); beyond 1,500 candidates they are adapted only up to the cap, as before.
+- The semantic cue check ("the dot did not shift") measures layout, so for status items in one inline flow which cues
+  survive depends on which cues are added together, in the unchanged build as well (3,580 of 5,000 before, 4,018 after);
+  rows that do not share a line end identically.
+- The full analysis of a page keeps its own 50 ms wall-clock budget (M3); in Firefox, which is slower, it covers fewer
+  elements of a very large page.
+- The pipeline's counters are local (`GET_DYNAMIC_DIAGNOSTICS`): `slices`, `maxSliceMs`, `totalSliceMs`,
+  `peakQueuedRecords`, `peakDeferredRoots`, `staleRoots`, `cancelledRoots`; nothing is sent anywhere.
+
+**Benchmark.** `pnpm test:burst` (`docs/DEVELOPMENT.md`, "Burst scalability (M12.5)"); the gates are in
+`realworld/m125/budgets.ts`.
+
+#### History: the M12 measurement
+
+Chrome 154 on a page that adds new adaptable elements in one task (300-element page, a third of the new elements
+needing a rule), before M12.5:
 
 | Elements added at once | Longest main-thread task | Time until the pipeline is idle | Rules in the sheet |
 | ---------------------- | ------------------------ | ------------------------------- | ------------------ |
@@ -103,21 +187,6 @@ a third of the new elements needing a rule):
 | 2,000                  | 213 to 231 ms            | about 0.4 to 0.9 s              | about 780          |
 | 5,000                  | 875 to 979 ms            | about 3.0 to 3.7 s              | about 1,800        |
 | 10,000                 | 3.5 to 3.9 s             | about 15 to 28 s                | about 3,500        |
-
-With the extension off the same page has no long task. In every case the pipeline ends idle with empty queues, never
-loops and never overflows; up to 1,000 added elements the M10 budget (a longest task of at most 200 ms) holds and is
-tested. Beyond that the page stays correct but can stutter while the work is spread over passes. Removing the cost
-means changing how rules are emitted (fewer rules than elements, or selectors the browser can index); that is an
-engine change and is not part of M12. Wall-clock numbers are recorded, not asserted, in line with the rule above.
-
-**Registered limitation (M12.R1): burst scalability.** Measured, Chrome 154, extension on:
-
-- about 1,000 adaptable elements added at once: longest task about 100 ms (inside the 200 ms M10 budget);
-- about 10,000 adaptable elements added at once: longest task about 3.9 s, time to idle about 15 to 28 s.
-
-The adaptation engine was deliberately not changed in M12 or M12.R1. This is open debt, owned by a separate
-remediation milestone (**M12.5, Burst Scalability Remediation**, `docs/ROADMAP.md`) that must be closed before the Store
-release candidate of M13. It is not an M12 acceptance criterion and is not counted as one.
 
 ### Idle CPU is judged relative to a control (M12.R1)
 

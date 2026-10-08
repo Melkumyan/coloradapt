@@ -122,9 +122,11 @@ before being dispatched, since both `runtime.onMessage` and
    `AdaptationPlan`; the core never writes CSS. See
    `docs/ADAPTATION_ENGINE.md`.
 5. Changes are applied as CSS rules in a single injected
-   `<style id="coloradapt-stylesheet">`, targeting elements via a
-   `data-coloradapt-id` attribute — never inline styles, never direct DOM
-   mutation of content. Elements whose `color` is animated are not adapted. Every
+   `<style id="coloradapt-stylesheet">` — never inline styles, never direct DOM
+   mutation of content. The sheet has one rule per distinct declaration, not per element (M12.5): an element
+   names the declarations it is subject to in a `data-coloradapt-s` attribute (`color:#112233`), so a page
+   with thousands of adapted elements has tens of rules, and adding elements to an existing declaration writes
+   attributes only (`docs/PERFORMANCE.md`, "Burst model"). Elements whose `color` is animated are not adapted. Every
    commit suppresses `transition` for one synchronous style flush (no fade or
    flicker), and the browser's computed color is read back: a change the cascade
    did not honor (e.g. inline `!important`) is dropped and counted as
@@ -136,6 +138,17 @@ before being dispatched, since both `runtime.onMessage` and
    explicit fallback (stylesheet changes, `<html>/<body>` changes, budget
    overflow). The observer exists only while adaptation is ON. See
    `docs/DYNAMIC_ANALYSIS.md`.
+
+   **Scheduling (M12.5).** The batcher's one scheduled callback per frame is a _slice_: the regions that fit the
+   slice budget (`SLICE_BUDGET`: slice units where an element is 1, an inline SVG `12 + 3 x descendants`, a
+   semantic candidate 5; at most 600 units after the first region, which is always taken whole; a further region
+   starts only within 20 ms of analysis clock) are analyzed, planned and applied together; the rest stays in the
+   ordered work queue (`deferredRoots`) for the next frame. A frame is a real event-loop boundary (`requestAnimationFrame`
+   while the page is visible, a zero timeout otherwise), so the browser renders and handles input between slices;
+   the state machine (IDLE, SCHEDULED, RUNNING, DIRTY, STOPPED) cannot be re-entered, there is one loop per page,
+   and `stop`, `discardPending` and a full refresh cancel what is queued (a new generation: nothing queued before it
+   is applied after it). The budget decides how many regions share a slice, never what is analyzed.
+
 7. Inline `<svg>` elements (M5, `core/svg`) are analyzed as one unit each: a bounded
    walk, one shared style probe per batch, and a single effective paint over the
    page background. A unit that is exactly one visible paint becomes an
@@ -180,8 +193,10 @@ before being dispatched, since both `runtime.onMessage` and
   UI root has an error boundary.
 - **No History API hooks, no global patching.** Navigation is learned from the browser (`tabs.onUpdated`) and from the
   DOM the page changes; a static check of the bundles fails on any reference to `pushState` or `replaceState`.
-- **Known limit.** The cost of one pass grows with the number of rules already in the stylesheet; adding thousands
-  of adaptable elements at once is slow but bounded and always ends idle (`docs/PERFORMANCE.md`, `docs/m12/report.md`).
+- **Bursts (M12.5).** Thousands of adaptable elements added at once are worked off in bounded slices (a slice of
+  the canonical 10,000-element burst takes about 30 ms in Chrome; before M12.5 one task took about 3.9 s and the burst
+  24 s), with the same final result (`docs/PERFORMANCE.md`, `docs/m125/report.md`). The M3 caps on what one region
+  or one full analysis covers are unchanged.
 
 ## Why no `<all_urls>`
 

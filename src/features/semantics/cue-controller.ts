@@ -532,6 +532,11 @@ export class SemanticCueController {
     };
   }
 
+  /** Whether a pass that reaches `element` will examine it (the layer is on and the element carries a hint). */
+  examines(element: Element): boolean {
+    return this.#enabled && !isSkippedTag(element) && hasHint(element);
+  }
+
   /** Read-only look at one element, for tests and debugging: no counters, no DOM writes. */
   inspect(element: Element): SemanticInspection {
     return this.#sheet.withOriginalStyles(() => {

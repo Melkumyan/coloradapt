@@ -560,10 +560,12 @@ test.describe('M6.R1 next to M3 recoloring', () => {
     page.evaluate(() => ({
       a: getComputedStyle(document.getElementById('m3a')!).color,
       b: getComputedStyle(document.getElementById('m3b')!).color,
-      rules:
-        (document.getElementById('coloradapt-stylesheet')?.textContent ?? '').match(
-          /data-coloradapt-id=/g,
-        )?.length ?? 0,
+      // rules in force: one per (element, declaration), a rule of the sheet being shared (M12.5)
+      rules: [...document.querySelectorAll('[data-coloradapt-s]')].reduce(
+        (sum, e) =>
+          sum + (e.getAttribute('data-coloradapt-s') ?? '').split(' ').filter(Boolean).length,
+        0,
+      ),
     }));
 
   test('color-only + recolored: one cue per element, no duplicate adaptation, and OFF restores both', async () => {

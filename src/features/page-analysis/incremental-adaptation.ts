@@ -16,6 +16,7 @@ import {
   type PlanningMemo,
   type StylesheetManager,
 } from '@core/adaptation';
+import { SLICE_BUDGET } from '@shared/constants';
 import {
   EMPTY_CHART_DIAGNOSTICS,
   EMPTY_IMAGE_DIAGNOSTICS,
@@ -62,6 +63,8 @@ export interface IncrementalPassResult {
   readonly elementsProcessed: number;
   /** A budget cut a root short; its tail was not analyzed. */
   readonly truncated: boolean;
+  /** Consumed regions that had already left the page when their turn came (nothing was done for them). */
+  readonly staleRoots: number;
   readonly delta: AdaptationDelta;
   /** Rules actually added/updated/removed in the stylesheet. */
   readonly rules: { readonly added: number; readonly updated: number; readonly removed: number };
@@ -111,6 +114,7 @@ const EMPTY_RESULT: IncrementalPassResult = {
   rootsConsumed: 0,
   elementsProcessed: 0,
   truncated: false,
+  staleRoots: 0,
   delta: { added: [], updated: [], removed: [], notApplied: [], unresolved: 0 },
   rules: { added: 0, updated: 0, removed: 0 },
 };
@@ -274,6 +278,11 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     this.#images?.update([]);
   }
 
+  /**
+   * One slice of work: the regions that fit the slice budget (docs/PERFORMANCE.md, "Burst model"), analyzed,
+   * planned and applied in one pass over all layers. The first region is always taken whole (up to the analysis
+   * cap), so the budget decides how many passes a burst takes, never what ends up adapted.
+   */
   update(input: IncrementalPassInput): IncrementalPassResult {
     const context = this.#context;
     if (!context) return EMPTY_RESULT;
@@ -287,7 +296,22 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
     const getStyle = this.#analyzerOptions.getStyle ?? ((el: Element) => getComputedStyle(el));
     // Analysis must see the page's own colors, never our adaptation (docs/ADAPTATION_ENGINE.md).
     const { sub, unsafe } = this.#stylesheet.withOriginalStyles(() => {
-      const analysis = analyzeSubtrees(input.roots, this.#analyzerOptions);
+      // a weight is worked out once per element and pass (the analyzer asks for it twice)
+      const weights = new WeakMap<Element, number>();
+      const weigh = (element: Element) => {
+        let weight = weights.get(element);
+        if (weight === undefined) {
+          weight = this.#sliceWeight(element);
+          weights.set(element, weight);
+        }
+        return weight;
+      };
+      const analysis = analyzeSubtrees(input.roots, {
+        sliceElements: SLICE_BUDGET.maxElements,
+        sliceWeight: weigh,
+        maxDurationMs: SLICE_BUDGET.maxStartMs,
+        ...this.#analyzerOptions,
+      });
       return {
         sub: analysis,
         unsafe: findNotAdaptable(
@@ -297,7 +321,7 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
           analysis.nodes,
         ),
       };
-    });
+    }, input.roots);
 
     // Only a root that alone exceeds the element budget is cut short; it is consumed (its
     // tail is reported as truncated) rather than retried forever. Roots that merely did not
@@ -380,6 +404,8 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
       rootsConsumed: Math.min(rootsConsumed, chartsConsumed),
       elementsProcessed: sub.candidatesInspected,
       truncated: sub.truncated,
+      staleRoots: input.roots.slice(0, rootsConsumed).filter((root) => !root.element.isConnected)
+        .length,
       delta: {
         added,
         updated,
@@ -393,6 +419,15 @@ export class IncrementalAdaptationSession implements IncrementalAdaptation {
         removed: removals.size + result.pruned,
       },
     };
+  }
+
+  /** What an element costs a slice, in elements: its analysis and what the layers behind it do with it. */
+  #sliceWeight(element: Element): number {
+    if (element.localName === 'svg') {
+      const inside = Math.min(element.querySelectorAll('*').length, SLICE_BUDGET.svgDescendantCap);
+      return SLICE_BUDGET.svgWeight + SLICE_BUDGET.svgDescendantWeight * inside;
+    }
+    return this.#semantic?.examines(element) ? SLICE_BUDGET.semanticWeight : 1;
   }
 
   #track(id: string, kind: TrackedKind): void {

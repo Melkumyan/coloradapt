@@ -116,10 +116,21 @@ describe('createContentController', () => {
     document.body.innerHTML =
       '<p id="x" style="color: #c0392b; background-color: #27ae60;">Red on green</p>';
     const controller = createContentController(document, { now: () => 0 });
-    // Make the planned color unreachable: the element carries no usable selector target.
-    const original = document.querySelector.bind(document);
-    vi.spyOn(document, 'querySelector').mockImplementation((selector: string) =>
-      selector.includes('coloradapt-specificity') ? null : original(selector),
+    // Make the planned color unreachable: the browser reports the page's own color whatever the sheet says.
+    const original = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation(
+      (element: Element, pseudo?: string | null) => {
+        const style = original(element, pseudo);
+        return element.id === 'x' && document.getElementById('coloradapt-stylesheet')?.textContent
+          ? new Proxy(style, {
+              get: (target, key) =>
+                key === 'getPropertyValue'
+                  ? (name: string) =>
+                      name === 'color' ? 'rgb(192, 57, 43)' : target.getPropertyValue(name)
+                  : (Reflect.get(target, key) as unknown),
+            })
+          : style;
+      },
     );
 
     const { adaptation } = controller.enableAdaptation('https://example.com', DEUTAN_SETTINGS);

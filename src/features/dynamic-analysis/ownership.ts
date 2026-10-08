@@ -1,6 +1,6 @@
 import { ELEMENT_ID_ATTRIBUTE } from '@core/analysis';
 import { CHART_NODE_ATTRIBUTE } from '@core/charts';
-import { STYLE_ELEMENT_ID } from '@core/adaptation';
+import { STYLE_ELEMENT_ID, SUPPRESS_ELEMENT_ID } from '@core/adaptation';
 
 const OWN_ATTRIBUTE_PREFIX = 'data-coloradapt-';
 
@@ -18,7 +18,17 @@ export function isChartOwnedNode(node: Node | null): boolean {
 }
 
 function isOwnedNode(node: Node): boolean {
-  return isColorAdaptStyleElement(node) || isChartOwnedNode(node) || isAuditOverlayNode(node);
+  return (
+    isColorAdaptStyleElement(node) ||
+    isSuppressStyleElement(node) ||
+    isChartOwnedNode(node) ||
+    isAuditOverlayNode(node)
+  );
+}
+
+/** The transient `<style>` of a delta commit (M12.5): in the document for one synchronous style flush. */
+function isSuppressStyleElement(node: Node | null): boolean {
+  return node instanceof Element && node.id === SUPPRESS_ELEMENT_ID && node.localName === 'style';
 }
 
 /** True for ColorAdapt's own injected `<style>` element. */
@@ -52,9 +62,12 @@ export function isColorAdaptOwnedMutation(record: MutationRecord): boolean {
     );
   }
   if (record.type === 'characterData') {
-    return isColorAdaptStyleElement(record.target.parentNode);
+    return (
+      isColorAdaptStyleElement(record.target.parentNode) ||
+      isSuppressStyleElement(record.target.parentNode)
+    );
   }
-  if (isColorAdaptStyleElement(record.target)) return true;
+  if (isColorAdaptStyleElement(record.target) || isSuppressStyleElement(record.target)) return true;
 
   const touched = [...record.addedNodes, ...record.removedNodes];
   return touched.length > 0 && touched.every(isOwnedNode);

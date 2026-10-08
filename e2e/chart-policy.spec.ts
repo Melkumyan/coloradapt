@@ -152,7 +152,7 @@ test.describe('canvas: detected, never adapted, never patched', () => {
     await refresh(ext.worker, view.page);
     await settle(view.page);
     expect(await pixelsOf(view.page)).toEqual(before);
-    expect((await markup(view.page)).replace(/ data-coloradapt-id="[^"]*"/g, '')).toBe(html);
+    expect((await markup(view.page)).replace(/ data-coloradapt-(id|s)="[^"]*"/g, '')).toBe(html);
     expect(await artifacts(view.page)).toEqual(NOTHING);
     expect(await chartCounters(view)).toMatchObject({
       canvasCharts: 1,

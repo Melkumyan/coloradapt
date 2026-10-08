@@ -288,6 +288,9 @@ test.describe('M5 dynamic SVG', () => {
       () => document.getElementById('coloradapt-stylesheet')?.textContent ?? '',
     );
     expect(css).not.toContain('sym-');
+    expect(
+      await page.evaluate(() => document.querySelectorAll('#sprite [data-coloradapt-s]').length),
+    ).toBe(0);
     // (the probe may tag the symbol's *parent*, e.g. <defs>, with the plain id attribute; a rule never targets it)
     const symbols = await page.evaluate(
       () =>

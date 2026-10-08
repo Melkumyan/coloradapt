@@ -196,13 +196,12 @@ test.describe('real browser: inline SVG adaptation', () => {
     expect(units['img-svg']).toBeUndefined();
     expect(planned['img-svg']).toBeUndefined();
     expect(await pixelAt(page, 'img-svg', 12, 12)).toBe(RED);
-    expect(await sheetText(page)).not.toContain(
-      (await page.evaluate(
-        () => document.getElementById('img-svg')?.getAttribute('data-coloradapt-id') ?? 'none',
-      )) === 'none'
-        ? 'never-matches'
-        : `data-coloradapt-id="${await page.evaluate(() => document.getElementById('img-svg')?.getAttribute('data-coloradapt-id'))}"`,
-    );
+    // no rule reaches it: the <img> carries no token (one rule is shared per declaration, M12.5)
+    expect(
+      await page.evaluate(() =>
+        document.getElementById('img-svg')?.hasAttribute('data-coloradapt-s'),
+      ),
+    ).toBe(false);
   });
 
   test('aria-hidden, role=img and <title> are only metadata: icons adapt either way', async () => {
@@ -473,8 +472,8 @@ test.describe('real browser: <use> / <symbol>', () => {
     expect(await paints.color(page, ['sym-cc-r'])).toEqual(symbolColorBefore);
     const tagged = await page.evaluate(
       () =>
-        [...document.querySelectorAll('symbol, symbol *')].filter((e) =>
-          e.hasAttribute('data-coloradapt-id'),
+        [...document.querySelectorAll('symbol, symbol *')].filter(
+          (e) => e.hasAttribute('data-coloradapt-id') || e.hasAttribute('data-coloradapt-s'),
         ).length,
     );
     expect(tagged).toBe(0);

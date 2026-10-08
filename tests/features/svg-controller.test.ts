@@ -36,10 +36,22 @@ function setup(markup: string) {
 
 const realColor = (id: string) => getComputedStyle(document.getElementById(id)!).color;
 const sheet = () => document.getElementById('coloradapt-stylesheet')?.textContent ?? '';
+/** One line per (element, property) the stylesheet styles right now (rules are shared per declaration, M12.5). */
 const rules = () =>
-  sheet()
-    .split('\n')
-    .filter((line) => line.includes('!important'));
+  document.querySelectorAll('[data-coloradapt-s]').length === 0
+    ? []
+    : sheet()
+        .split('\n')
+        .filter((line) => line.includes('!important'))
+        .flatMap((line) => {
+          const token = /\[data-coloradapt-s~="([^"]+)"\]/.exec(line)?.[1];
+          if (!token) return [];
+          return [...document.querySelectorAll('[data-coloradapt-s]')]
+            .filter((el) => (el.getAttribute('data-coloradapt-s') ?? '').split(' ').includes(token))
+            .map((el) => `${el.getAttribute('data-coloradapt-id')} ${line}`);
+        });
+/** Whether the stylesheet currently styles `element` (it carries a rule token). */
+const styled = (element: Element) => (element.getAttribute('data-coloradapt-s') ?? '') !== '';
 const byId = (id: string) => document.getElementById(id)!;
 
 beforeEach(() => {
@@ -224,8 +236,8 @@ describe('incremental updates of an SVG unit', () => {
     });
     expect(rules()).toHaveLength(1);
     expect(controller.incremental.trackedCount()).toBe(1);
-    expect(sheet()).toContain(byId('fresh').getAttribute('data-coloradapt-id')!);
-    expect(sheet()).not.toContain(old.getAttribute('data-coloradapt-id')!);
+    expect(styled(byId('fresh'))).toBe(true);
+    expect(styled(old)).toBe(false);
   });
 
   it('a hundred replacements leave one rule and no tracking behind (no stale rules)', () => {
@@ -300,7 +312,7 @@ describe('shape-owned paint and the group', () => {
     );
     controller.enableAdaptation('https://example.com', SETTINGS);
     expect(rules()).toHaveLength(1);
-    expect(sheet()).toContain(byId('p').getAttribute('data-coloradapt-id')!);
+    expect(styled(byId('p'))).toBe(true);
 
     // The shape now follows currentColor: the <svg>'s color owns the paint.
     byId('p').setAttribute('fill', 'currentColor');
@@ -310,8 +322,8 @@ describe('shape-owned paint and the group', () => {
       removedIds: [],
     });
     expect(rules()).toHaveLength(1);
-    expect(sheet()).toContain(`${byId('icon').getAttribute('data-coloradapt-id')}"]`);
-    expect(sheet()).not.toContain(`${byId('p').getAttribute('data-coloradapt-id')}"]`);
+    expect(styled(byId('icon'))).toBe(true);
+    expect(styled(byId('p'))).toBe(false);
     expect(sheet()).toMatch(/color: #[0-9a-f]{6} !important/);
     expect(result.rules.removed).toBe(1); // the pruned shape rule
     expect(controller.incremental.ruleCount).toBe(1);

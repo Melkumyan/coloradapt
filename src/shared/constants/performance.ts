@@ -30,6 +30,29 @@ export const DYNAMIC_BUDGET: DynamicBudget = {
   stylesheetRepairMinIntervalMs: 500,
 } as const;
 
+/**
+ * Slice budget of the dynamic pipeline (M12.5, docs/PERFORMANCE.md): one scheduled flush is one slice, and the
+ * browser paints and handles input between slices. Frozen before the formal run (the gates are in
+ * `realworld/m125/budgets.ts`). They only decide how many regions share a slice; none changes what is analyzed.
+ */
+export const SLICE_BUDGET = {
+  /** Structural: elements one slice may inspect once its first region is in (a region after the first must fit). */
+  maxElements: 600,
+  /**
+   * An inline SVG unit weighs `svgWeight + svgDescendantWeight x its descendants` elements in that count: its analysis
+   * (probes, inheritance, a chart's marks) costs far more than a text element's (measured: about 0.8 ms for an icon,
+   * 2.6 ms for a small line chart, 0.05 ms for a text element).
+   */
+  svgWeight: 12,
+  svgDescendantWeight: 3,
+  /** Descendants beyond this add nothing: a larger SVG is `complex-svg` (SVG_BUDGET) and is not analyzed in depth. */
+  svgDescendantCap: 60,
+  /** A semantic-cue candidate weighs this many elements: reading it, its peers and its pseudo-elements costs far more. */
+  semanticWeight: 5,
+  /** A further region is started only while the slice has used less than this of the clock (batching only). */
+  maxStartMs: 10,
+} as const;
+
 export interface DynamicBudget {
   readonly maxQueuedRecords: number;
   readonly maxAffectedRoots: number;

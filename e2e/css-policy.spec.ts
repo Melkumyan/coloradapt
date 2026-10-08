@@ -105,9 +105,11 @@ test.describe('real browser: CSS application policy', () => {
     expect(rules.length).toBeGreaterThan(0);
     for (const rule of rules) {
       expect(rule).toMatch(
-        /^\[data-coloradapt-id="[^"]+"\]:not\(#coloradapt-specificity\) \{ color: #[0-9a-f]{6} !important; \}$/,
+        /^\[data-coloradapt-s~="color:#[0-9a-f]{6}"\]:not\(#coloradapt-specificity\) \{ color: #[0-9a-f]{6} !important; \}$/,
       );
     }
+    // One rule per distinct declaration, never one per element (M12.5), and every one is reached through a token.
+    expect(new Set(rules).size).toBe(rules.length);
     expect(css).not.toContain('transition');
   });
 
