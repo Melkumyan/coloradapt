@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>ColorAdapt privacy policy</title>
+<style>:root{color-scheme:light dark;--bg:#fff;--fg:#1a1a1a;--muted:#4a4a4a;--link:#0b4f9c;--rule:#c9c9c9;--code:#f0f0f0}
+@media (prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#ececec;--muted:#b5b5b5;--link:#8ab8ff;--rule:#3a3d44;--code:#262a31}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:1rem/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header,main,footer{max-width:46rem;margin:0 auto;padding:0 1rem}
+header{padding-top:1rem;border-bottom:1px solid var(--rule)}
+nav ul{display:flex;flex-wrap:wrap;gap:1rem;margin:0 0 .75rem;padding:0;list-style:none}
+a{color:var(--link);text-underline-offset:.15em}
+a:focus-visible{outline:3px solid currentColor;outline-offset:2px}
+h1{font-size:1.75rem;line-height:1.25;margin:1.5rem 0 .5rem}
+h2{font-size:1.3rem;line-height:1.3;margin:2rem 0 .5rem}
+h1,h2,p,li{overflow-wrap:anywhere}
+li{margin:.25rem 0}
+code{background:var(--code);padding:.1em .3em;border-radius:3px;font-size:.92em;overflow-wrap:anywhere}
+footer{padding-top:1rem;padding-bottom:2rem;margin-top:2rem;border-top:1px solid var(--rule);color:var(--muted);font-size:.9rem}</style>
+</head>
+<body>
+<header><nav aria-label="ColorAdapt"><ul><li><a href="../privacy/" aria-current="page">Privacy policy</a></li><li><a href="../support/">Support</a></li></ul></nav></header>
+<main id="main">
+<h1>ColorAdapt Privacy Policy</h1>
+<p><em>Version 0.1.0. Applies to the ColorAdapt browser extension for Google Chrome and Mozilla Firefox.</em></p>
+<p>ColorAdapt helps people with color-vision deficiencies read and distinguish web pages. To do that it has to look at the pages you visit. This policy says what it looks at, what it keeps, and the one optional feature that can pass information to software on your own computer.</p>
+<h2>In short</h2>
+<ul>
+<li>By default, ColorAdapt sends no page data to external services.</li>
+<li>No telemetry, no analytics, no advertising, no accounts, no sale or sharing of data, no cloud backend.</li>
+<li>Your settings stay in your browser's local extension storage.</li>
+<li>The optional AI-assisted developer review is <strong>disabled by default</strong>. When you explicitly enable and run it, ColorAdapt may send a small sanitized semantic context to a local loopback AI runtime configured on your computer. ColorAdapt has <strong>no cloud AI fallback</strong>.</li>
+</ul>
+<h2>What ColorAdapt accesses, and why</h2>
+<p>ColorAdapt requests access to websites (<code>http://*/*</code> and <code>https://*/*</code>) because it must inspect and adapt page presentation on the websites where you enable or use it. In the page, in your browser, it reads the structure, computed colors and a few attributes of elements (for example ARIA state, form-control state, image sizes) in order to decide which color combinations are hard to tell apart and what to change. It adds a stylesheet and, in supported cases, small non-color cues to the page, and removes them when you turn ColorAdapt off. This processing happens in your browser. The page data it reads is not stored. By default none of it is transmitted; the single exception is the optional, off-by-default AI-assisted review described below, which can send a small sanitized part of it to a model runtime on your own computer.</p>
+<h2>What is stored</h2>
+<ul>
+<li><strong>Settings</strong> (the selected color-vision profile, strength, on/off switches, the optional AI settings) in <code>storage.local</code>, which stays in your browser profile. If you enable your browser's own sync, that browser's terms apply to it; ColorAdapt adds nothing.</li>
+<li><strong>Nothing else.</strong> No page content, no browsing history, no audit results, no AI prompts or answers are written to storage. Developer-audit reports and exports exist in memory (and in a file only if you save one) and are gone when the audit page closes.</li>
+<li>One line of diagnostic text may be written to your browser's developer console when something recovers or fails (an error code, never a page's content). It is never sent anywhere.</li>
+</ul>
+<h2>No telemetry, analytics, ads or sale of data</h2>
+<p>ColorAdapt contains no analytics, crash-reporting, advertising or tracking code, makes no request to any ColorAdapt server (there is none), and does not sell, rent or share user data with anyone.</p>
+<h2>The optional local AI-assisted review</h2>
+<p>The developer audit can, if you turn it on in the extension's settings and then press <strong>Run AI-assisted review</strong>, ask a language-model runtime that you run on your own computer (for example Ollama) what a finding that needs manual review may mean. It is advisory only: it cannot change a finding or a page.</p>
+<ul>
+<li><strong>Disabled by default.</strong> An update never turns it on. ColorAdapt works the same without it.</li>
+<li><strong>Where it can send:</strong> only to <code>http://127.0.0.1:&lt;port&gt;</code> or <code>http://localhost:&lt;port&gt;</code> on your computer. The browser enforces this in the extension's content security policy as well as the code. No other host, no LAN address, no Internet address, no redirect is followed.</li>
+<li><strong>What it sends,</strong> per finding, a small bounded summary: element type and role, a few accessibility state values, a bounded accessible name, up to five nearby short labels, names of a few sibling elements, and the deterministic evidence the audit found. Text passes redaction (email addresses, long numbers, opaque tokens and invisible characters are removed). A short visible label can still be personal text, such as a person's name; ColorAdapt cannot recognize that, so do not run the review on a page whose short labels you do not want your local runtime to see.</li>
+<li><strong>What it never sends:</strong> the value or text of any form field or editable area, passwords, URLs, the page address, ids, class names, <code>data-</code> attributes, cookies, storage, headers, HTML, the page's full text, hidden text, images or screenshots.</li>
+<li><strong>Storage:</strong> none. Prompts, answers and cache are in memory and discarded when you close the audit page, turn the setting off, or change the page or provider.</li>
+<li><strong>Firefox:</strong> Firefox counts this as data leaving the add-on, so the add-on declares the optional data-collection permission <code>websiteContent</code> and Firefox itself asks you the first time you press the button. If you decline, nothing is sent and the rest of ColorAdapt works as before. You can withdraw the permission at any time in the add-on's permissions page; ColorAdapt then stops, cancels what is running and sends nothing further. Firefox 140 or later is required.</li>
+<li><strong>Chrome:</strong> Chrome has no equivalent prompt; the setting that is off by default, the explicit button and this disclosure are the consent.</li>
+<li><strong>The runtime is separate software.</strong> What it does with a request (logging, forwarding, showing) is outside ColorAdapt's control and governed by its own terms. Use one you trust. ColorAdapt does not install, bundle or configure a runtime and ships no model.</li>
+</ul>
+<h2>Images</h2>
+<p>The optional image layer (off by default) reads the pixels of images that the page already displays, in your browser, to recolor a few kinds of single-color icons. To read them it may request the same image again from the page's own site (same origin, or an image the page loads with CORS), exactly as the page could. Pixels and the generated bitmaps are not uploaded or stored.</p>
+<h2>Permissions and revocation</h2>
+<ul>
+<li><code>storage</code> keeps your settings. Website access (<code>http://*/*</code>, <code>https://*/*</code>) lets the extension run on the pages you visit. Nothing else is requested; there is no access to your history, tabs list, cookies, downloads or bookmarks.</li>
+<li>You can remove ColorAdapt at any time; as browsers do for every extension, the browser then deletes the extension's stored settings. You can reset the settings by removing and reinstalling it. Data held by a separate AI runtime you installed is not removed by this.</li>
+</ul>
+<h2>Children</h2>
+<p>ColorAdapt does not collect personal information from anyone, children included.</p>
+<h2>Changes</h2>
+<p>If a future version changes what is described here, this policy and the store listing change with it, and any new data transmission would be opt-in, off by default and never required for the extension to work.</p>
+<h2>Contact</h2>
+<p>The publisher's support route is given on the store listing page for ColorAdapt. This repository contains no contact address.</p>
+</main>
+<footer>ColorAdapt 0.1.0. This page is static: it has no scripts, trackers, cookies or forms.</footer>
+</body>
+</html>
