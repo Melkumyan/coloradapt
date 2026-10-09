@@ -38,7 +38,7 @@ function EndpointField({
       >
         {parsed.ok
           ? 'Saved. Only this computer’s own loopback address is ever contacted.'
-          : 'Not saved: only http://127.0.0.1:<port>, http://localhost:<port> or http://[::1]:<port> (port 1024 or higher) are accepted.'}
+          : 'Not saved: only http://127.0.0.1:<port> or http://localhost:<port> (port 1024 or higher) are accepted.'}
       </p>
     </>
   );
@@ -242,9 +242,13 @@ export function App(): JSX.Element {
         {settings.semanticAIEnabled && <AIProviderField settings={settings} update={update} />}
         <p className="options__hint">
           Only small, redacted summaries of the findings that need review are sent, only to the
-          address above, only when you press the button. Form values, URLs, cookies and page text
-          are never included. Your local runtime must allow requests from this extension (for
-          Ollama: set OLLAMA_ORIGINS to include chrome-extension://*).
+          address above, only when you press the button. Form values, URLs, cookies and full page
+          text are never included, but a few short visible labels of the elements being asked about
+          can be (a label may contain personal text such as a name). In Firefox the browser asks for
+          your permission the first time you press the button, and you can withdraw it in the
+          add-on’s permissions. Your local runtime must allow requests from this extension (for
+          Ollama: set OLLAMA_ORIGINS to include chrome-extension://* in Chrome, or moz-extension://*
+          in Firefox).
         </p>
       </section>
 
@@ -252,7 +256,7 @@ export function App(): JSX.Element {
         <h2 id="sites-heading">Site Profiles</h2>
         {siteEntries.length === 0 ? (
           <p className="options__hint">
-            No per-site overrides yet. Site overrides appear here once configured.
+            No per-site settings are stored. Settings apply to every site.
           </p>
         ) : (
           <ul className="options__site-list">
@@ -279,8 +283,10 @@ export function App(): JSX.Element {
       <section aria-labelledby="privacy-heading" className="options__section">
         <h2 id="privacy-heading">Privacy</h2>
         <p className="options__hint">
-          ColorAdapt analyzes pages entirely on your device. No page content, settings, or usage
-          data is ever sent to a server. See the Privacy document in the project repository for
+          ColorAdapt analyzes pages in your browser and sends nothing to any Internet service: no
+          telemetry, no analytics, no account. Your settings stay in this browser. The one optional
+          exception is the AI-assisted review above, which is off by default and talks only to a
+          model runtime on this computer. See the Privacy document in the project repository for
           details.
         </p>
       </section>
@@ -288,9 +294,9 @@ export function App(): JSX.Element {
       <section aria-labelledby="about-heading" className="options__section">
         <h2 id="about-heading">About</h2>
         <p className="options__hint">
-          ColorAdapt is an early-stage, local-first browser extension that helps make the web more
-          usable for people with color vision deficiencies. Simulations are estimates for
-          accessibility purposes, not a medical model of vision.
+          ColorAdapt is a local-first browser extension that helps make the web more usable for
+          people with color vision deficiencies. Simulations are estimates for accessibility
+          purposes, not a medical model of vision.
         </p>
       </section>
     </main>

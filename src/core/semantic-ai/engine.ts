@@ -90,6 +90,7 @@ const UNREACHABLE: ReadonlySet<ProviderFailure> = new Set([
   'unavailable',
   'blocked-endpoint',
   'not-configured',
+  'consent-required',
 ]);
 /** Two unreachable answers in a row end the run: the runtime is not there, and asking more is a storm. */
 const UNREACHABLE_STREAK = 2;

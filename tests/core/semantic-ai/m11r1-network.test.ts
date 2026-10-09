@@ -13,7 +13,7 @@ import { ACTIVE_TAB, answer, bound, supporters } from './kit';
 /**
  * M11.R1: the network boundary, hostile corpus first (docs/AI_PRIVACY.md, "Network"). The only thing a
  * page-independent configuration may reach is the machine's own loopback, on the exact spellings
- * `127.0.0.1`, `localhost` and `[::1]`; nothing the URL parser would normalize is accepted, a redirect
+ * `127.0.0.1` and `localhost` (`[::1]` is refused: no CSP can express it); nothing the URL parser would normalize is accepted, a redirect
  * is never followed, and a response never gets to be larger than the budget.
  */
 
@@ -132,7 +132,7 @@ describe('endpoint corpus (SSRF and parser confusion)', () => {
     expect(parseLoopbackEndpoint(input).ok).toBe(false);
   });
 
-  it('accepts only the three canonical spellings, with an unprivileged port', () => {
+  it('accepts only the two canonical spellings (the IPv6 loopback is refused, as no CSP can express it), with an unprivileged port', () => {
     const accepted: string[] = [];
     for (const host of [
       '127.0.0.1',
@@ -156,14 +156,11 @@ describe('endpoint corpus (SSRF and parser confusion)', () => {
         'http://localhost:1024',
         'http://localhost:11434',
         'http://localhost:65535',
-        'http://[::1]:1024',
-        'http://[::1]:11434',
-        'http://[::1]:65535',
       ].sort(),
     );
   });
 
-  it('is structurally immune to DNS rebinding: only three literal hosts exist, no name is ever resolved', () => {
+  it('is structurally immune to DNS rebinding: only two literal hosts exist, no name is ever resolved', () => {
     // Any other hostname, however it is built, is refused; there is nothing for a resolver to rebind.
     const names = [
       'rebind.example',
@@ -192,7 +189,7 @@ describe('endpoint corpus (SSRF and parser confusion)', () => {
       for (let n = 1 + Math.floor(random() * 14); n > 0; n -= 1)
         host += alphabet[Math.floor(random() * alphabet.length)];
       const parsed = parseLoopbackEndpoint(`http://${host}:8080`);
-      if (parsed.ok) expect(['127.0.0.1', 'localhost', '[::1]']).toContain(host);
+      if (parsed.ok) expect(['127.0.0.1', 'localhost']).toContain(host);
     }
   });
 

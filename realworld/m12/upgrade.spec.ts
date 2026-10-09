@@ -40,7 +40,8 @@ import {
 
 const AREA = 'm12-upgrade';
 const KEY = 'coloradapt:settings';
-const PREVIOUS = process.env['M12_PREVIOUS_DIR'] ?? 'E:/temp/claude/m12';
+const PREVIOUS =
+  process.env['M12_PREVIOUS_DIR'] ?? path.join(ROOT, 'realworld', '.artifacts', 'previous-builds');
 const M11 = path.join(PREVIOUS, 'wt-m11-ai-semantic-engine', 'dist', 'chrome-mv3');
 const M7 = path.join(PREVIOUS, 'wt-m7-charts', 'dist', 'chrome-mv3');
 const OLD_BUILDS: Array<[string, string]> = [

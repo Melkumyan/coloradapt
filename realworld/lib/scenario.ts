@@ -46,8 +46,16 @@ export function record(
   appendFileSync(path.join(OUT, 'scenarios.jsonl'), `${JSON.stringify(line)}\n`);
 }
 
+/**
+ * The browsers of the scenario suites. Firefox asks for the optional `websiteContent` data permission (M13) before the
+ * AI-assisted review sends anything; these suites test the review's behavior (failures, lifecycle, privacy of the
+ * packet), not the consent, which realworld/m13/consent.spec.ts exercises through Firefox's real prompt. Here the
+ * prompt is turned off with Firefox's own preference, so a request is granted as the user would grant it.
+ */
 export function launch(name: BrowserName): Promise<Driver> {
-  return name === 'chrome' ? startChrome() : startFirefox();
+  return name === 'chrome'
+    ? startChrome()
+    : startFirefox({ prefs: { 'extensions.webextOptionalPermissionPrompts': false } });
 }
 
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

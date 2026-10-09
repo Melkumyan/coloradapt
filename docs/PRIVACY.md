@@ -5,10 +5,13 @@ alone — there is no backend for it to send data to.
 
 - **All analysis happens on-device.** Page content (DOM structure, computed
   styles, colors) is read and processed entirely within the browser, in the
-  content script injected into that page. It never leaves the device.
-- **No data is sent to a server.** ColorAdapt has no backend. There is no
-  network request in the codebase that transmits page content, settings, or
-  usage data anywhere.
+  content script injected into that page. By default it does not leave the browser; the one optional exception
+  is the AI-assisted review below, which can send small redacted summaries to a model runtime on this computer.
+- **No data is sent to an Internet service.** ColorAdapt has no backend. There is no network request in the
+  codebase that transmits page content, settings, or usage data to any server on the Internet. The only network
+  calls it can make are listed in `docs/store/STORE_RELEASE.md` ("Network inventory"): requests to the loopback
+  model runtime you configure (optional AI review), and, with the optional image layer, a re-read of an image the
+  page itself already displays (same origin or CORS-enabled), exactly as the page could.
 - **No API keys, no third-party services.** ColorAdapt does not call any
   external API.
 - **Settings are stored locally.** User settings and per-site profiles are
@@ -47,13 +50,16 @@ alone — there is no backend for it to send data to.
   path waits for a model and the audit page makes no request. On, and only when the developer presses the
   button, small bounded and redacted summaries of the audit's _manual-review_ findings (a handful of ARIA state
   tokens, a bounded accessible name, up to five nearby labels, same-kind sibling names, the matched state words) are
-  sent to a model runtime on this computer's loopback (`127.0.0.1`, `localhost` or `[::1]` with a port) and nowhere
-  else; there is no cloud provider and no fallback to one. Form values, text of editable regions, URLs, ids, class
+  sent to a model runtime on this computer's loopback (`127.0.0.1` or `localhost` with a port; the IPv6 loopback is not
+  offered because no browser can allow it in the extension's content security policy) and nowhere else; there is no cloud provider and no fallback to one. Form values, text of editable regions, URLs, ids, class
   lists, `data-*`, cookies, storage, full text, HTML and image pixels are never part of a summary. Short visible
   labels (which may include a person's name: M11 does not try to detect names) can be part of one, and go only to
   your own computer. The runtime that receives them is separate software with its own behavior. Prompts and
   answers are never stored or exported; a report may carry labels, ids, statuses and a fingerprint, apart from the
-  findings. What the local runtime does with a request is outside ColorAdapt's control. See `docs/AI_PRIVACY.md`.
+  findings. What the local runtime does with a request is outside ColorAdapt's control. **Firefox** counts this as
+  data leaving the add-on, so the add-on declares the optional `websiteContent` data-collection permission and
+  Firefox itself asks for it the first time you press the button; without it nothing is sent, and you can withdraw it
+  at any time in the add-on's permissions. See `docs/AI_PRIVACY.md` and `docs/store/PRIVACY_POLICY.md`.
 - **No telemetry.** There is no analytics or crash-reporting SDK in this
   project, and none is planned as a default-on feature.
 - **Local diagnostics only.** When something recovers or fails, ColorAdapt writes one line to the browser's own

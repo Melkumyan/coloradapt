@@ -27,6 +27,8 @@ export const PROVIDER_FAILURES = [
   'blocked-endpoint',
   'too-large',
   'not-configured',
+  /** Firefox only: the optional `websiteContent` data-collection permission is not (or no longer) granted. */
+  'consent-required',
 ] as const;
 export type ProviderFailure = (typeof PROVIDER_FAILURES)[number];
 
@@ -57,6 +59,49 @@ export class DisabledProvider implements SemanticProvider {
 
   infer(): Promise<ProviderResult> {
     return Promise.resolve({ ok: false, failure: 'unavailable' });
+  }
+}
+
+/**
+ * Wraps a provider so that nothing is sent unless `allowed()` says the browser-level consent exists, checked
+ * again before every request (a permission revoked mid-run stops the next request). Without consent it
+ * answers `consent-required` and reaches nothing. It is the only thing in the product that knows of consent;
+ * the provider and the engine stay as they were.
+ */
+export class ConsentGatedProvider implements SemanticProvider {
+  readonly #inner: SemanticProvider;
+  readonly #allowed: () => Promise<boolean>;
+
+  constructor(inner: SemanticProvider, allowed: () => Promise<boolean>) {
+    this.#inner = inner;
+    this.#allowed = allowed;
+  }
+
+  get id(): SemanticProvider['id'] {
+    return this.#inner.id;
+  }
+
+  identity(): ProviderIdentity {
+    return this.#inner.identity();
+  }
+
+  async #permitted(): Promise<boolean> {
+    try {
+      return await this.#allowed();
+    } catch {
+      return false;
+    }
+  }
+
+  async health(signal?: AbortSignal): Promise<ProviderHealth> {
+    if (!(await this.#permitted())) return 'UNAVAILABLE';
+    return this.#inner.health(signal);
+  }
+
+  async infer(request: ProviderRequest, signal: AbortSignal): Promise<ProviderResult> {
+    if (!(await this.#permitted())) return { ok: false, failure: 'consent-required' };
+    if (signal.aborted) return { ok: false, failure: 'aborted' };
+    return this.#inner.infer(request, signal);
   }
 }
 

@@ -72,7 +72,7 @@ describe('build configuration', () => {
     }
   });
 
-  it('only the Firefox manifest carries the add-on id, and it declares no data collection', async () => {
+  it('only the Firefox manifest carries the add-on id, the minimum version and the data-collection declaration (M13: none required, website content optional)', async () => {
     type Manifest = {
       browser_specific_settings?: {
         gecko?: { id?: string; data_collection_permissions?: unknown };
@@ -83,8 +83,9 @@ describe('build configuration', () => {
     };
     expect(config.manifest({ browser: 'chrome' }).browser_specific_settings).toBeUndefined();
     expect(config.manifest({ browser: 'firefox' }).browser_specific_settings?.gecko).toEqual({
-      id: 'coloradapt@coloradapt.invalid',
-      data_collection_permissions: { required: ['none'] },
+      id: 'coloradapt@melkumyan',
+      strict_min_version: '140.0',
+      data_collection_permissions: { required: ['none'], optional: ['websiteContent'] },
     });
   });
 });

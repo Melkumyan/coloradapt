@@ -8,6 +8,7 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
+      'release/**',
       '.output/**',
       '.wxt/**',
       'node_modules/**',

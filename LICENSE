@@ -1,0 +1,36 @@
+ColorAdapt 0.1.0
+Copyright (c) 2026 the ColorAdapt authors. All Rights Reserved.
+
+PROPRIETARY LICENSE - ALL RIGHTS RESERVED
+
+1. Ownership. ColorAdapt (the "Software"), including its source code, build scripts, documentation, icons, store
+   graphics and text, is the copyrighted work of its authors. All rights not expressly granted in this license are
+   reserved.
+
+2. Use. The authors permit you to install and run the officially published builds of the Software, obtained from the
+   Chrome Web Store or Mozilla Add-ons, for your own personal or internal use, under the terms of the store through which
+   you obtained it.
+
+3. No other rights. Except as stated in section 2, or as applicable law gives you regardless of this license, you may
+   not copy, modify, adapt, translate, merge, publish, distribute, sublicense, sell, host, or create derivative works of
+   the Software or any part of it, and you may not use its name, icons or graphics to identify other products.
+
+4. Source made available for review. Source code may be supplied to browser-store operators and their reviewers so that
+   they can verify and rebuild a submitted package (for example the archive described in AMO_BUILD.md). That supply is
+   for review and reproducibility only. It does not make the Software open source and does not grant any right to reuse,
+   redistribute or modify it.
+
+5. Third-party components. The Software contains or is built with third-party components that keep their own copyright and
+   licenses (their notices are in THIRD_PARTY_NOTICES.txt, shipped with the Software; the bill of materials is generated
+   by `pnpm release:notices`). Nothing in this license changes, restricts or replaces the terms of those licenses.
+
+6. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+   LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. ColorAdapt is an aid
+   for reading color-dependent information; it is not a medical device and does not guarantee accessibility or
+   conformance with any standard. TO THE EXTENT PERMITTED BY LAW, THE AUTHORS ARE NOT LIABLE FOR ANY CLAIM OR DAMAGES
+   ARISING FROM THE USE OF THE SOFTWARE.
+
+7. Termination. Rights under section 2 end automatically if you violate this license.
+
+The identity of the publisher (name and contact) is given by the developer account of the store listing; this file does
+not state one.

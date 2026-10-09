@@ -139,8 +139,9 @@ export function AssistPanel({ assist }: { assist: SemanticAssistState }): JSX.El
       )}
       {assist.coverage === 'unavailable' && (
         <p role="alert" className="notice">
-          Local AI unavailable{assist.failure ? ` (${assist.failure})` : ''}. Nothing was sent
-          anywhere else; findings stay as they are.
+          {assist.failure === 'consent-denied' || assist.failure === 'consent-required'
+            ? 'AI-assisted review needs your permission to send a small summary of the findings to the model on this computer. It was not granted, so nothing was sent. The audit and manual review work as before.'
+            : `Local AI unavailable${assist.failure ? ` (${assist.failure})` : ''}. Nothing was sent anywhere else; findings stay as they are.`}
           {assist.failure === 'http-error' &&
             ' The runtime refused the request: Ollama only accepts requests from this extension if OLLAMA_ORIGINS includes chrome-extension://* .'}
         </p>

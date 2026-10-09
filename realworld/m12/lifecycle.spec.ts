@@ -74,9 +74,7 @@ for (const browser of BROWSERS) {
       expect(settings['enabled']).toBe(true); // the product default
       expect(settings['adaptImages']).toBe(false);
       expect(settings['semanticAIEnabled']).toBe(false);
-      expect(String(settings['semanticAIEndpoint'])).toMatch(
-        /^http:\/\/(127\.0\.0\.1|localhost|\[::1\])/,
-      );
+      expect(String(settings['semanticAIEndpoint'])).toMatch(/^http:\/\/(127\.0\.0\.1|localhost)/);
 
       // the UI opens without a fatal error
       for (const pagePath of ['popup.html', 'options.html']) {

@@ -126,11 +126,19 @@ describe('release gate (audit-dist)', () => {
       (m) =>
         (m['content_security_policy'] = {
           extension_pages:
-            "script-src 'self' 'unsafe-inline'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*",
+            "script-src 'self' 'unsafe-inline'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*",
         }),
     ],
     ['an optional permission', (m) => (m['optional_permissions'] = ['history'])],
     ['an unknown manifest key', (m) => (m['commands'] = {})],
+    [
+      'an IPv6 loopback source the browsers cannot parse',
+      (m) =>
+        (m['content_security_policy'] = {
+          extension_pages:
+            "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*",
+        }),
+    ],
   ];
   for (const [name, mutate] of widenings) {
     it(`fails on ${name}`, () => {
@@ -143,6 +151,8 @@ describe('release gate (audit-dist)', () => {
     ['a source map file', 'content-scripts/content.js.map', '{}'],
     ['a test file', 'content-scripts/thing.test.js', 'x'],
     ['a markdown note', 'NOTES.md', '# notes'],
+    ['an image that is not an icon', 'screenshot-01.png', 'x'],
+    ['a fake icon', 'icon-16.png', 'not a png'],
     ['eval', 'content-scripts/extra.js', 'eval("1")'],
     ['new Function', 'content-scripts/extra.js', 'new Function("return 1")'],
     ['a remote import', 'content-scripts/extra.js', 'import("https://cdn.example/x.js")'],
@@ -184,8 +194,9 @@ describe('release gate (audit-dist)', () => {
       manifest['name'] = 'ColorAdapt';
       manifest['browser_specific_settings'] = {
         gecko: {
-          id: 'coloradapt@coloradapt.invalid',
-          data_collection_permissions: { required: ['none'] },
+          id: 'coloradapt@melkumyan',
+          strict_min_version: '140.0',
+          data_collection_permissions: { required: ['none'], optional: ['websiteContent'] },
         },
       };
       mutateFirefox(manifest);

@@ -77,7 +77,7 @@ SPA, hostile CSP). Not verified: heap, DOM-node and listener counters of the 500
 expose them; the pipeline's own counters were flat: tracked 4 to 4, rules 1 to 1, one observer start).
 
 Firefox manifest: `wxt.config.ts` gives only the Firefox manifest `browser_specific_settings.gecko` with the id
-`coloradapt@coloradapt.invalid` (a placeholder until publication) and `data_collection_permissions: none`. The
+`coloradapt@melkumyan` (the permanent release id) and `data_collection_permissions: none`. The
 permissions are unchanged and identical in both browsers; `tests/core/audit/review-architecture.test.ts` checks it.
 
 ## Findings that changed the harness

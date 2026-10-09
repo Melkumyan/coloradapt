@@ -146,6 +146,23 @@ describe('AI panel: every coverage state has a word and a symbol', () => {
     expect(down.textContent).not.toMatch(/<[a-z]+/i);
   });
 
+  for (const failure of ['consent-denied', 'consent-required']) {
+    it(`says in words that the permission was not granted and nothing was sent (${failure}), without a retry control`, () => {
+      const element = render(
+        createElement(AssistPanel, {
+          assist: state({ coverage: 'unavailable', failure, stats: STATS }),
+        }),
+      );
+      const alert = element.querySelector('[role="alert"]')?.textContent ?? '';
+      expect(alert).toContain('needs your permission');
+      expect(alert).toContain('nothing was sent');
+      expect(alert).not.toContain('OLLAMA_ORIGINS');
+      // the run button stays the only way to ask again: no automatic prompt, no "retry" loop
+      expect(element.querySelectorAll('[data-testid="assist-run"]').length).toBe(1);
+      expect(element.textContent).not.toMatch(/retry|try again automatically/i);
+    });
+  }
+
   it('explains findings left alone because their elements differ, in words', () => {
     const element = render(
       createElement(AssistPanel, {

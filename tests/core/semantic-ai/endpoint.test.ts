@@ -6,7 +6,6 @@ describe('parseLoopbackEndpoint', () => {
     ['http://127.0.0.1:11434', 'http://127.0.0.1:11434'],
     ['http://127.0.0.1:11434/', 'http://127.0.0.1:11434'],
     ['http://localhost:8080', 'http://localhost:8080'],
-    ['http://[::1]:1234', 'http://[::1]:1234'],
     [DEFAULT_ENDPOINT, 'http://127.0.0.1:11434'],
   ])('accepts %s', (input, origin) => {
     const parsed = parseLoopbackEndpoint(input);

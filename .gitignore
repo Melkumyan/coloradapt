@@ -46,3 +46,6 @@ test-results/
 realworld/.tools/
 realworld/.artifacts/
 dist-profile/
+
+# M13 release candidate (generated; reproducible from source with `pnpm release:package`)
+/release/

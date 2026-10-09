@@ -16,6 +16,11 @@ import {
   type SemanticAssistDiagnostics,
 } from '@core/semantic-ai';
 import type { UserSettings } from '@domain/models';
+import {
+  requestWebsiteContentConsent,
+  watchWebsiteContentRevoked,
+  websiteContentAllowed,
+} from '@infrastructure/browser/data-consent';
 import { sendToTab } from '@infrastructure/messaging';
 
 /**
@@ -42,6 +47,19 @@ interface Verified {
   readonly generation: number;
   readonly hashes: ReadonlyMap<string, string>;
 }
+
+const EMPTY_STATS: AssistStats = {
+  eligible: 0,
+  queried: 0,
+  deduped: 0,
+  cacheHits: 0,
+  accepted: 0,
+  rejected: 0,
+  unresolved: 0,
+  modelErrors: 0,
+  timeouts: 0,
+  notQueued: 0,
+};
 
 export interface SemanticAssistState {
   readonly enabled: boolean;
@@ -81,7 +99,11 @@ export function useSemanticAssist(
       settings?.semanticAIModel,
     ],
   );
-  const engine = useMemo(() => new SemanticAssistEngine(createSemanticProvider(config)), [config]);
+  const engine = useMemo(
+    () =>
+      new SemanticAssistEngine(createSemanticProvider(config, undefined, websiteContentAllowed)),
+    [config],
+  );
 
   const [results, setResults] = useState<ReadonlyMap<string, Stored>>(new Map());
   const [verified, setVerified] = useState<Verified | null>(null);
@@ -127,6 +149,18 @@ export function useSemanticAssist(
 
   const run = useCallback(async (): Promise<void> => {
     if (!enabled || tabId === null || running) return;
+    // Firefox: the optional `websiteContent` consent is asked for here, first, from the click (nothing is read
+    // from the page, let alone sent, before it is granted). Denial ends the run: no retry, no request.
+    setRunning(true);
+    const consent = await requestWebsiteContentConsent();
+    if (consent === 'denied') {
+      setRunning(false);
+      cancel();
+      engine.cancelAll();
+      setFailure('consent-denied');
+      setSummary({ coverage: 'unavailable', stats: EMPTY_STATS });
+      return;
+    }
     cancel();
     engine.cancelAll();
     const mine = token.current;
@@ -179,21 +213,7 @@ export function useSemanticAssist(
       });
     } catch {
       if (token.current === mine) {
-        setSummary({
-          coverage: 'unavailable',
-          stats: {
-            eligible: 0,
-            queried: 0,
-            deduped: 0,
-            cacheHits: 0,
-            accepted: 0,
-            rejected: 0,
-            unresolved: 0,
-            modelErrors: 0,
-            timeouts: 0,
-            notQueued: 0,
-          },
-        });
+        setSummary({ coverage: 'unavailable', stats: EMPTY_STATS });
       }
     } finally {
       if (token.current === mine) {
@@ -228,6 +248,22 @@ export function useSemanticAssist(
     // `results` is read for its keys only, at the moment the page moved on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generation, behind, tabId, enabled]);
+
+  // Firefox: removing the consent in about:addons ends what is in flight and forgets what it answered.
+  useEffect(
+    () =>
+      watchWebsiteContentRevoked(() => {
+        cancel();
+        engine.cancelAll();
+        engine.cache.clear();
+        setResults(new Map());
+        setVerified(null);
+        setSummary({ coverage: 'unavailable', stats: EMPTY_STATS });
+        setFailure('consent-required');
+        setRunning(false);
+      }),
+    [cancel, engine],
+  );
 
   // Closing the page ends everything.
   useEffect(() => {

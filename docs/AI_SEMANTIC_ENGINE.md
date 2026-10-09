@@ -216,6 +216,12 @@ storage is replaced by `http://127.0.0.1:11434`), `semanticAIModel`. With the se
 storage): turning the review off in the options page aborts requests in flight, drops every answer and clears the
 cache, without a reload.
 
+**Firefox consent (M13).** The Firefox package declares the optional data-collection permission `websiteContent`. The
+run button asks for it first (Firefox shows its own prompt); a `ConsentGatedProvider` re-checks it before every request
+(`consent-required` when missing), and a withdrawal (`permissions.onRemoved`) cancels the run, drops the answers and
+clears the cache. Denied: nothing is read from the page for the review and nothing is sent. The Chrome package has no
+such key and no prompt. See `docs/AI_PRIVACY.md`, "Firefox consent".
+
 ## Runtime capability
 
 | Item                     | Status                                                                                                                                                                                                                                                                                                                                                                          |

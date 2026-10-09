@@ -140,6 +140,19 @@ if (existsSync(distDir)) {
     }
   }
 }
+// M13: the store upload archives and the AMO source archive (release/m13), read in memory.
+const releaseDir = path.join(ROOT, 'release', 'm13');
+if (existsSync(releaseDir)) {
+  for (const f of walk(releaseDir)) {
+    const rel = path.relative(ROOT, f).split(path.sep).join('/');
+    if (f.endsWith('.zip')) {
+      for (const entry of readZip(f))
+        zipEntries.push({ label: `${rel}!/${entry.name}`, text: entry.data.toString('utf8') });
+    } else if (/\.(json|md|txt)$|SHA256SUMS$/.test(f) && statSync(f).size <= 2_000_000) {
+      zipEntries.push({ label: rel, text: readFileSync(f, 'utf8') });
+    }
+  }
+}
 
 const findings = [];
 const classified = [];
@@ -170,7 +183,8 @@ for (const { label, text } of texts) {
       const allowed = ALLOW.find(
         (a) =>
           a.rule === rule &&
-          label.startsWith(a.file) &&
+          (label.startsWith(a.file) ||
+            (label.includes('.zip!/') && label.split('.zip!/')[1].startsWith(a.file))) &&
           (a.match === undefined || a.match === match[0].replace(/^https?:\/\//, '')),
       );
       (allowed ? classified : findings).push(allowed ? { ...hit, reason: allowed.reason } : hit);

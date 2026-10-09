@@ -26,8 +26,14 @@ before being merged.
 Since M12 the manifest carries one policy for the extension's own pages (popup, options, developer audit):
 
 ```
-script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*
+script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*
 ```
+
+The IPv6 loopback (`http://[::1]:*`) was part of the M12 policy and is gone (M13): both Chrome and Firefox were tested
+with every spelling (`http://[::1]:*`, with an explicit port, without a port, without a scheme, the long form); in
+neither can a CSP host source name `[::1]`, so the address was accepted by the settings page but blocked by the
+browser, and Firefox printed a parse warning. The endpoint parser no longer accepts it either, so what the settings
+page accepts and what the CSP permits are the same two hosts.
 
 Scripts are the extension's own files only (no `eval`, no inline script, no remote script, no `wasm-unsafe-eval`), and
 the pages can connect to themselves and to this computer's loopback only (where the optional local model runtime
@@ -130,13 +136,13 @@ it can contact only this computer's loopback (`docs/AI_PRIVACY.md`, `docs/AI_PRO
 - **One place, one rule.** `core/semantic-ai/local-provider.ts` is the only AI code that calls `fetch` (a static test
   pins it, and `realworld/dist.spec.ts` pins it in the built bundles: the content script and the background contain
   no model path or client). It runs in the audit page only.
-- **The endpoint is hostile input.** It is matched, as typed, against `^http://(127.0.0.1|localhost|[::1]):<1024-65535>/?$`
+- **The endpoint is hostile input.** It is matched, as typed, against `^http://(127.0.0.1|localhost):<1024-65535>/?$`
   in lower case, in settings (anything else is replaced by the default when read) and again before every request.
   `localhost.evil.com`, `127.0.0.1.evil.com`, `127.0.0.1@evil.com`, `evil.com@127.0.0.1`, `2130706433`, `0x7f000001`,
   `0177.0.0.1`, `127.1`, `127.0.1`, `[::ffff:127.0.0.1]`, `[::1].evil.com`, percent-encoded and full-width spellings,
   mixed case, a trailing dot, userinfo, a path, a query, a fragment, other 127.x addresses, `0.0.0.0`, private and
   public addresses, IPv6 variants and `https` are refused with no request (a corpus of about 70 spellings, plus 4000
-  random hosts, in `tests/core/semantic-ai/m11r1-network.test.ts`). Only three literal hosts exist, so there is no
+  random hosts, in `tests/core/semantic-ai/m11r1-network.test.ts`). Only two literal hosts exist, so there is no
   name to resolve and DNS rebinding has nothing to rebind.
 - **No redirect escape.** `redirect: 'error'`: a 3xx is a failure, so a loopback server that answers
   `302 → https://example.com` (or another loopback port) never makes the extension contact the target (tested against

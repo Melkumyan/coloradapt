@@ -68,6 +68,9 @@ export function SummaryBar({ summary }: { summary: AuditSummary }): JSX.Element 
 }
 
 /** What was and was not audited: a clean result is only about the part that was looked at. */
+/** Milestone numbers are project history, not words for the person reading the page: the audit page leaves them out. */
+const withoutMilestone = (name: string): string => name.replace(/\s*\(M\d+(?:–M\d+)?\)/g, '');
+
 export function CoveragePanel({ coverage }: { coverage: AuditCoverage }): JSX.Element {
   const limited =
     coverage.analysisTruncated ||
@@ -97,7 +100,7 @@ export function CoveragePanel({ coverage }: { coverage: AuditCoverage }): JSX.El
         <tbody>
           {coverage.subsystems.map((s) => (
             <tr key={s.id} data-coverage={s.id} data-level={s.level}>
-              <th scope="row">{s.name}</th>
+              <th scope="row">{withoutMilestone(s.name)}</th>
               <td>{COVERAGE_LEVEL_LABEL[s.level]}</td>
               <td>{s.note}</td>
             </tr>
@@ -364,13 +367,7 @@ export function FindingCard({
                   {MODEL_CONFIDENCE_LABEL[sim.modelConfidence]} ({sim.fidelity}).
                 </li>
               ))}
-              <li>
-                Source: {finding.source.primary} {finding.source.subsystem}
-                {finding.source.contributing.length > 0
-                  ? ` (with ${finding.source.contributing.join(', ')})`
-                  : ''}
-                .
-              </li>
+              <li>Source: {finding.source.subsystem}.</li>
               {finding.wcag.length > 0 && (
                 <li>
                   Related to {finding.wcag.map((w) => `WCAG ${w.criterion} ${w.name}`).join('; ')} —

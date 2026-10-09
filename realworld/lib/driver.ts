@@ -33,7 +33,7 @@ import path from 'node:path';
 
 export const ROOT = path.resolve(import.meta.dirname, '..', '..');
 export const SETTINGS_KEY = 'coloradapt:settings';
-export const FIREFOX_ID = 'coloradapt@coloradapt.invalid';
+export const FIREFOX_ID = 'coloradapt@melkumyan';
 export const FIREFOX_UUID = '5d1c9a3e-7b2f-4c11-9a55-0d6f3e8b1a42';
 
 export type BrowserName = 'chrome' | 'firefox';
@@ -497,6 +497,8 @@ export interface FirefoxOptions {
   readonly prefs?: Record<string, unknown>;
   /** Use (and keep) this profile directory: browser restart scenarios. */
   readonly profileDir?: string;
+  /** M13: let the test run privileged (chrome-context) scripts, to answer Firefox's native permission prompt. */
+  readonly systemAccess?: boolean;
   /** Test-side failure evidence (M12.R1-P04): observes and records, never retries or alters a result. */
   readonly evidence?: EvidenceRecorder;
 }
@@ -740,9 +742,19 @@ export class FirefoxDriver implements Driver {
       // same two pipes. Both go to files from the first byte: the cause may predate any failure.
       const out = evidence.sink('firefox.log');
       const err = evidence.sink('geckodriver.log');
-      this.#proc = spawn(geckodriverBinary(), ['--port', String(port), '--log', 'trace'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      this.#proc = spawn(
+        geckodriverBinary(),
+        [
+          '--port',
+          String(port),
+          '--log',
+          'trace',
+          ...(this.#opts.systemAccess ? ['--allow-system-access'] : []),
+        ],
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+        },
+      );
       this.#proc.stdout?.on('data', (chunk: Buffer) => out.write(chunk));
       this.#proc.stderr?.on('data', (chunk: Buffer) => err.write(chunk));
       this.#proc.on('exit', (code, signal) =>
@@ -750,7 +762,11 @@ export class FirefoxDriver implements Driver {
       );
       evidence.event('geckodriver.spawn', { port, pid: this.#proc.pid ?? null });
     } else {
-      this.#proc = spawn(geckodriverBinary(), ['--port', String(port)], { stdio: 'ignore' });
+      this.#proc = spawn(
+        geckodriverBinary(),
+        ['--port', String(port), ...(this.#opts.systemAccess ? ['--allow-system-access'] : [])],
+        { stdio: 'ignore' },
+      );
     }
     for (let i = 0; i < 40; i++) {
       await sleep(250);
@@ -783,9 +799,10 @@ export class FirefoxDriver implements Driver {
             webSocketUrl: true,
             'moz:firefoxOptions': {
               binary: firefoxBinary(),
-              args: this.#opts.profileDir
-                ? ['-headless', '-profile', this.#opts.profileDir]
-                : ['-headless'],
+              args: [
+                '-headless',
+                ...(this.#opts.profileDir ? ['-profile', this.#opts.profileDir] : []),
+              ],
               prefs,
             },
             timeouts: { script: 180_000, pageLoad: 45_000 },

@@ -63,6 +63,33 @@ The Firefox restart test (P04) records failure evidence to `realworld/.artifacts
 browser console, every BiDi log entry, a correlated timeline, the raw extension-side error, process and profile state;
 `failure.json` only on failure). It is test-side only and is described in `docs/m12/protocol.md` section 12.
 
+## Store release (M13)
+
+`docs/store/STORE_RELEASE.md` is the procedure and the decisions; `AMO_BUILD.md` is the reviewer's build recipe.
+
+```bash
+pnpm release:icons        # (rarely) re-render public/icon-*.png and the store icon from assets/store/icon.svg (needs Chrome via Playwright)
+pnpm release:notices      # rewrite public/THIRD_PARTY_NOTICES.txt from the installed production dependencies
+pnpm build && pnpm release:assets   # store screenshots and promo tile from the real extension (needs Chrome)
+pnpm release:site         # (re)render public-site/{privacy,support}/index.html from docs/store/PRIVACY_POLICY.md and SUPPORT.md (`--check` in the tests)
+pnpm release:package      # fresh builds -> release/m13/ (Chrome zip, Firefox zip, source zip, inventories, SHA256SUMS)
+pnpm release:validate     # reads release/m13/ and the store documents; never writes; exit 1 on any failed check
+pnpm release:rebuild      # the AMO reviewer rebuild from the source zip in an empty folder; the archives must be byte-identical
+```
+
+Real-browser evidence for the store decisions (Firefox 140+ and Chrome; `pnpm build` and `pnpm build:firefox` first, and
+`pnpm release:package` for the fresh-install spec):
+
+```bash
+pnpm exec playwright test -c playwright.realworld.config.ts realworld/m13/consent.spec.ts       # Firefox native data-collection prompt
+pnpm exec playwright test -c playwright.realworld.config.ts realworld/m13/loopback.spec.ts      # loopback-only endpoint policy, both browsers
+pnpm exec playwright test -c playwright.realworld.config.ts realworld/m13/csp-console.spec.ts   # no CSP warning from ColorAdapt
+pnpm exec playwright test -c playwright.realworld.config.ts realworld/m13/fresh-install.spec.ts # the release archives in a fresh profile
+```
+
+The consent spec answers Firefox's own prompt through geckodriver's privileged context (`--allow-system-access`,
+`FirefoxOptions.systemAccess`). `release/` is git-ignored: the archives are reproducible from the sources.
+
 ## Tests, lint, typecheck
 
 ```bash

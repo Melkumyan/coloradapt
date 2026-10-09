@@ -2,6 +2,7 @@
   "name": "coloradapt",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Browser extension that adapts web pages for people with color vision deficiencies",
   "type": "module",
   "scripts": {
@@ -29,6 +30,13 @@
     "knip:diff": "node scripts/release/knip-diff.mjs",
     "release:hash": "node scripts/release/candidate-hash.mjs",
     "release:repro": "node scripts/release/repro-check.mjs --zip",
+    "release:icons": "node scripts/release/render-icons.mjs",
+    "release:notices": "node scripts/release/third-party.mjs --write",
+    "release:package": "node scripts/release/package.mjs",
+    "release:assets": "playwright test -c playwright.realworld.config.ts realworld/m13/store-assets.spec.ts",
+    "release:site": "node scripts/release/public-site.mjs",
+    "release:validate": "node scripts/release/validate.mjs",
+    "release:rebuild": "node scripts/release/rebuild-from-source.mjs",
     "verify": "pnpm lint && pnpm typecheck && pnpm format:check && pnpm test && pnpm build && pnpm audit:dist"
   },
   "dependencies": {

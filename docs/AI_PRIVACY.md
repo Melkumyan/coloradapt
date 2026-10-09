@@ -6,15 +6,16 @@ send. It adds no permission, no host, no account, no key and no telemetry.
 
 ## Summary
 
-| Question                                        | Answer                                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Is it on?                                       | No. `semanticAIEnabled` is `false`; an upgrade never changes it; a site cannot change it                   |
-| Does the extension need it?                     | No. Adaptation and the audit are identical with it off; there is no code path that waits for a model       |
-| When does anything leave the audit page?        | Only after the developer presses **Run AI-assisted review**, with the setting on                           |
-| Where can it go?                                | Only to `http://127.0.0.1:<port>`, `http://localhost:<port>` or `http://[::1]:<port>`; nowhere else        |
-| Is there a cloud provider or a fallback to one? | No provider value exists for one; if the local runtime is unavailable the answer is "unavailable"          |
-| Is anything stored?                             | No. No prompt, packet or answer is written to `storage`, `localStorage`, IndexedDB or a cache              |
-| What does an export contain of it?              | Labels, ids, statuses, a packet fingerprint, the provider type and model name; no prompt and no model text |
+| Question                                        | Answer                                                                                                                              |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Is it on?                                       | No. `semanticAIEnabled` is `false`; an upgrade never changes it; a site cannot change it                                            |
+| Does the extension need it?                     | No. Adaptation and the audit are identical with it off; there is no code path that waits for a model                                |
+| When does anything leave the audit page?        | Only after the developer presses **Run AI-assisted review**, with the setting on                                                    |
+| Where can it go?                                | Only to `http://127.0.0.1:<port>` or `http://localhost:<port>`; nowhere else (IPv6 loopback is not offered)                         |
+| Is there a cloud provider or a fallback to one? | No provider value exists for one; if the local runtime is unavailable the answer is "unavailable"                                   |
+| Does the browser ask first?                     | Firefox: yes, once, natively (optional `websiteContent`, see "Firefox consent"). Chrome: no prompt exists; the button is the action |
+| Is anything stored?                             | No. No prompt, packet or answer is written to `storage`, `localStorage`, IndexedDB or a cache                                       |
+| What does an export contain of it?              | Labels, ids, statuses, a packet fingerprint, the provider type and model name; no prompt and no model text                          |
 
 ColorAdapt controls what it sends and where; it cannot control what the model runtime on your computer does with
 a request (log it, forward it, display it). Use a runtime you trust. "Local" is a statement about where
@@ -97,7 +98,7 @@ textarea, `contenteditable`, hidden fields) placed next to the elements being as
   response bounded to 64 KiB while it is read, and a check that the answer came from the same origin. A request
   to a redirect target or a second loopback port is never made.
 - The configured address is hostile input. It must match
-  `^http://(127.0.0.1|localhost|[::1]):<port 1024–65535>/?$` as typed, in lower case, so `localhost.evil.com`,
+  `^http://(127.0.0.1|localhost):<port 1024–65535>/?$` as typed, in lower case, so `localhost.evil.com`,
   `127.0.0.1.evil.com`, `127.0.0.1@evil.com`, decimal / hex / octal / short IPv4 spellings (`2130706433`,
   `0x7f.1`, `127.1`, `127.0.1`, `0177.0.0.1`), percent-encoded or full-width spellings, other loopback addresses, `0.0.0.0`, private and public addresses, IPv6 variants, `https`,
   credentials, a path, a query and a fragment are all refused, in settings (the value is replaced by the default
@@ -107,7 +108,7 @@ textarea, `contenteditable`, hidden fields) placed next to the elements being as
   from the extension (for Ollama set `OLLAMA_ORIGINS` to include `chrome-extension://*`, and `moz-extension://*` for
   Firefox). ColorAdapt never changes the runtime's configuration and never works around its refusal (HTTP 403 is
   reported as "unavailable", with the status only, never the body).
-- Only the three literal loopback spellings are accepted as a host, so there is no name to resolve and nothing for
+- Only the two literal loopback spellings are accepted as a host, so there is no name to resolve and nothing for
   DNS rebinding to rebind (`localhost` is the one name; every other hostname is refused before any request).
 - The model has no tools: its output has no field that could name a URL, a command or a page change.
 
@@ -128,3 +129,33 @@ supporting deterministic evidence (id, source, bounded value), and a fingerprint
 provider type and model name, the schema and instruction versions, the coverage and counts. Never the prompt,
 the packet, the provider's raw answer or reasoning, provider logs, or the endpoint. The report parser rejects an
 entry with a field outside the schema.
+
+## Firefox consent (M13)
+
+Firefox treats anything that leaves the add-on, even to this computer's own runtime, as data handled outside the
+add-on, and has a built-in consent mechanism for it (Firefox 140 and later). The Firefox package therefore declares
+
+```json
+"data_collection_permissions": { "required": ["none"], "optional": ["websiteContent"] }
+```
+
+and `strict_min_version` 140.0, so no Firefox without the mechanism can install it. `websiteContent` is the
+narrowest category that fits what a packet holds (short visible labels and accessible names from the page); nothing
+about browsing activity, search terms or personal identifiers is declared because none is collected.
+
+- **Required: none.** Adaptation, the audit and everything else work with nothing granted. An upgrade or install
+  shows no data-collection prompt for them.
+- **Optional `websiteContent`.** Requested only when the developer presses **Run AI-assisted review** (never on
+  install, startup or page load, never in the background). Firefox shows its own prompt.
+- **Denied:** nothing is sent, the panel says the permission was not granted, the deterministic audit and manual
+  review are unchanged, and ColorAdapt does not ask again until the button is pressed again.
+- **Granted:** requests go to the loopback endpoint as before. The permission is checked again before **every**
+  request (`ConsentGatedProvider`), so a withdrawal takes effect at the next request.
+- **Withdrawn** (add-on permissions page, or removed by the add-on): the run in flight is cancelled, answers
+  already shown are forgotten, no further request is sent.
+- **Chrome** has no such manifest key and no prompt; the explicit button press, the setting that is off by default
+  and the disclosure in the store listing are its consent.
+
+Verified in real Firefox 151 against a counting loopback runtime (`realworld/m13/consent.spec.ts`): fresh install
+nothing granted and 0 requests; Run then Deny: 0 requests; Run then Allow: the runtime is reached; withdrawn and
+denied again: 0 new requests; withdrawn while a request is held open: the run ends and no further request is made.

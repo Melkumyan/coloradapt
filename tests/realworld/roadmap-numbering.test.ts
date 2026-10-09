@@ -64,9 +64,9 @@ describe('roadmap numbering', () => {
     }
   });
 
-  it('the store publication (the Firefox add-on id placeholder) belongs to M13', () => {
+  it('the permanent Firefox add-on id was decided by the store release validation (M13.R1)', () => {
     const config = readFileSync(path.join(ROOT, 'wxt.config.ts'), 'utf8');
-    expect(config).toMatch(/published \(M13/);
-    expect(config).not.toMatch(/published \(M1[0-24]/);
+    expect(config).toContain("id: 'coloradapt@melkumyan'");
+    expect(config).toContain('owner-chosen canonical id for 0.1.0 (M13.R1)');
   });
 });

@@ -1,5 +1,5 @@
 import { LocalSemanticProvider, type FetchLike } from './local-provider';
-import { DisabledProvider, type SemanticProvider } from './provider';
+import { ConsentGatedProvider, DisabledProvider, type SemanticProvider } from './provider';
 import type { SelectableProviderId } from './taxonomy';
 
 /** The part of the user's settings that picks a provider. */
@@ -18,12 +18,15 @@ export interface ProviderConfig {
 export function createSemanticProvider(
   config: ProviderConfig,
   fetchImpl?: FetchLike,
+  /** The browser's data-collection consent (Firefox); when given, every request asks it first. */
+  consent?: () => Promise<boolean>,
 ): SemanticProvider {
   if (!config.enabled) return new DisabledProvider();
-  return new LocalSemanticProvider({
+  const local = new LocalSemanticProvider({
     protocol: config.provider,
     endpoint: config.endpoint,
     model: config.model === '' ? null : config.model,
     ...(fetchImpl ? { fetch: fetchImpl } : {}),
   });
+  return consent ? new ConsentGatedProvider(local, consent) : local;
 }

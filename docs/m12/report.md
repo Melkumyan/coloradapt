@@ -232,7 +232,7 @@ fails on widening.
 | `externally_connectable`                              | none                                                                                                            | no page or other extension can message the extension                                                                           |
 | `content_security_policy` (extension pages)           | `script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*` | scripts only from the package; network only to itself and the loopback (the optional local AI client)                          |
 | `background`, `action`/`browser_action`, `options_ui` | service worker / background page, popup, options                                                                | the extension's own pages                                                                                                      |
-| Firefox only: `browser_specific_settings.gecko`       | id `coloradapt@coloradapt.invalid`, `data_collection_permissions: none`                                         | a stable id for MV2 and signing; a placeholder until M13                                                                       |
+| Firefox only: `browser_specific_settings.gecko`       | id `coloradapt@melkumyan`, `data_collection_permissions: none`                                                  | a stable id for MV2 and signing; a placeholder until M13 (final id chosen in M13.R1)                                           |
 
 Nothing was removable: every entry is used. **Manifest parity (P16):** the two manifests differ only in manifest
 version, where host patterns are listed, the background form, the action key and the Firefox add-on id; name,

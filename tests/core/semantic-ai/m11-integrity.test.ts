@@ -139,9 +139,13 @@ describe('M11 defaults', () => {
       const parsed = parseUserSettings({ semanticAIEnabled: true, semanticAIEndpoint: endpoint });
       expect(parsed.semanticAIEndpoint).toBe(DEFAULT_USER_SETTINGS.semanticAIEndpoint);
     }
+    // The IPv6 loopback is not offered: no browser can express it in the extension CSP (M13).
     expect(parseUserSettings({ semanticAIEndpoint: 'http://[::1]:1234/' }).semanticAIEndpoint).toBe(
-      'http://[::1]:1234',
+      DEFAULT_USER_SETTINGS.semanticAIEndpoint,
     );
+    expect(
+      parseUserSettings({ semanticAIEndpoint: 'http://localhost:1234/' }).semanticAIEndpoint,
+    ).toBe('http://localhost:1234');
   });
 
   it('accepts only the known providers and plain model names', () => {

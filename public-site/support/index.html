@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>ColorAdapt support</title>
+<style>:root{color-scheme:light dark;--bg:#fff;--fg:#1a1a1a;--muted:#4a4a4a;--link:#0b4f9c;--rule:#c9c9c9;--code:#f0f0f0}
+@media (prefers-color-scheme:dark){:root{--bg:#16181c;--fg:#ececec;--muted:#b5b5b5;--link:#8ab8ff;--rule:#3a3d44;--code:#262a31}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:1rem/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header,main,footer{max-width:46rem;margin:0 auto;padding:0 1rem}
+header{padding-top:1rem;border-bottom:1px solid var(--rule)}
+nav ul{display:flex;flex-wrap:wrap;gap:1rem;margin:0 0 .75rem;padding:0;list-style:none}
+a{color:var(--link);text-underline-offset:.15em}
+a:focus-visible{outline:3px solid currentColor;outline-offset:2px}
+h1{font-size:1.75rem;line-height:1.25;margin:1.5rem 0 .5rem}
+h2{font-size:1.3rem;line-height:1.3;margin:2rem 0 .5rem}
+h1,h2,p,li{overflow-wrap:anywhere}
+li{margin:.25rem 0}
+code{background:var(--code);padding:.1em .3em;border-radius:3px;font-size:.92em;overflow-wrap:anywhere}
+footer{padding-top:1rem;padding-bottom:2rem;margin-top:2rem;border-top:1px solid var(--rule);color:var(--muted);font-size:.9rem}</style>
+</head>
+<body>
+<header><nav aria-label="ColorAdapt"><ul><li><a href="../privacy/">Privacy policy</a></li><li><a href="../support/" aria-current="page">Support</a></li></ul></nav></header>
+<main id="main">
+<h1>ColorAdapt support</h1>
+<h2>How to report a problem</h2>
+<p>Use the support route on the store listing page for ColorAdapt (the publisher provides it; this repository does not carry a contact address). Please include: the browser and its version, the ColorAdapt version (shown in the browser's extension page), the color-vision profile you selected, the address of a page where it happens if it is public, and what you expected. <strong>Do not send screenshots or reports of pages that show personal information.</strong> A developer-audit export contains element locators and short redacted text snippets; read it before you share it.</p>
+<h2>Supported browsers</h2>
+<ul>
+<li>Google Chrome (desktop), current stable. Tested with Chrome 154 on Windows 11.</li>
+<li>Mozilla Firefox (desktop) <strong>140 or later</strong>. Tested with Firefox 151 on Windows 11. Older Firefox cannot install it.</li>
+</ul>
+<p>Other Chromium browsers and Firefox for Android are not tested and not supported.</p>
+<h2>Basic troubleshooting</h2>
+<ul>
+<li><strong>Nothing changes on a page.</strong> Open the toolbar popup: Protection must be ON and the vision profile must not be &quot;Normal vision&quot; (that profile adapts nothing). Reload the page after changing the profile on a page opened before you installed the extension. ColorAdapt does not run on browser pages (<code>chrome://</code>, <code>about:</code>), the extension stores' pages, local <code>file://</code> pages or pages your browser blocks extensions from.</li>
+<li><strong>A page looks the same as before in some places.</strong> ColorAdapt is deliberately conservative: it changes only colors it is confident about and leaves photographs, logos, gradients, complex graphics and uncertain cases alone.</li>
+<li><strong>I want the original page back.</strong> Turn Protection off in the popup; the page returns to what the site made it. Reload if a page was already open when the browser updated the extension (Firefox keeps its old styling until the tab reloads).</li>
+<li><strong>Settings do not load.</strong> The popup says so and the page stays unadapted; close and reopen the popup, or restart the browser. If it persists, remove and reinstall the extension (this resets the settings).</li>
+<li><strong>Charts or icons are unchanged.</strong> Only simple inline-SVG charts with a clear legend, and single-color icons, are adapted. Canvas charts, heatmaps and stacked areas are reported by the developer audit but left alone.</li>
+</ul>
+<h2>Optional AI-assisted review (Ollama and similar)</h2>
+<p>The AI-assisted review is <strong>optional, off by default and not needed</strong> for anything else in ColorAdapt. It requires a language-model runtime that you install and run yourself on your own computer; ColorAdapt does not include one and has no cloud option.</p>
+<ol>
+<li>Install a runtime such as <a href="https://ollama.com" rel="noopener noreferrer">Ollama</a> and pull a model.</li>
+<li>Allow requests from the extension: for Ollama set the environment variable <code>OLLAMA_ORIGINS</code> to include <code>chrome-extension://*</code> (Chrome) or <code>moz-extension://*</code> (Firefox; Firefox gives every installation a random internal address, so the wildcard is the correct form), then restart Ollama.</li>
+<li>In ColorAdapt's settings turn on &quot;Enable AI-assisted review in the developer audit&quot;, choose the provider, keep the address <code>http://127.0.0.1:11434</code> (or the <code>localhost</code> form; <strong>only <code>127.0.0.1</code> and <code>localhost</code> with a port are accepted; the IPv6 address <code>[::1]</code> is not</strong>), and enter the model name.</li>
+<li>Open the developer audit and press <strong>Run AI-assisted review</strong>. In Firefox the browser asks for your permission the first time; you can withdraw it later in the add-on's permissions.</li>
+</ol>
+<p>If it says the local AI is unavailable: the runtime is not running or not at that address; a firewall or a wrong port; <code>OLLAMA_ORIGINS</code> is not set (the runtime answers 403); or the model name is wrong. Nothing was sent anywhere else, and the manual-review findings are unchanged. The review never changes a finding or a page.</p>
+<h2>Known limitations</h2>
+<ul>
+<li>Adaptation is an estimate based on common color-vision models. It is not a medical tool and does not restore color vision or replace professional advice.</li>
+<li>Some complex graphics, canvas charts, photographs and uncertain cases remain unchanged, and some findings are left for manual review. ColorAdapt does not make a page WCAG-compliant.</li>
+<li>The interface is in English only.</li>
+<li>In Firefox, after the extension updates or reloads, a page that was already open keeps its previous adaptation until you reload the tab.</li>
+<li>Very large page updates (thousands of elements at once) may take a moment to finish adapting.</li>
+<li>On rare occasions Firefox cannot read the extension's settings at start; ColorAdapt then leaves the page unadapted and tells you, instead of changing anything.</li>
+</ul>
+<h2>Privacy and support route</h2>
+<p>See <a href="../privacy/">the privacy policy</a>. ColorAdapt sends no telemetry, so support never needs your data: you decide what, if anything, to share.</p>
+</main>
+<footer>ColorAdapt 0.1.0. This page is static: it has no scripts, trackers, cookies or forms.</footer>
+</body>
+</html>

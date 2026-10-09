@@ -9,16 +9,16 @@ page, estimates which specific foreground/background combinations are
 likely to be hard to distinguish, and adjusts only those elements —
 leaving the rest of the page's design untouched.
 
-> **Status: early-stage foundation.** This repository currently implements
-> a minimal, real (not mocked) vertical slice: contrast-based conflict
-> detection plus a reversible color fix, wired end-to-end through the
-> Popup UI. See `docs/ROADMAP.md` for what's planned next.
+> **Status: store release candidate (0.1.0).** Color-vision science status (M2) is PARTIAL: adaptation is an
+> estimate, not a medical tool. Store packaging, privacy and reviewer material are in `docs/store/`; the Firefox
+> reviewer build is `AMO_BUILD.md`. See `docs/ROADMAP.md`.
 
 ## Supported browsers
 
-- Google Chrome (Manifest V3)
-- Microsoft Edge (Manifest V3)
-- Mozilla Firefox (Manifest V2, built from the same source)
+- Google Chrome (Manifest V3; tested on 154)
+- Mozilla Firefox 140 or later (Manifest V2, built from the same source; tested on 151). The 140 minimum is the first
+  Firefox with built-in data-collection consent, which the optional AI review uses.
+- Microsoft Edge and other Chromium browsers load the Chrome build but are not tested and not offered by the stores.
 
 ## Architecture
 
@@ -103,7 +103,7 @@ switched on by an upgrade, and the extension works identically without it. When 
 asks a model running **on your own computer** (Ollama, or any runtime behind a small loopback protocol) what a
 `manual-review` finding may mean ("Likely meaning" or "Needs review"), sending only small, redacted, bounded
 summaries (no form values, URLs, ids, class lists or page text beyond a few short labels) to
-`127.0.0.1`, `localhost` or `[::1]` and nowhere else; there is no cloud provider and no fallback to one. The model's
+`127.0.0.1` or `localhost` and nowhere else (Firefox asks for the optional `websiteContent` data permission first); there is no cloud provider and no fallback to one. The model's
 answer is parsed into a label and evidence ids and then judged by deterministic code from the audit's own evidence;
 a model's confidence never authorizes anything, and it cannot override, suppress or create a finding, or change a
 page. Results live in memory, are labelled as AI-assisted, and travel in a separate `semanticAssist` section of the
@@ -203,7 +203,7 @@ M0 (this repository) through M14 are tracked in `docs/ROADMAP.md`:
 - M10: real-world validation (M10.R1 is its findings closeout)
 - M11: the optional, local, advisory AI semantic engine (`docs/AI_SEMANTIC_ENGINE.md`)
 - M12: production hardening
-- M13: store release
+- M13: store release; M13.R1: store submission validation and release freeze (`docs/store/`)
 - M14: advanced product
 
 ## Scientific accuracy note
@@ -214,3 +214,8 @@ Vision simulations use published color vision deficiency models
 accessibility purposes — not a medical model of any individual's actual
 perception, and not a diagnostic tool. See `docs/COLOR_VISION_SIMULATION.md`
 for sources, policies, and limitations.
+
+## License
+
+ColorAdapt is proprietary software: **All Rights Reserved** (see `LICENSE`). Source supplied to store reviewers is for
+review and reproducibility only. Bundled third-party libraries keep their own licenses (`public/THIRD_PARTY_NOTICES.txt`).
